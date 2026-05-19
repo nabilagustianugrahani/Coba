@@ -1,61 +1,78 @@
 import logging
 import os
+import json
+import modal
 from scraper.scraper import EcommerceScraper
 from evaluator.evaluator import FYPEvaluator
+from video_processor.auto_editor import AutoEditor
 from uploader.uploader import SocialUploader
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def generate_video_locally(script: str, video_path: str):
-    """
-    Simulates calling Modal to actually produce the bytes, and saves locally.
-    In a fully distributed environment, this calls `modal run` or the deployed webhook.
-    """
-    logger.info("Connecting to Modal H100 generation pipeline...")
+from modal_gpu.modal_app import (
+    app as modal_app,
+    generate_base_video,
+    face_swap_consistency,
+    generate_voiceover,
+    lip_sync_video
+)
+
+def get_face_bytes():
+    face_path = "assets/influencer_face.jpg"
+    if os.path.exists(face_path):
+        with open(face_path, "rb") as f:
+            return f.read()
+    return b"dummy_face_bytes"
+
+def generate_video_modal_remote(swarm_data: dict, video_path: str):
+    logger.info("Connecting to Modal B200 God-Tier pipeline...")
     try:
-        from modal_gpu.modal_app import generate_influencer_character, generate_voiceover, animate_character
+        narration = swarm_data["narration"]
+        motion_prompt = swarm_data["avatar_motion_prompt"]
+        face_bytes = get_face_bytes()
 
-        # 1. Generate Image (Consistency)
-        logger.info("Generating consistent Influencer Image...")
-        prompt = "Portrait of a beautiful Indonesian female e-commerce influencer, highly detailed, photorealistic, standing in a studio, 8k resolution, 9:16 aspect ratio"
-        image_bytes = generate_influencer_character.local(prompt)
+        # Check if modal token exists, otherwise fallback to local execution for testing
+        if os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml")):
+            with modal_app.run():
+                logger.info("Generating Text-to-Video Base remotely on Modal...")
+                base_vid_bytes = generate_base_video.remote(motion_prompt)
 
-        if not image_bytes:
-            logger.error("Failed to generate image bytes.")
-            return False
+                logger.info("Applying FaceFusion remotely on Modal...")
+                swapped_vid_bytes = face_swap_consistency.remote(base_vid_bytes, face_bytes)
 
-        # 2. Generate Voice (Zero-cost TTS)
-        logger.info("Generating TTS Voiceover...")
-        audio_bytes = generate_voiceover.local(script)
+                logger.info("Generating Edge-TTS Audio remotely on Modal...")
+                audio_bytes = generate_voiceover.remote(narration)
 
-        if not audio_bytes:
-            logger.error("Failed to generate audio bytes.")
-            return False
+                logger.info("Running LivePortrait Lip-Sync remotely on Modal...")
+                synced_vid_bytes = lip_sync_video.remote(swapped_vid_bytes, audio_bytes)
+        else:
+            logger.warning("No Modal Token found. Falling back to local execution for pipeline testing.")
+            logger.info("Generating Text-to-Video Base locally...")
+            base_vid_bytes = generate_base_video.local(motion_prompt)
+            logger.info("Applying FaceFusion locally...")
+            swapped_vid_bytes = face_swap_consistency.local(base_vid_bytes, face_bytes)
+            logger.info("Generating Edge-TTS Audio locally...")
+            audio_bytes = generate_voiceover.local(narration)
+            logger.info("Running LivePortrait Lip-Sync locally...")
+            synced_vid_bytes = lip_sync_video.local(swapped_vid_bytes, audio_bytes)
 
-        # 3. Animate (Video composite)
-        logger.info("Animating Video...")
-        video_bytes = animate_character.local(image_bytes, audio_bytes)
-
-        if not video_bytes:
-            logger.error("Failed to generate final video bytes.")
-            return False
+        logger.info("Applying Auto-Captions locally...")
+        editor = AutoEditor()
+        final_video_bytes = editor.apply_hormozi_captions(synced_vid_bytes, audio_bytes, narration)
 
         with open(video_path, "wb") as f:
-            f.write(video_bytes)
+            f.write(final_video_bytes)
 
         return True
-    except ImportError as e:
-        logger.error(f"Modal pipeline not accessible locally without environment setup: {e}")
-        return False
     except Exception as e:
-        logger.error(f"Error executing Modal generation: {e}")
+        logger.error(f"Error executing Modal pipeline: {e}")
         return False
 
 def main():
-    logger.info("Starting UGC AI Overpower Pipeline...")
+    logger.info("Starting God-Tier UGC Pipeline (B200 Setup)...")
 
-    # 1. Scrape top affiliate products
+    # 1. Scrape
     scraper = EcommerceScraper()
     niche = os.getenv("UGC_NICHE", "beauty")
     products = scraper.get_best_products(niche=niche)
@@ -64,32 +81,44 @@ def main():
         return
 
     top_product = products[0]
-    logger.info(f"Selected Product: {top_product['product_name']} with {top_product['commission_rate']}% commission.")
+    logger.info(f"Selected Product: {top_product['product_name']} | Com: {top_product['commission_rate']}%")
 
-    # 2. Generate and evaluate script
+    # 2. Swarm AI Evaluation & Generation
     evaluator = FYPEvaluator()
-    base_script = f"Halo semuanya! Cek {top_product['product_name']} ini, beneran bikin glowing! Klik link di bio ya!"
-    final_script, eval_result = evaluator.recursive_improvement_loop(base_script, top_product['product_name'])
+    swarm_blueprint = evaluator.swarm_evaluate_and_generate(top_product['product_name'], niche)
 
-    logger.info(f"Final Approved Script: {final_script}")
+    logger.info("Swarm Blueprint Approved:")
+    logger.info(json.dumps(swarm_blueprint, indent=2))
 
-    # 3. Trigger Modal GPU Pipeline
-    video_path = "output_ugc_video.mp4"
-    logger.info("Triggering AI Video Generation...")
+    # 3. Trigger Modal GPU Pipeline + Auto Editor
+    video_path = "output_god_tier_ugc.mp4"
+    logger.info("Triggering AI Video Generation via Modal...")
 
-    # Note: Using .local() for testing. In production, this uses .remote()
-    success = generate_video_locally(final_script, video_path)
+    success = generate_video_modal_remote(swarm_blueprint, video_path)
 
     if not success:
-        logger.warning("Falling back to simulated video file for pipeline completion.")
-        with open(video_path, "wb") as f:
-            f.write(b"fallback_video_data")
+        logger.warning("Pipeline execution failed.")
+        return
 
-    logger.info(f"Video ready at: {video_path}")
+    logger.info(f"God-Tier Video ready at: {video_path}")
 
-    # 4. Schedule Upload
+    # 4. Recursive FYP Evaluation Loop on Final Video
+    final_eval = evaluator.evaluate_final_video(swarm_blueprint, video_path)
+    logger.info("Final Video FYP Evaluation Result:")
+    # We safely grab the JSON if it fell back to dict, or parse it if it returned a raw string dict
+    try:
+        if isinstance(final_eval, dict):
+            logger.info(json.dumps(final_eval, indent=2))
+        else:
+            logger.info(final_eval)
+    except Exception:
+        logger.info(str(final_eval))
+
+    # In a real scenario, if final_eval["is_viral_ready"] == False, we would loop back to step 2.
+
+    # 5. Schedule Upload
     uploader = SocialUploader()
-    caption = f"Beli {top_product['product_name']} sekarang! #fyp #shopeeaffiliate #tokopedia"
+    caption = f"{swarm_blueprint['hook']} Cek keranjang sekarang! #fyp #ugc"
     uploader.schedule_upload(video_path, caption)
 
     logger.info("Pipeline completed successfully. Awaiting scheduled uploads.")

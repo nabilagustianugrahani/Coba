@@ -25,3 +25,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+output_god_tier_ugc.mp4
+*.mp4
+*.mp3

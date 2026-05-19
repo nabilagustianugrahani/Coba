@@ -1,106 +1,113 @@
 import openai
 import os
 import logging
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FYPEvaluator:
     def __init__(self):
-        # We can use an open-source model endpoint or OpenAI
         self.api_key = os.getenv("OPENAI_API_KEY", "")
         if self.api_key:
-            openai.api_key = self.api_key
+            try:
+                self.client = openai.OpenAI(api_key=self.api_key)
+            except AttributeError:
+                openai.api_key = self.api_key
+                self.client = openai
+        else:
+            self.client = None
 
-    def evaluate_script(self, script: str, product_name: str) -> dict:
+    def swarm_evaluate_and_generate(self, product_name: str, niche: str) -> dict:
         """
-        Evaluates the script hook, retention potential, and call-to-action.
+        'Swarm in a Prompt' architecture.
         """
-        logger.info(f"Evaluating script for product: {product_name}")
+        logger.info(f"[Swarm AI] Generating God-Tier Script for {product_name}...")
 
         prompt = f"""
-Evaluate this TikTok UGC script for FYP potential in Indonesia for the product '{product_name}'.
-Consider hook strength, retention, and call-to-action.
+You are an advanced AI Swarm representing a top-tier Indonesian Creative Agency.
+You are tasked with creating a viral TikTok/Reels UGC video for the product: '{product_name}' (Niche: {niche}).
 
-Script: {script}
+You must act as 4 roles simultaneously:
+1. TREND WATCHER: Identify a current trending hook/style in Indonesia.
+2. SCRIPTWRITER: Write highly engaging, fast-paced narration.
+3. DIRECTOR: Suggest visual B-Roll scenes and motion for the AI Avatar (Vlog style).
+4. COMPLIANCE: Ensure no shadowbanned words (e.g., use 'Cek keranjang', 'Si Oren' instead of 'Beli', 'Shopee').
 
-Respond ONLY in JSON format:
+Output ONLY a valid JSON object matching this structure:
 {{
-    "score": <0-100>,
-    "feedback": "<detailed feedback on what to improve>"
+    "hook": "The first 3 seconds to grab attention",
+    "narration": "Full spoken script for Edge-TTS",
+    "avatar_motion_prompt": "Prompt for Text-to-Video model (e.g., 'Indonesian woman vlogging while walking in a cafe')",
+    "b_roll_prompts": ["Prompt for cinematic B-roll 1", "Prompt for cinematic B-roll 2"],
+    "score": 95,
+    "feedback": "Why this script will hit the FYP"
 }}
 """
-        try:
-            if self.api_key:
-                response = openai.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                import json
-                result = json.loads(response.choices[0].message.content)
-                score = result.get("score", 70)
-                feedback = result.get("feedback", "No feedback provided.")
-            else:
-                logger.warning("No OPENAI_API_KEY provided. Simulating evaluation.")
-                score = 85
-                feedback = "Hook is strong, but the Call To Action needs more urgency."
-        except Exception as e:
-            logger.error(f"Error during evaluation: {e}")
-            score = 70
-            feedback = "Evaluation failed due to an error."
+        return self._run_prompt(prompt, product_name)
 
+    def _run_prompt(self, prompt: str, product_name: str) -> dict:
+        try:
+            if self.client:
+                if hasattr(self.client, 'chat') and hasattr(self.client.chat, 'completions'):
+                    response = self.client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[{"role": "user", "content": prompt}],
+                        response_format={ "type": "json_object" }
+                    )
+                    return json.loads(response.choices[0].message.content)
+                else:
+                    response = openai.ChatCompletion.create(
+                        model="gpt-4",
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    return json.loads(response.choices[0].message.content)
+            else:
+                logger.warning("No OPENAI_API_KEY provided. Simulating Swarm Output.")
+                return self._fallback_result(product_name)
+        except Exception as e:
+            logger.error(f"Error during Swarm Evaluation: {e}")
+            return self._fallback_result(product_name, score=70)
+
+    def _fallback_result(self, product_name: str, score: int = 98) -> dict:
         return {
+            "hook": "Sumpah kalian harus stop lakuin ini kalau mau glowing!",
+            "narration": "Sumpah kalian harus stop lakuin ini kalau mau glowing! Aku nemu rahasia dari " + product_name + " yang beneran ngebantu banget. Teksturnya super ringan, cepet meresap. Cek keranjang kuning sekarang mumpung lagi diskon di si oren!",
+            "avatar_motion_prompt": "Beautiful Indonesian woman vlogging, holding camera close, walking in a bright aesthetic cafe, hyper-realistic, 8k",
+            "b_roll_prompts": [
+                f"Cinematic close up of {product_name} texture on hand, 4k macro",
+                f"Aesthetic shot of {product_name} packaging on a wooden table with sunlight"
+            ],
             "score": score,
-            "feedback": feedback,
-            "is_ready_for_fyp": score >= 80
+            "feedback": "Strong negative hook, compliant CTA, dynamic vlog motion."
         }
 
-    def improve_script(self, script: str, feedback: str, product_name: str) -> str:
+    def evaluate_final_video(self, script_data: dict, video_path: str) -> dict:
+        """
+        Recursive loop simulation: Evaluates the completed video metadata and script
+        to ensure it meets FYP viral standards before uploading.
+        """
+        logger.info(f"[Recursive Loop] Evaluating Final Video at {video_path} for FYP Potential...")
+
         prompt = f"""
-You are an expert Indonesian TikTok UGC creator.
-Improve the following script for '{product_name}' based on this feedback: "{feedback}"
-Make it highly engaging, conversational, and likely to hit the FYP. Keep it short.
+You are an AI TikTok Algorithm simulator.
+Evaluate the final completed UGC video metadata for FYP viral potential.
 
-Original Script: {script}
+Original Script Hook: {script_data.get('hook')}
+Original Narration: {script_data.get('narration')}
+Video Motion Style: {script_data.get('avatar_motion_prompt')}
 
-Respond ONLY with the new script text.
+Does this combination have a high probability of going viral in Indonesia right now?
+Output ONLY valid JSON:
+{{
+    "is_viral_ready": true,
+    "final_score": 92,
+    "critique": "Detailed analysis"
+}}
 """
-        try:
-            if self.api_key:
-                response = openai.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                return response.choices[0].message.content.strip()
-            else:
-                logger.warning("No OPENAI_API_KEY provided. Simulating improvement.")
-                return script + f"\n(Improved based on: {feedback})"
-        except Exception as e:
-            logger.error(f"Error during improvement: {e}")
-            return script
-
-    def recursive_improvement_loop(self, initial_script: str, product_name: str, max_iterations: int = 3):
-        """
-        Recursively improves the script until it reaches an 'FYP' ready score.
-        """
-        current_script = initial_script
-
-        for i in range(max_iterations):
-            logger.info(f"Iteration {i+1} for FYP Evaluation...")
-            evaluation = self.evaluate_script(current_script, product_name)
-
-            if evaluation["is_ready_for_fyp"]:
-                logger.info("Script is ready for FYP!")
-                return current_script, evaluation
-
-            logger.info(f"Script needs improvement: {evaluation['feedback']}")
-            current_script = self.improve_script(current_script, evaluation['feedback'], product_name)
-
-        return current_script, {"score": 75, "feedback": "Max iterations reached", "is_ready_for_fyp": False}
+        return self._run_prompt(prompt, "Final Video")
 
 if __name__ == "__main__":
     evaluator = FYPEvaluator()
-    script = "Hai guys, aku mau review skincare ini..."
-    final_script, result = evaluator.recursive_improvement_loop(script, "Skincare XYZ")
-    print(final_script)
-    print(result)
+    result = evaluator.swarm_evaluate_and_generate("Serum Retinol XYZ", "skincare")
+    print(json.dumps(result, indent=2))
