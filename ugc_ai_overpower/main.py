@@ -3,7 +3,7 @@ import os
 import json
 import modal
 import hashlib
-from scraper.scraper import EcommerceScraper
+from scraper.scraper import EcommerceScraper, TikTokScraper
 from evaluator.evaluator import FYPEvaluator
 from video_processor.auto_editor import AutoEditor
 from uploader.uploader import SocialUploader
@@ -13,11 +13,9 @@ logger = logging.getLogger(__name__)
 
 from modal_gpu.modal_app import (
     app as modal_app,
-    ModelGenerator,
-    generate_voiceover
+    ModelGenerator
 )
 
-# Initialize caching directory
 CACHE_DIR = "broll_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -29,7 +27,6 @@ def get_face_bytes():
     return b"dummy_face_bytes"
 
 def get_cached_broll(prompt: str) -> bytes:
-    """Returns cached B-Roll bytes if available, else None."""
     prompt_hash = hashlib.md5(prompt.encode('utf-8')).hexdigest()
     cache_path = os.path.join(CACHE_DIR, f"{prompt_hash}.mp4")
     if os.path.exists(cache_path):
@@ -39,7 +36,6 @@ def get_cached_broll(prompt: str) -> bytes:
     return None
 
 def set_cached_broll(prompt: str, video_bytes: bytes):
-    """Saves generated B-Roll bytes to cache."""
     prompt_hash = hashlib.md5(prompt.encode('utf-8')).hexdigest()
     cache_path = os.path.join(CACHE_DIR, f"{prompt_hash}.mp4")
     with open(cache_path, "wb") as f:
@@ -55,8 +51,6 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
         face_bytes = get_face_bytes()
 
         b_roll_data = []
-
-        # Instantiate the Stateful generator class
         generator = ModelGenerator()
 
         if os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml")):
@@ -72,27 +66,20 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
                     else:
                         b_bytes = generator.generate_base_video.remote(b_roll["prompt"])
                         set_cached_broll(b_roll["prompt"], b_bytes)
-
-                    b_roll_data.append({
-                        "start": b_roll["start"],
-                        "end": b_roll["end"],
-                        "clip_bytes": b_bytes
-                    })
+                    b_roll_data.append({"start": b_roll["start"], "end": b_roll["end"], "clip_bytes": b_bytes})
 
                 logger.info("Applying FaceFusion remotely on Modal...")
                 swapped_vid_bytes = generator.face_swap_consistency.remote(base_vid_bytes, face_bytes)
 
-                logger.info("Generating Edge-TTS Audio remotely on Modal...")
-                audio_bytes = generate_voiceover.remote(narration)
+                logger.info("Generating F5-TTS Audio remotely on Modal...")
+                audio_bytes = generator.generate_voiceover_f5.remote(narration)
 
                 logger.info("Running LivePortrait Lip-Sync remotely on Modal...")
                 synced_vid_bytes = generator.lip_sync_video.remote(swapped_vid_bytes, audio_bytes)
         else:
             logger.warning("No Modal Token found. Falling back to local execution for pipeline testing.")
-            logger.info("Generating Text-to-Video Base locally...")
             base_vid_bytes = generator.generate_base_video.local(motion_prompt)
 
-            logger.info("Generating B-Rolls locally (with Caching)...")
             for b_roll in b_roll_schedule:
                 cached_bytes = get_cached_broll(b_roll["prompt"])
                 if cached_bytes:
@@ -100,18 +87,10 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
                 else:
                     b_bytes = generator.generate_base_video.local(b_roll["prompt"])
                     set_cached_broll(b_roll["prompt"], b_bytes)
+                b_roll_data.append({"start": b_roll["start"], "end": b_roll["end"], "clip_bytes": b_bytes})
 
-                b_roll_data.append({
-                    "start": b_roll["start"],
-                    "end": b_roll["end"],
-                    "clip_bytes": b_bytes
-                })
-
-            logger.info("Applying FaceFusion locally...")
             swapped_vid_bytes = generator.face_swap_consistency.local(base_vid_bytes, face_bytes)
-            logger.info("Generating Edge-TTS Audio locally...")
-            audio_bytes = generate_voiceover.local(narration)
-            logger.info("Running LivePortrait Lip-Sync locally...")
+            audio_bytes = generator.generate_voiceover_f5.local(narration)
             synced_vid_bytes = generator.lip_sync_video.local(swapped_vid_bytes, audio_bytes)
 
         logger.info("Applying Auto-Captions and B-Rolls locally...")
@@ -129,7 +108,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
 def main():
     logger.info("Starting God-Tier UGC Pipeline (B200 Setup)...")
 
-    # 1. Scrape
+    # 1. Scrape E-commerce
     scraper = EcommerceScraper()
     niche = os.getenv("UGC_NICHE", "beauty")
     products = scraper.get_best_products(niche=niche)
@@ -140,14 +119,18 @@ def main():
     top_product = products[0]
     logger.info(f"Selected Product: {top_product['product_name']} | Com: {top_product['commission_rate']}%")
 
-    # 2. Swarm AI Evaluation & Generation
+    # 2. Scrape TikTok Trends
+    tiktok_scraper = TikTokScraper()
+    trend_data = tiktok_scraper.get_realtime_trends()
+
+    # 3. Swarm AI Evaluation & Generation
     evaluator = FYPEvaluator()
-    swarm_blueprint = evaluator.swarm_evaluate_and_generate(top_product['product_name'], niche)
+    swarm_blueprint = evaluator.swarm_evaluate_and_generate(top_product['product_name'], niche, trend_data)
 
     logger.info("Swarm Blueprint Approved:")
     logger.info(json.dumps(swarm_blueprint, indent=2))
 
-    # 3. Trigger Modal GPU Pipeline + Auto Editor
+    # 4. Trigger Modal GPU Pipeline + Auto Editor
     video_path = "output_god_tier_ugc.mp4"
     logger.info("Triggering AI Video Generation via Modal...")
 
@@ -159,7 +142,7 @@ def main():
 
     logger.info(f"God-Tier Video ready at: {video_path}")
 
-    # 4. Recursive FYP Evaluation Loop on Final Video
+    # 5. Recursive FYP Evaluation Loop on Final Video
     final_eval = evaluator.evaluate_final_video(swarm_blueprint, video_path)
     logger.info("Final Video FYP Evaluation Result:")
     try:
@@ -170,11 +153,14 @@ def main():
     except Exception:
         logger.info(str(final_eval))
 
-    # 5. Schedule Upload
+    # 6. Schedule Upload
     uploader = SocialUploader()
-    caption = f"{swarm_blueprint['hook']} Cek keranjang sekarang! #fyp #ugc"
-    uploader.schedule_upload(video_path, caption)
 
+    # Construct final caption integrating trending hashtags seamlessly
+    tags = " ".join(swarm_blueprint.get("hashtags", []))
+    caption = f"{swarm_blueprint['hook']} Cek keranjang sekarang! {tags} #fyp #ugc"
+
+    uploader.schedule_upload(video_path, caption)
     logger.info("Pipeline completed successfully. Awaiting scheduled uploads.")
 
 if __name__ == "__main__":

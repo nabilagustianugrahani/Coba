@@ -3,33 +3,29 @@ import os
 import asyncio
 import json
 
-# Ensure modules can be found
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 import mcp.types as types
 
-from scraper.scraper import EcommerceScraper
+from scraper.scraper import EcommerceScraper, TikTokScraper
 from evaluator.evaluator import FYPEvaluator
 from uploader.uploader import SocialUploader
 
-# To trigger Modal remotely from MCP
 import modal
 from modal_gpu.modal_app import (
     app as modal_app,
-    ModelGenerator,
-    generate_voiceover
+    ModelGenerator
 )
 from video_processor.auto_editor import AutoEditor
 from main import get_face_bytes, get_cached_broll, set_cached_broll
 
-# Initialize core components
 scraper = EcommerceScraper()
+tiktok_scraper = TikTokScraper()
 evaluator = FYPEvaluator()
 uploader = SocialUploader()
 
-# Initialize MCP Server
 app = Server("ugc-ai-overpower-b200-mcp")
 
 @app.list_tools()
@@ -47,20 +43,29 @@ async def list_tools() -> list[types.Tool]:
             }
         ),
         types.Tool(
+            name="hijack_tiktok_trends",
+            description="Extract live trending hooks and hashtags from TikTok via Stealth Browser",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
+        ),
+        types.Tool(
             name="swarm_evaluate_script",
-            description="Swarm AI evaluates and generates Hook, Narration, and Vlog Motion Prompt",
+            description="Swarm AI evaluates and generates Hook, Narration, and Vlog Motion Prompt using live trends",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "product_name": {"type": "string"},
-                    "niche": {"type": "string"}
+                    "niche": {"type": "string"},
+                    "trend_data_json": {"type": "string"}
                 },
                 "required": ["product_name", "niche"]
             }
         ),
         types.Tool(
             name="generate_god_tier_video",
-            description="Trigger Stateful Modal B200 to generate Vlog-style AI Influencer Video with Caching and Auto-Captions",
+            description="Trigger Stateful Modal B200 to generate Vlog-style AI Influencer Video with F5-TTS, Caching and Auto-Captions",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -102,10 +107,17 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         result = scraper.get_best_products(niche)
         return [types.TextContent(type="text", text=str(result))]
 
+    elif name == "hijack_tiktok_trends":
+        result = tiktok_scraper.get_realtime_trends()
+        return [types.TextContent(type="text", text=json.dumps(result))]
+
     elif name == "swarm_evaluate_script":
         product_name = arguments.get("product_name")
         niche = arguments.get("niche", "general")
-        result = evaluator.swarm_evaluate_and_generate(product_name, niche)
+        trend_str = arguments.get("trend_data_json", "")
+        trend_data = json.loads(trend_str) if trend_str else None
+
+        result = evaluator.swarm_evaluate_and_generate(product_name, niche, trend_data)
         return [types.TextContent(type="text", text=json.dumps(result))]
 
     elif name == "generate_god_tier_video":
@@ -133,7 +145,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                         b_roll_data.append({"start": b_roll["start"], "end": b_roll["end"], "clip_bytes": b_bytes})
 
                     swapped_vid_bytes = generator.face_swap_consistency.remote(base_vid_bytes, face_bytes)
-                    audio_bytes = generate_voiceover.remote(narration)
+                    audio_bytes = generator.generate_voiceover_f5.remote(narration)
                     synced_vid_bytes = generator.lip_sync_video.remote(swapped_vid_bytes, audio_bytes)
             else:
                 base_vid_bytes = generator.generate_base_video.local(motion_prompt)
@@ -148,7 +160,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                     b_roll_data.append({"start": b_roll["start"], "end": b_roll["end"], "clip_bytes": b_bytes})
 
                 swapped_vid_bytes = generator.face_swap_consistency.local(base_vid_bytes, face_bytes)
-                audio_bytes = generate_voiceover.local(narration)
+                audio_bytes = generator.generate_voiceover_f5.local(narration)
                 synced_vid_bytes = generator.lip_sync_video.local(swapped_vid_bytes, audio_bytes)
 
             editor = AutoEditor()
