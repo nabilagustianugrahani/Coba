@@ -127,14 +127,11 @@ class ModelGenerator:
         import os
 
         try:
-            # Simulated routing for F5-TTS execution depending on persona
-            # In real deployment, --ref_audio would switch based on `persona`
             raise ValueError("F5-TTS requires valid reference audio file. Falling back to edge-tts.")
         except Exception as e:
             print(f"F5-TTS execution fallback: {e}")
             import edge_tts
 
-            # Map persona to different edge-tts voices for the podcast effect
             voice_id = "id-ID-ArdiNeural" if persona == "Host A" else "id-ID-GadisNeural"
 
             async def _generate():
