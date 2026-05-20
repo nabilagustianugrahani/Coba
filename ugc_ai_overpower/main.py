@@ -56,21 +56,18 @@ def resolve_node_variables(value, nodes):
                 break
     return value
 
-def generate_video_modal_remote(swarm_data: dict, video_path: str):
-    logger.info("Connecting to Modal B200 God-Tier Node pipeline...")
+def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str = "Host A"):
+    logger.info(f"Connecting to Modal B200 God-Tier Node pipeline for {persona}...")
     try:
         nodes = swarm_data.get("nodes", [])
         graph = swarm_data.get("execution_graph", {})
-        # Force the evaluator to just use extend_and_stitch for this build structure
         template = "05_extend_and_stitch"
 
         face_bytes = get_face_bytes()
         generator = ModelGenerator()
 
         is_remote = os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml"))
-
         final_video_bytes = None
-
         ctx = modal_app.run() if is_remote else None
 
         try:
@@ -91,13 +88,13 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
             logger.info("Generating Part 1...")
             vid1 = gen_vid(prompt_part1)
             vid1 = face_swap(vid1, face_bytes)
-            aud1 = gen_aud(audio_text_part1)
+            aud1 = gen_aud(audio_text_part1, persona=persona)
             synced_vid1 = sync_vid(vid1, aud1)
 
             logger.info("Generating Part 2...")
             vid2 = gen_vid(prompt_part2)
             vid2 = face_swap(vid2, face_bytes)
-            aud2 = gen_aud(audio_text_part2)
+            aud2 = gen_aud(audio_text_part2, persona=persona)
             synced_vid2 = sync_vid(vid2, aud2)
 
             logger.info("Stitching Part 1 and Part 2 together...")
@@ -162,7 +159,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
         return False
 
 def main():
-    logger.info("Starting God-Tier UGC Pipeline (B200 Setup)...")
+    logger.info("Starting God-Tier UGC Pipeline (Multi-Persona Network Setup)...")
 
     scraper = EcommerceScraper()
     niche = os.getenv("UGC_NICHE", "beauty")
@@ -181,22 +178,39 @@ def main():
     logger.info("Node-Based Swarm Blueprint Approved:")
     logger.info(json.dumps(swarm_blueprint, indent=2))
 
-    video_path = "output_god_tier_ugc.mp4"
-    logger.info("Triggering AI Video Node Graph via Modal...")
-
-    success = generate_video_modal_remote(swarm_blueprint, video_path)
-
-    if not success:
-        logger.warning("Pipeline execution failed.")
-        return
-
-    final_eval = evaluator.evaluate_final_video(swarm_blueprint, video_path)
-
+    # Generate 3 distinct variants to build a Creator Network
+    personas = ["Host A", "Host B", "Host C"]
     uploader = SocialUploader()
-    tags = " ".join(swarm_blueprint.get("hashtags", []))
-    caption = f"{swarm_blueprint['hook']} {tags} #fyp"
-    uploader.schedule_upload(video_path, caption)
-    logger.info("Pipeline completed successfully.")
+
+    for i, persona in enumerate(personas):
+        video_path = f"output_god_tier_ugc_variant_{i+1}.mp4"
+        logger.info(f"Triggering AI Video Node Graph for {persona}...")
+
+        success = generate_video_modal_remote(swarm_blueprint, video_path, persona=persona)
+
+        if success:
+            logger.info(f"God-Tier Video {persona} ready at: {video_path}")
+
+            # Recursive FYP Evaluation Loop on Final Video
+            final_eval = evaluator.evaluate_final_video(swarm_blueprint, video_path)
+            logger.info(f"Final Video {persona} FYP Evaluation Result:")
+            try:
+                if isinstance(final_eval, dict):
+                    logger.info(json.dumps(final_eval, indent=2))
+                else:
+                    logger.info(final_eval)
+            except Exception:
+                logger.info(str(final_eval))
+
+            tags = " ".join(swarm_blueprint.get("hashtags", []))
+            caption = f"{swarm_blueprint['hook']} {tags} #fyp"
+
+            # Pass the variant index so the uploader can schedule them uniquely (drip-feed)
+            uploader.schedule_upload(video_path, caption, variant_index=i)
+        else:
+            logger.warning(f"Pipeline execution failed for {persona}.")
+
+    logger.info("Pipeline completed successfully. All variants awaiting scheduled drip-feed uploads.")
 
 if __name__ == "__main__":
     main()

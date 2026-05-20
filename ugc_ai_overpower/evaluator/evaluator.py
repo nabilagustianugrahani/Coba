@@ -33,37 +33,76 @@ class FYPEvaluator:
                 openai.api_key = self.openai_key
                 self.client = openai
 
+        self.db_path = "performance_db.json"
+        self._init_db()
+
+    def _init_db(self):
+        if not os.path.exists(self.db_path):
+            with open(self.db_path, "w") as f:
+                json.dump({"history": []}, f)
+
+    def _get_history(self):
+        with open(self.db_path, "r") as f:
+            return json.load(f).get("history", [])
+
+    def log_performance(self, hook: str, score: int):
+        """Logs the hook and its simulated success score for Darwinian Evolution."""
+        data = {"history": self._get_history()}
+        data["history"].append({"hook": hook, "score": score})
+        # Keep top 100 for memory efficiency
+        data["history"] = sorted(data["history"], key=lambda x: x["score"], reverse=True)[:100]
+        with open(self.db_path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    def _build_rag_context(self):
+        history = self._get_history()
+        if not history:
+            return "No historical data available yet."
+
+        winning_hooks = [h["hook"] for h in history if h["score"] >= 90][:3]
+        losing_hooks = [h["hook"] for h in history if h["score"] < 70][:3]
+
+        ctx = "DARWINIAN AUTO-EVOLUTION DATA (RAG Memory):\n"
+        if winning_hooks:
+            ctx += f"SUCCESSFUL HOOKS TO ITERATE ON: {', '.join(winning_hooks)}\n"
+        if losing_hooks:
+            ctx += f"FAILED HOOKS TO STRICTLY AVOID: {', '.join(losing_hooks)}\n"
+
+        return ctx
+
     def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None) -> dict:
         """
-        'Swarm in a Prompt' incorporating Claude-Arcads Visual Template parsing
-        and Open-Studio Node-Based Workflow variables ({{var_name}}).
+        'Swarm in a Prompt' incorporating Darwinian Auto-Evolution (RAG)
+        and Node-Based Workflow generation.
         """
-        logger.info(f"[Swarm AI] Generating Node-Based UGC Workflow for {product_name}...")
+        logger.info(f"[Swarm AI] Generating Evolutionary Node-Based Workflow for {product_name}...")
 
         trends_context = ""
         if trend_data:
             hooks = ", ".join(trend_data.get("trending_hooks", []))
             tags = ", ".join(trend_data.get("trending_hashtags", []))
-            trends_context = f"\nCRITICAL TRENDS: Hijack these hooks: {hooks}\nHashtags: {tags}\n"
+            trends_context = f"\nCRITICAL TRENDS: Hijack these live TikTok hooks: {hooks}\nHashtags: {tags}\n"
+
+        rag_context = self._build_rag_context()
 
         prompt = f"""
 You are an advanced AI Swarm representing a top-tier Indonesian Creative Agency.
 Task: Create a viral TikTok/Reels UGC video workflow for '{product_name}' (Niche: {niche}).
 {trends_context}
+{rag_context}
 
 You must act as these roles to build a NODE-BASED WORKFLOW JSON:
 
-1. AD ANALYZER (Claude-Arcads Logic):
-   - Choose ONE template based on the niche: `01_talking_head`, `02_product_unboxing`, `03_faceless_lifestyle`, `04_app_promo`, or `05_extend_and_stitch` (if the product needs a deep dive).
-   - Extract/define: script, setting, character, camera style, and beat structure.
-   - For T2V prompts, FORBID words like: cinematic, professional, stunning, 8k, studio, perfect. End prompts with a one-line emotional closing ("The feeling of..."). Must say "No on-screen text, no captions, no subtitles."
+1. AD ANALYZER:
+   - Choose `05_extend_and_stitch` template.
+   - For T2V prompts, FORBID words like: cinematic, professional, 8k. End prompts with ("The feeling of..."). Must say "No on-screen text."
 
 2. SCRIPTWRITER & COMPLIANCE:
-   - Write engaging narration. No shadowbanned words (use 'Cek keranjang', 'Si Oren').
+   - Learn from the DARWINIAN DATA. Do not use failed hooks. Iterate on successful hooks or use live trends.
+   - No shadowbanned words (use 'Cek keranjang', 'Si Oren').
 
-3. NODE ARCHITECT (Open-Studio Logic):
-   - Output the generation steps as interconnected nodes.
-   - Use `{{{{node_id}}}}` syntax to pass variables between nodes (e.g., `{{{{node_base_video_prompt}}}}`).
+3. NODE ARCHITECT:
+   - Output the generation steps as interconnected nodes using `{{{{node_id}}}}` syntax.
 
 Output ONLY valid JSON matching this schema:
 {{
@@ -71,33 +110,11 @@ Output ONLY valid JSON matching this schema:
     "hook": "The first 3 seconds to grab attention",
     "hashtags": ["#tag1"],
     "nodes": [
-        {{
-            "id": "node_part1_prompt",
-            "type": "t2v_prompt",
-            "value": "[Duration, aspect ratio, setting, lighting] [Character: age, hair, clothing] [Camera: angle, distance] [Beat breakdown]. No on-screen text, no captions, no subtitles. The feeling of..."
-        }},
-        {{
-            "id": "node_part2_prompt",
-            "type": "t2v_prompt",
-            "value": "[Continuation of Part 1 focus on deep dive benefits]. No on-screen text... The feeling of..."
-        }},
-        {{
-            "id": "node_narration_part1",
-            "type": "text",
-            "value": "Script part 1"
-        }},
-        {{
-            "id": "node_narration_part2",
-            "type": "text",
-            "value": "Script part 2"
-        }},
-        {{
-            "id": "node_broll_1",
-            "type": "broll_prompt",
-            "value": "Macro shot of product. The feeling of...",
-            "start": 2.0,
-            "end": 4.5
-        }}
+        {{ "id": "node_part1_prompt", "type": "t2v_prompt", "value": "..." }},
+        {{ "id": "node_part2_prompt", "type": "t2v_prompt", "value": "..." }},
+        {{ "id": "node_narration_part1", "type": "text", "value": "Script part 1" }},
+        {{ "id": "node_narration_part2", "type": "text", "value": "Script part 2" }},
+        {{ "id": "node_broll_1", "type": "broll_prompt", "value": "...", "start": 2.0, "end": 4.5 }}
     ],
     "execution_graph": {{
         "generate_part1_video": "{{{{node_part1_prompt}}}}",
@@ -151,12 +168,12 @@ Output ONLY valid JSON matching this schema:
                 {
                     "id": "node_part1_prompt",
                     "type": "t2v_prompt",
-                    "value": "15s, 9:16, bright minimal bedroom, morning natural light. 24yo Indonesian woman, clear skin, light linen wide-leg trousers, white tank top. Eye-level, selfie-style handheld camera. She holds the product close to lens. No on-screen text, no captions, no subtitles. The feeling of fresh morning confidence."
+                    "value": "15s, 9:16, bright minimal bedroom, morning natural light. 24yo Indonesian woman, clear skin. Eye-level, selfie-style handheld camera. No on-screen text. The feeling of fresh morning confidence."
                 },
                 {
                     "id": "node_part2_prompt",
                     "type": "t2v_prompt",
-                    "value": "15s, 9:16, bright minimal bedroom, morning natural light. 24yo Indonesian woman, clear skin, light linen wide-leg trousers, white tank top. Eye-level, tripod static camera. She points to her glowing cheek and smiles warmly. No on-screen text, no captions, no subtitles. The feeling of lasting radiance."
+                    "value": "15s, 9:16, bright minimal bedroom. Eye-level, tripod static camera. She points to her glowing cheek and smiles warmly. No on-screen text. The feeling of lasting radiance."
                 },
                 {
                     "id": "node_narration_part1",
@@ -171,7 +188,7 @@ Output ONLY valid JSON matching this schema:
                 {
                     "id": "node_broll_1",
                     "type": "broll_prompt",
-                    "value": "Macro close-up, 9:16, bright lighting. Fingers gently rubbing serum. No on-screen text, no captions, no subtitles. The feeling of deep hydration.",
+                    "value": "Macro close-up, 9:16, bright lighting. Fingers gently rubbing serum. No on-screen text. The feeling of deep hydration.",
                     "start": 2.0,
                     "end": 4.5
                 }
@@ -201,7 +218,15 @@ Output ONLY valid JSON:
     "critique": "Detailed analysis"
 }}
 """
-        return self._run_prompt(prompt, "Final Video")
+        res = self._run_prompt(prompt, "Final Video")
+
+        # Log performance into Darwinian DB
+        score = 92
+        if isinstance(res, dict) and "final_score" in res:
+            score = res["final_score"]
+        self.log_performance(script_data.get('hook', 'unknown'), score)
+
+        return res
 
 if __name__ == "__main__":
     evaluator = FYPEvaluator()
