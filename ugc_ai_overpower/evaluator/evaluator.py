@@ -20,25 +20,29 @@ class FYPEvaluator:
 
     def swarm_evaluate_and_generate(self, product_name: str, niche: str) -> dict:
         """
-        'Swarm in a Prompt' architecture.
+        'Swarm in a Prompt' architecture updated with a Master Prompt Engineer.
         """
-        logger.info(f"[Swarm AI] Generating God-Tier Script for {product_name}...")
+        logger.info(f"[Swarm AI] Generating God-Tier Script & Flawless Prompts for {product_name}...")
 
         prompt = f"""
 You are an advanced AI Swarm representing a top-tier Indonesian Creative Agency.
 You are tasked with creating a viral TikTok/Reels UGC video for the product: '{product_name}' (Niche: {niche}).
 
-You must act as 4 roles simultaneously:
+You must act as 5 roles simultaneously:
 1. TREND WATCHER: Identify a current trending hook/style in Indonesia.
 2. SCRIPTWRITER: Write highly engaging, fast-paced narration.
-3. DIRECTOR: Suggest visual B-Roll scenes and motion for the AI Avatar (Vlog style).
+3. DIRECTOR: Suggest visual B-Roll scenes.
 4. COMPLIANCE: Ensure no shadowbanned words (e.g., use 'Cek keranjang', 'Si Oren' instead of 'Beli', 'Shopee').
+5. MASTER PROMPT ENGINEER: Write mathematically perfect, highly detailed Text-to-Video (T2V) prompts.
+   - The T2V prompt MUST include lighting (e.g., 'volumetric lighting, soft studio light'), camera angle (e.g., 'medium shot, eye-level vlog angle'), camera movement ('static, locked off' to prevent morphing), character details, and explicitly forbid morphing/artifacts.
+   - Also generate a 'negative_prompt' to ensure flawless, artifact-free generation (e.g., 'extra fingers, morphed face, bad anatomy, jitter, low resolution').
 
 Output ONLY a valid JSON object matching this structure:
 {{
     "hook": "The first 3 seconds to grab attention",
     "narration": "Full spoken script for Edge-TTS",
-    "avatar_motion_prompt": "Prompt for Text-to-Video model (e.g., 'Indonesian woman vlogging while walking in a cafe')",
+    "avatar_motion_prompt": "FLAWLESS detailed prompt for Text-to-Video model. Example: 'Medium shot of a beautiful Indonesian woman vlogging, eye-level, soft cinematic lighting, holding camera steady, realistic skin texture, 8k resolution, highly detailed, photorealistic'",
+    "negative_prompt": "Detailed negative prompt to prevent artifacts",
     "b_roll_prompts": ["Prompt for cinematic B-roll 1", "Prompt for cinematic B-roll 2"],
     "score": 95,
     "feedback": "Why this script will hit the FYP"
@@ -73,22 +77,18 @@ Output ONLY a valid JSON object matching this structure:
         return {
             "hook": "Sumpah kalian harus stop lakuin ini kalau mau glowing!",
             "narration": "Sumpah kalian harus stop lakuin ini kalau mau glowing! Aku nemu rahasia dari " + product_name + " yang beneran ngebantu banget. Teksturnya super ringan, cepet meresap. Cek keranjang kuning sekarang mumpung lagi diskon di si oren!",
-            "avatar_motion_prompt": "Beautiful Indonesian woman vlogging, holding camera close, walking in a bright aesthetic cafe, hyper-realistic, 8k",
+            "avatar_motion_prompt": "Medium shot of a beautiful Indonesian woman vlogging, eye-level angle, soft volumetric lighting, holding camera steady, realistic skin texture, photorealistic, 8k, locked off camera, no movement",
+            "negative_prompt": "morphed face, bad anatomy, extra fingers, jitter, low resolution, blurry, distorted, cartoon, 3d render",
             "b_roll_prompts": [
                 f"Cinematic close up of {product_name} texture on hand, 4k macro",
                 f"Aesthetic shot of {product_name} packaging on a wooden table with sunlight"
             ],
             "score": score,
-            "feedback": "Strong negative hook, compliant CTA, dynamic vlog motion."
+            "feedback": "Strong negative hook, compliant CTA, flawless vlog motion prompt."
         }
 
     def evaluate_final_video(self, script_data: dict, video_path: str) -> dict:
-        """
-        Recursive loop simulation: Evaluates the completed video metadata and script
-        to ensure it meets FYP viral standards before uploading.
-        """
         logger.info(f"[Recursive Loop] Evaluating Final Video at {video_path} for FYP Potential...")
-
         prompt = f"""
 You are an AI TikTok Algorithm simulator.
 Evaluate the final completed UGC video metadata for FYP viral potential.
