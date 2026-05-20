@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 class FYPEvaluator:
     def __init__(self):
-        # We check for free provider keys first, then fallback to OpenAI
         self.groq_key = os.getenv("GROQ_API_KEY")
         self.cerebras_key = os.getenv("CEREBRAS_API_KEY")
         self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
@@ -18,54 +17,49 @@ class FYPEvaluator:
         self.model_name = "gpt-4o-mini"
 
         if self.groq_key:
-            logger.info("Initializing Groq (Free/Ultra-fast) for Swarm Evaluator.")
             self.client = openai.OpenAI(api_key=self.groq_key, base_url="https://api.groq.com/openai/v1")
             self.model_name = "llama-3.3-70b-versatile"
         elif self.cerebras_key:
-            logger.info("Initializing Cerebras (Free/Ultra-fast) for Swarm Evaluator.")
             self.client = openai.OpenAI(api_key=self.cerebras_key, base_url="https://api.cerebras.ai/v1")
             self.model_name = "llama3.1-70b"
         elif self.openrouter_key:
-            logger.info("Initializing OpenRouter (Free Gemini) for Swarm Evaluator.")
             self.client = openai.OpenAI(api_key=self.openrouter_key, base_url="https://openrouter.ai/api/v1")
             self.model_name = "google/gemini-2.0-flash-exp:free"
         elif self.openai_key:
-            logger.info("Initializing OpenAI for Swarm Evaluator.")
             try:
                 self.client = openai.OpenAI(api_key=self.openai_key)
             except AttributeError:
                 openai.api_key = self.openai_key
                 self.client = openai
-        else:
-            logger.warning("No API Keys found for Swarm Evaluator. Will use simulation fallback.")
 
     def swarm_evaluate_and_generate(self, product_name: str, niche: str) -> dict:
         """
-        'Swarm in a Prompt' architecture updated with a Master Prompt Engineer.
-        Runs entirely on free/zero-cost LLM providers.
+        'Swarm in a Prompt' architecture updated with a Master Prompt Engineer and a Video Editor.
         """
-        logger.info(f"[Swarm AI] Generating God-Tier Script & Flawless Prompts for {product_name}...")
+        logger.info(f"[Swarm AI] Generating God-Tier Script, Flawless Prompts, and Edit Timestamps for {product_name}...")
 
         prompt = f"""
 You are an advanced AI Swarm representing a top-tier Indonesian Creative Agency.
 You are tasked with creating a viral TikTok/Reels UGC video for the product: '{product_name}' (Niche: {niche}).
 
-You must act as 5 roles simultaneously:
+You must act as 6 roles simultaneously:
 1. TREND WATCHER: Identify a current trending hook/style in Indonesia.
 2. SCRIPTWRITER: Write highly engaging, fast-paced narration.
 3. DIRECTOR: Suggest visual B-Roll scenes.
 4. COMPLIANCE: Ensure no shadowbanned words (e.g., use 'Cek keranjang', 'Si Oren' instead of 'Beli', 'Shopee').
-5. MASTER PROMPT ENGINEER: Write mathematically perfect, highly detailed Text-to-Video (T2V) prompts.
-   - The T2V prompt MUST include lighting (e.g., 'volumetric lighting, soft studio light'), camera angle (e.g., 'medium shot, eye-level vlog angle'), camera movement ('static, locked off' to prevent morphing), character details, and explicitly forbid morphing/artifacts.
-   - Also generate a 'negative_prompt' to ensure flawless, artifact-free generation (e.g., 'extra fingers, morphed face, bad anatomy, jitter, low resolution').
+5. MASTER PROMPT ENGINEER: Write mathematically perfect, highly detailed Text-to-Video (T2V) prompts forbidding morphing/artifacts.
+6. VIDEO EDITOR AI: Define exact timestamps (in seconds) where the B-Roll scenes should be overlaid on top of the talking head.
 
 Output ONLY a valid JSON object matching this structure:
 {{
     "hook": "The first 3 seconds to grab attention",
     "narration": "Full spoken script for Edge-TTS",
-    "avatar_motion_prompt": "FLAWLESS detailed prompt for Text-to-Video model. Example: 'Medium shot of a beautiful Indonesian woman vlogging, eye-level, soft cinematic lighting, holding camera steady, realistic skin texture, 8k resolution, highly detailed, photorealistic'",
+    "avatar_motion_prompt": "FLAWLESS detailed prompt for Text-to-Video model.",
     "negative_prompt": "Detailed negative prompt to prevent artifacts",
-    "b_roll_prompts": ["Prompt for cinematic B-roll 1", "Prompt for cinematic B-roll 2"],
+    "b_roll_schedule": [
+        {{ "prompt": "Cinematic B-Roll 1", "start": 2.0, "end": 4.5 }},
+        {{ "prompt": "Cinematic B-Roll 2", "start": 6.0, "end": 8.0 }}
+    ],
     "score": 95,
     "feedback": "Why this script will hit the FYP"
 }}
@@ -101,12 +95,20 @@ Output ONLY a valid JSON object matching this structure:
             "narration": "Sumpah kalian harus stop lakuin ini kalau mau glowing! Aku nemu rahasia dari " + product_name + " yang beneran ngebantu banget. Teksturnya super ringan, cepet meresap. Cek keranjang kuning sekarang mumpung lagi diskon di si oren!",
             "avatar_motion_prompt": "Medium shot of a beautiful Indonesian woman vlogging, eye-level angle, soft volumetric lighting, holding camera steady, realistic skin texture, photorealistic, 8k, locked off camera, no movement",
             "negative_prompt": "morphed face, bad anatomy, extra fingers, jitter, low resolution, blurry, distorted, cartoon, 3d render",
-            "b_roll_prompts": [
-                f"Cinematic close up of {product_name} texture on hand, 4k macro",
-                f"Aesthetic shot of {product_name} packaging on a wooden table with sunlight"
+            "b_roll_schedule": [
+                {
+                    "prompt": f"Cinematic close up of {product_name} texture on hand, 4k macro",
+                    "start": 2.0,
+                    "end": 4.0
+                },
+                {
+                    "prompt": f"Aesthetic shot of {product_name} packaging on a wooden table with sunlight",
+                    "start": 5.5,
+                    "end": 7.5
+                }
             ],
             "score": score,
-            "feedback": "Strong negative hook, compliant CTA, flawless vlog motion prompt."
+            "feedback": "Strong negative hook, compliant CTA, flawless vlog motion prompt, dynamic B-Roll editing."
         }
 
     def evaluate_final_video(self, script_data: dict, video_path: str) -> dict:
@@ -118,6 +120,7 @@ Evaluate the final completed UGC video metadata for FYP viral potential.
 Original Script Hook: {script_data.get('hook')}
 Original Narration: {script_data.get('narration')}
 Video Motion Style: {script_data.get('avatar_motion_prompt')}
+Editor Insertions: {len(script_data.get('b_roll_schedule', []))} B-Rolls
 
 Does this combination have a high probability of going viral in Indonesia right now?
 Output ONLY valid JSON:
