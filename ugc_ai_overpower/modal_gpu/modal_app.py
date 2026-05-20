@@ -1,7 +1,6 @@
 import modal
 import os
 import asyncio
-from io import BytesIO
 import tempfile
 import subprocess
 
