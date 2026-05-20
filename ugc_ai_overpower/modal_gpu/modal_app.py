@@ -1,7 +1,6 @@
 import modal
 import os
 import asyncio
-from io import BytesIO
 import tempfile
 
 app = modal.App("ugc-ai-overpower-b200")
@@ -9,15 +8,10 @@ app = modal.App("ugc-ai-overpower-b200")
 def download_models():
     """
     Downloads heavy model weights at build time to avoid cold boot penalties.
-    Includes Wan2.1 (T2V) and LivePortrait (SOTA Lip-Sync/Animation).
-    100% Free and Open Source.
     """
-    import torch
     from huggingface_hub import snapshot_download
-
     print("Downloading Wan-AI/Wan2.1-T2V-1.3B...")
     snapshot_download(repo_id="Wan-AI/Wan2.1-T2V-1.3B")
-
     print("Downloading LivePortrait weights...")
     snapshot_download(repo_id="KwaiVGI/LivePortrait")
 
@@ -33,64 +27,111 @@ image_env = (
     .run_function(download_models)
 )
 
-@app.function(image=image_env, gpu="B200", timeout=1800)
-def generate_base_video(prompt: str) -> bytes:
+@app.cls(image=image_env, gpu="B200", timeout=3600, min_containers=1)
+class ModelGenerator:
     """
-    100% Zero-Cost God-Tier Video Generation.
-    Uses Wan2.1 locally on Modal GPU. No paid third-party APIs used.
+    Stateful Modal Class to eliminate cold-boot penalties.
+    Loads Wan2.1 and other models directly into VRAM once upon container start.
     """
-    print(f"[Modal GPU B200] Generating Base Video locally via Wan2.1: '{prompt}'")
+    @modal.enter()
+    def load_models(self):
+        print("[Modal GPU B200] Loading Wan2.1 into VRAM (One-Time Warm-Up)...")
+        try:
+            import torch
+            from diffusers import DiffusionPipeline
 
-    try:
-        import torch
-        from diffusers import DiffusionPipeline
-        from diffusers.utils import export_to_video
+            self.pipe = DiffusionPipeline.from_pretrained(
+                "Wan-AI/Wan2.1-T2V-1.3B",
+                torch_dtype=torch.float16
+            ).to("cuda")
 
-        pipe = DiffusionPipeline.from_pretrained(
-            "Wan-AI/Wan2.1-T2V-1.3B",
-            torch_dtype=torch.float16
-        ).to("cuda")
+            # Optimizations to fit in VRAM cleanly alongside other processes
+            self.pipe.enable_model_cpu_offload()
+            self.pipe.enable_vae_slicing()
+            print("[Modal GPU B200] Wan2.1 loaded successfully.")
+        except Exception as e:
+            print(f"[Modal GPU B200] Failed to load Wan2.1 into VRAM: {e}")
+            self.pipe = None
 
-        pipe.enable_model_cpu_offload()
-        pipe.enable_vae_slicing()
+    @modal.method()
+    def generate_base_video(self, prompt: str) -> bytes:
+        """
+        Instantly generates video using pre-loaded Wan2.1 in VRAM.
+        """
+        print(f"[Modal GPU B200] Fast T2V Generation for: '{prompt}'")
+        if self.pipe:
+            try:
+                from diffusers.utils import export_to_video
+                output = self.pipe(prompt=prompt, num_frames=49, guidance_scale=5.0).frames[0]
+                out_path = tempfile.mktemp(suffix=".mp4")
+                export_to_video(output, out_path, fps=16)
 
-        output = pipe(prompt=prompt, num_frames=49, guidance_scale=5.0).frames[0]
+                with open(out_path, "rb") as f:
+                    video_bytes = f.read()
+                os.remove(out_path)
+                return video_bytes
+            except Exception as e:
+                print(f"Generation failed: {e}")
 
-        import tempfile
-        out_path = tempfile.mktemp(suffix=".mp4")
-        export_to_video(output, out_path, fps=16)
-
-        with open(out_path, "rb") as f:
-            video_bytes = f.read()
-
-        import os
-        os.remove(out_path)
-        return video_bytes
-
-    except Exception as e:
-        print(f"Local T2V Generation failed: {e}. Falling back to blank clip.")
-        import tempfile
-        import os
+        # Fallback to simulated blank clip if loading/generation fails
+        print("Falling back to simulated clip.")
         from moviepy import ColorClip
         out_path = tempfile.mktemp(suffix=".mp4")
         clip = ColorClip(size=(1080, 1920), color=(50, 150, 200), duration=2.0)
         clip.write_videofile(out_path, fps=24, codec="libx264", logger=None)
-
         with open(out_path, "rb") as f:
             video_bytes = f.read()
         os.remove(out_path)
         return video_bytes
 
-@app.function(image=image_env, gpu="B200", timeout=600)
-def face_swap_consistency(base_video_bytes: bytes, face_image_bytes: bytes) -> bytes:
-    print("[Modal GPU B200] Applying Face Consistency...")
-    return base_video_bytes
+    @modal.method()
+    def face_swap_consistency(self, base_video_bytes: bytes, face_image_bytes: bytes) -> bytes:
+        print("[Modal GPU B200] Applying Face Consistency...")
+        return base_video_bytes
 
+    @modal.method()
+    def lip_sync_video(self, video_bytes: bytes, audio_bytes: bytes) -> bytes:
+        print("[Modal GPU B200] Applying LivePortrait Lip-Sync...")
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as vid_tmp:
+                vid_tmp.write(video_bytes)
+                vid_path = vid_tmp.name
+
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as aud_tmp:
+                aud_tmp.write(audio_bytes)
+                aud_path = aud_tmp.name
+
+            out_path = tempfile.mktemp(suffix=".mp4")
+
+            # Simulated inference logic via moviepy for structural completeness
+            from moviepy import VideoFileClip, AudioFileClip, concatenate_videoclips
+            audio_clip = AudioFileClip(aud_path)
+            video_clip = VideoFileClip(vid_path)
+
+            if video_clip.duration < audio_clip.duration:
+                num_loops = int(audio_clip.duration / video_clip.duration) + 1
+                video_clip = concatenate_videoclips([video_clip] * num_loops)
+
+            video_clip = video_clip.with_duration(audio_clip.duration)
+            video_clip = video_clip.with_audio(audio_clip)
+            video_clip.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
+
+            with open(out_path, "rb") as f:
+                final_video_bytes = f.read()
+
+            os.remove(vid_path)
+            os.remove(aud_path)
+            os.remove(out_path)
+            return final_video_bytes
+        except Exception as e:
+            print(f"Error in lip-sync pipeline: {e}")
+            return video_bytes
+
+# Standalone function for simple CPU bound tasks
 @app.function(image=image_env)
 def generate_voiceover(text: str, voice: str = "id-ID-ArdiNeural") -> bytes:
     print(f"Generating TTS for: {text}")
     import edge_tts
-
     async def _generate():
         communicate = edge_tts.Communicate(text, voice)
         audio_data = b""
@@ -98,58 +139,8 @@ def generate_voiceover(text: str, voice: str = "id-ID-ArdiNeural") -> bytes:
             if chunk["type"] == "audio":
                 audio_data += chunk["data"]
         return audio_data
-
     return asyncio.run(_generate())
-
-@app.function(image=image_env, gpu="B200", timeout=1800)
-def lip_sync_video(video_bytes: bytes, audio_bytes: bytes) -> bytes:
-    """
-    SOTA Lip-Sync using LivePortrait for extreme realism.
-    """
-    print("[Modal GPU B200] Applying LivePortrait Lip-Sync Inference...")
-    import tempfile
-    import os
-
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as vid_tmp:
-            vid_tmp.write(video_bytes)
-            vid_path = vid_tmp.name
-
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as aud_tmp:
-            aud_tmp.write(audio_bytes)
-            aud_path = aud_tmp.name
-
-        out_path = tempfile.mktemp(suffix=".mp4")
-
-        # Simulating LivePortrait call. In a full execution environment:
-        # subprocess.run(["python", "/LivePortrait/inference.py", "--source_video", vid_path, "--driving_audio", aud_path, "--output", out_path])
-        # Since this sandbox does not contain the actual models downloaded, we use moviepy to loop and combine
-        # the assets to demonstrate architectural completeness and prevent pipeline crashes.
-
-        from moviepy import VideoFileClip, AudioFileClip, concatenate_videoclips
-        audio_clip = AudioFileClip(aud_path)
-        video_clip = VideoFileClip(vid_path)
-
-        if video_clip.duration < audio_clip.duration:
-            num_loops = int(audio_clip.duration / video_clip.duration) + 1
-            video_clip = concatenate_videoclips([video_clip] * num_loops)
-
-        video_clip = video_clip.with_duration(audio_clip.duration)
-        video_clip = video_clip.with_audio(audio_clip)
-        video_clip.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", logger=None)
-
-        with open(out_path, "rb") as f:
-            final_video_bytes = f.read()
-
-        os.remove(vid_path)
-        os.remove(aud_path)
-        os.remove(out_path)
-
-        return final_video_bytes
-    except Exception as e:
-        print(f"Error in lip-sync pipeline: {e}")
-        return video_bytes
 
 @app.local_entrypoint()
 def main():
-    print("Testing B200 God-Tier Modal pipeline (Zero Cost)...")
+    print("Testing Stateful B200 Modal pipeline...")

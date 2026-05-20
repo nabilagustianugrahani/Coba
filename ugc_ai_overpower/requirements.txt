@@ -8,3 +8,6 @@ schedule
 fastapi
 uvicorn
 mcp
+curl_cffi
+playwright
+playwright-stealth

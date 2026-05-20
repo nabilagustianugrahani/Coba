@@ -2,6 +2,7 @@ import logging
 import os
 import json
 import modal
+import hashlib
 from scraper.scraper import EcommerceScraper
 from evaluator.evaluator import FYPEvaluator
 from video_processor.auto_editor import AutoEditor
@@ -12,11 +13,13 @@ logger = logging.getLogger(__name__)
 
 from modal_gpu.modal_app import (
     app as modal_app,
-    generate_base_video,
-    face_swap_consistency,
-    generate_voiceover,
-    lip_sync_video
+    ModelGenerator,
+    generate_voiceover
 )
+
+# Initialize caching directory
+CACHE_DIR = "broll_cache"
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 def get_face_bytes():
     face_path = "assets/influencer_face.jpg"
@@ -24,6 +27,24 @@ def get_face_bytes():
         with open(face_path, "rb") as f:
             return f.read()
     return b"dummy_face_bytes"
+
+def get_cached_broll(prompt: str) -> bytes:
+    """Returns cached B-Roll bytes if available, else None."""
+    prompt_hash = hashlib.md5(prompt.encode('utf-8')).hexdigest()
+    cache_path = os.path.join(CACHE_DIR, f"{prompt_hash}.mp4")
+    if os.path.exists(cache_path):
+        logger.info(f"B-Roll Cache Hit for prompt: {prompt[:30]}...")
+        with open(cache_path, "rb") as f:
+            return f.read()
+    return None
+
+def set_cached_broll(prompt: str, video_bytes: bytes):
+    """Saves generated B-Roll bytes to cache."""
+    prompt_hash = hashlib.md5(prompt.encode('utf-8')).hexdigest()
+    cache_path = os.path.join(CACHE_DIR, f"{prompt_hash}.mp4")
+    with open(cache_path, "wb") as f:
+        f.write(video_bytes)
+    logger.info(f"Saved B-Roll to cache: {cache_path}")
 
 def generate_video_modal_remote(swarm_data: dict, video_path: str):
     logger.info("Connecting to Modal B200 God-Tier pipeline...")
@@ -35,15 +56,23 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
 
         b_roll_data = []
 
-        # Check if modal token exists, otherwise fallback to local execution for testing
+        # Instantiate the Stateful generator class
+        generator = ModelGenerator()
+
         if os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml")):
             with modal_app.run():
                 logger.info("Generating Text-to-Video Base remotely on Modal...")
-                base_vid_bytes = generate_base_video.remote(motion_prompt)
+                base_vid_bytes = generator.generate_base_video.remote(motion_prompt)
 
-                logger.info("Generating B-Rolls remotely on Modal...")
+                logger.info("Generating B-Rolls remotely on Modal (with Caching)...")
                 for b_roll in b_roll_schedule:
-                    b_bytes = generate_base_video.remote(b_roll["prompt"])
+                    cached_bytes = get_cached_broll(b_roll["prompt"])
+                    if cached_bytes:
+                        b_bytes = cached_bytes
+                    else:
+                        b_bytes = generator.generate_base_video.remote(b_roll["prompt"])
+                        set_cached_broll(b_roll["prompt"], b_bytes)
+
                     b_roll_data.append({
                         "start": b_roll["start"],
                         "end": b_roll["end"],
@@ -51,21 +80,27 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
                     })
 
                 logger.info("Applying FaceFusion remotely on Modal...")
-                swapped_vid_bytes = face_swap_consistency.remote(base_vid_bytes, face_bytes)
+                swapped_vid_bytes = generator.face_swap_consistency.remote(base_vid_bytes, face_bytes)
 
                 logger.info("Generating Edge-TTS Audio remotely on Modal...")
                 audio_bytes = generate_voiceover.remote(narration)
 
                 logger.info("Running LivePortrait Lip-Sync remotely on Modal...")
-                synced_vid_bytes = lip_sync_video.remote(swapped_vid_bytes, audio_bytes)
+                synced_vid_bytes = generator.lip_sync_video.remote(swapped_vid_bytes, audio_bytes)
         else:
             logger.warning("No Modal Token found. Falling back to local execution for pipeline testing.")
             logger.info("Generating Text-to-Video Base locally...")
-            base_vid_bytes = generate_base_video.local(motion_prompt)
+            base_vid_bytes = generator.generate_base_video.local(motion_prompt)
 
-            logger.info("Generating B-Rolls locally...")
+            logger.info("Generating B-Rolls locally (with Caching)...")
             for b_roll in b_roll_schedule:
-                b_bytes = generate_base_video.local(b_roll["prompt"])
+                cached_bytes = get_cached_broll(b_roll["prompt"])
+                if cached_bytes:
+                    b_bytes = cached_bytes
+                else:
+                    b_bytes = generator.generate_base_video.local(b_roll["prompt"])
+                    set_cached_broll(b_roll["prompt"], b_bytes)
+
                 b_roll_data.append({
                     "start": b_roll["start"],
                     "end": b_roll["end"],
@@ -73,11 +108,11 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
                 })
 
             logger.info("Applying FaceFusion locally...")
-            swapped_vid_bytes = face_swap_consistency.local(base_vid_bytes, face_bytes)
+            swapped_vid_bytes = generator.face_swap_consistency.local(base_vid_bytes, face_bytes)
             logger.info("Generating Edge-TTS Audio locally...")
             audio_bytes = generate_voiceover.local(narration)
             logger.info("Running LivePortrait Lip-Sync locally...")
-            synced_vid_bytes = lip_sync_video.local(swapped_vid_bytes, audio_bytes)
+            synced_vid_bytes = generator.lip_sync_video.local(swapped_vid_bytes, audio_bytes)
 
         logger.info("Applying Auto-Captions and B-Rolls locally...")
         editor = AutoEditor()
