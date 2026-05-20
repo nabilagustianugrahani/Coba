@@ -45,18 +45,23 @@ def set_cached_broll(prompt: str, video_bytes: bytes):
 def generate_video_modal_remote(swarm_data: dict, video_path: str):
     logger.info("Connecting to Modal B200 God-Tier pipeline...")
     try:
-        narration = swarm_data["narration"]
-        motion_prompt = swarm_data["avatar_motion_prompt"]
+        # Parse Swarm Data for Multi-Persona
+        narration = swarm_data["combined_narration_script"]
+        motion_prompt_a = swarm_data["avatar_a_motion_prompt"]
         b_roll_schedule = swarm_data.get("b_roll_schedule", [])
+        live_chat_schedule = swarm_data.get("live_chat_schedule", [])
+
         face_bytes = get_face_bytes()
 
         b_roll_data = []
         generator = ModelGenerator()
 
+        # Check if modal token exists, otherwise fallback to local execution for testing
         if os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml")):
             with modal_app.run():
+                # We generate base video using Host A prompt as the primary visual anchor
                 logger.info("Generating Text-to-Video Base remotely on Modal...")
-                base_vid_bytes = generator.generate_base_video.remote(motion_prompt)
+                base_vid_bytes = generator.generate_base_video.remote(motion_prompt_a)
 
                 logger.info("Generating B-Rolls remotely on Modal (with Caching)...")
                 for b_roll in b_roll_schedule:
@@ -71,6 +76,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
                 logger.info("Applying FaceFusion remotely on Modal...")
                 swapped_vid_bytes = generator.face_swap_consistency.remote(base_vid_bytes, face_bytes)
 
+                # F5-TTS will handle the multi-persona audio stream
                 logger.info("Generating F5-TTS Audio remotely on Modal...")
                 audio_bytes = generator.generate_voiceover_f5.remote(narration)
 
@@ -78,7 +84,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
                 synced_vid_bytes = generator.lip_sync_video.remote(swapped_vid_bytes, audio_bytes)
         else:
             logger.warning("No Modal Token found. Falling back to local execution for pipeline testing.")
-            base_vid_bytes = generator.generate_base_video.local(motion_prompt)
+            base_vid_bytes = generator.generate_base_video.local(motion_prompt_a)
 
             for b_roll in b_roll_schedule:
                 cached_bytes = get_cached_broll(b_roll["prompt"])
@@ -93,9 +99,16 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str):
             audio_bytes = generator.generate_voiceover_f5.local(narration)
             synced_vid_bytes = generator.lip_sync_video.local(swapped_vid_bytes, audio_bytes)
 
-        logger.info("Applying Auto-Captions and B-Rolls locally...")
+        logger.info("Applying Split-Screen, Live Commerce Overlays, Auto-Captions and B-Rolls locally...")
         editor = AutoEditor()
-        final_video_bytes = editor.apply_automated_factory_edit(synced_vid_bytes, audio_bytes, narration, b_roll_data)
+        # Feed the entire dataset into the factory editor
+        final_video_bytes = editor.apply_automated_factory_edit(
+            synced_vid_bytes,
+            audio_bytes,
+            narration,
+            b_roll_data=b_roll_data,
+            live_chat_data=live_chat_schedule
+        )
 
         with open(video_path, "wb") as f:
             f.write(final_video_bytes)

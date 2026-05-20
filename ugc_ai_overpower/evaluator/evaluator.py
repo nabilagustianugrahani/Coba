@@ -34,9 +34,9 @@ class FYPEvaluator:
 
     def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None) -> dict:
         """
-        'Swarm in a Prompt' architecture infused with live TikTok Trend data.
+        'Swarm in a Prompt' updated for Multi-Persona AI "Podcast" Debate Mode and "Live Commerce" Simulation.
         """
-        logger.info(f"[Swarm AI] Generating God-Tier Script & Prompts for {product_name}...")
+        logger.info(f"[Swarm AI] Generating God-Tier Podcast & Live Commerce Script for {product_name}...")
 
         trends_context = ""
         if trend_data:
@@ -50,26 +50,32 @@ You are tasked with creating a viral TikTok/Reels UGC video for the product: '{p
 {trends_context}
 
 You must act as 6 roles simultaneously:
-1. TREND WATCHER: Adapt the live trending hooks directly into the script's first 3 seconds.
-2. SCRIPTWRITER: Write highly engaging, fast-paced narration optimized for F5-TTS (human-level emotion).
+1. TREND WATCHER: Adapt the live trending hooks directly into the script.
+2. SCRIPTWRITER (MULTI-PERSONA & LIVE COMMERCE): Write a script featuring TWO personas (Host A: Skeptical, Host B: Enthusiastic Expert) debating the product in a fast-paced podcast style.
+   - INJECT SIMULATED LIVE COMMERCE INTERACTIONS: Host B must periodically respond to fake live chat comments (e.g., "Wah ada pertanyaan dari kak Budi...").
 3. DIRECTOR: Suggest visual B-Roll scenes.
-4. COMPLIANCE: Ensure no shadowbanned words (e.g., use 'Cek keranjang', 'Si Oren' instead of 'Beli', 'Shopee').
-5. MASTER PROMPT ENGINEER: Write mathematically perfect, highly detailed Text-to-Video (T2V) prompts forbidding morphing/artifacts.
-6. VIDEO EDITOR AI: Define exact timestamps (in seconds) where the B-Roll scenes should be overlaid.
+4. COMPLIANCE: Ensure no shadowbanned words (use 'Cek keranjang', 'Si Oren').
+5. MASTER PROMPT ENGINEER: Write mathematically perfect Text-to-Video (T2V) prompts for Host A and Host B (forbidding morphing/artifacts).
+6. VIDEO EDITOR AI: Define timestamps (in seconds) for B-Roll scenes and define timestamps for fake Live Chat UI popups.
 
 Output ONLY a valid JSON object matching this structure:
 {{
     "hook": "The first 3 seconds to grab attention",
-    "narration": "Full spoken script for F5-TTS, including emotional markers if any",
-    "avatar_motion_prompt": "FLAWLESS detailed prompt for Text-to-Video model.",
+    "narration_host_a": "Script for Host A (Skeptical)",
+    "narration_host_b": "Script for Host B (Expert, answers fake live chat)",
+    "combined_narration_script": "The chronological text of the entire dialogue",
+    "avatar_a_motion_prompt": "FLAWLESS detailed prompt for Text-to-Video model (Host A).",
+    "avatar_b_motion_prompt": "FLAWLESS detailed prompt for Text-to-Video model (Host B).",
     "negative_prompt": "Detailed negative prompt to prevent artifacts",
     "b_roll_schedule": [
-        {{ "prompt": "Cinematic B-Roll 1", "start": 2.0, "end": 4.5 }},
-        {{ "prompt": "Cinematic B-Roll 2", "start": 6.0, "end": 8.0 }}
+        {{ "prompt": "Cinematic B-Roll 1", "start": 2.0, "end": 4.5 }}
+    ],
+    "live_chat_schedule": [
+        {{ "username": "budi_gaming", "comment": "Beneran ngaruh bang?", "start": 5.0, "end": 8.0 }}
     ],
     "hashtags": ["#tag1", "#tag2"],
     "score": 95,
-    "feedback": "Why this script will hit the FYP based on the trends"
+    "feedback": "Why this podcast/live-commerce style will hit the FYP"
 }}
 """
         return self._run_prompt(prompt, product_name, trend_data)
@@ -110,24 +116,30 @@ Output ONLY a valid JSON object matching this structure:
 
         return {
             "hook": hook,
-            "narration": f"{hook} Aku nemu rahasia dari {product_name} yang beneran ngebantu banget. Teksturnya super ringan, cepet meresap. Cek keranjang kuning sekarang mumpung lagi diskon di si oren!",
-            "avatar_motion_prompt": "Medium shot of a beautiful Indonesian woman vlogging, eye-level angle, soft volumetric lighting, holding camera steady, realistic skin texture, photorealistic, 8k, locked off camera, no movement",
+            "narration_host_a": f"{hook} Gak percaya gue sama produk ginian.",
+            "narration_host_b": f"Eh jangan salah! {product_name} ini beda. Tuh lihat kak Budi nanya di chat, emang ngaruh? Ngaruh banget bro! Cek keranjang kuning sekarang mumpung lagi diskon di si oren!",
+            "combined_narration_script": f"Host A: {hook} Gak percaya gue sama produk ginian. Host B: Eh jangan salah! {product_name} ini beda. Tuh lihat kak Budi nanya di chat, emang ngaruh? Ngaruh banget bro! Cek keranjang kuning sekarang mumpung lagi diskon di si oren!",
+            "avatar_a_motion_prompt": "Medium shot of a skeptical Indonesian man vlogging, podcast mic, eye-level angle, soft volumetric lighting, photorealistic, 8k, locked off camera",
+            "avatar_b_motion_prompt": "Medium shot of an enthusiastic Indonesian woman vlogging, podcast mic, eye-level angle, soft volumetric lighting, photorealistic, 8k, locked off camera",
             "negative_prompt": "morphed face, bad anatomy, extra fingers, jitter, low resolution, blurry, distorted, cartoon, 3d render",
             "b_roll_schedule": [
                 {
                     "prompt": f"Cinematic close up of {product_name} texture on hand, 4k macro",
                     "start": 2.0,
                     "end": 4.0
-                },
+                }
+            ],
+            "live_chat_schedule": [
                 {
-                    "prompt": f"Aesthetic shot of {product_name} packaging on a wooden table with sunlight",
-                    "start": 5.5,
-                    "end": 7.5
+                    "username": "budi_gaming",
+                    "comment": "Beneran ngaruh bang?",
+                    "start": 5.0,
+                    "end": 8.0
                 }
             ],
             "hashtags": hashtags,
             "score": score,
-            "feedback": "Strong negative hook, compliant CTA, flawless vlog motion prompt, dynamic B-Roll editing."
+            "feedback": "Multi-persona podcast format with simulated live commerce chat increases engagement drastically."
         }
 
     def evaluate_final_video(self, script_data: dict, video_path: str) -> dict:
@@ -137,9 +149,10 @@ You are an AI TikTok Algorithm simulator.
 Evaluate the final completed UGC video metadata for FYP viral potential.
 
 Original Script Hook: {script_data.get('hook')}
-Original Narration: {script_data.get('narration')}
-Video Motion Style: {script_data.get('avatar_motion_prompt')}
+Original Narration: {script_data.get('combined_narration_script')}
+Video Motion Style: {script_data.get('avatar_a_motion_prompt')}
 Editor Insertions: {len(script_data.get('b_roll_schedule', []))} B-Rolls
+Live Chat Simulated: {len(script_data.get('live_chat_schedule', []))} interactions
 
 Does this combination have a high probability of going viral in Indonesia right now?
 Output ONLY valid JSON:

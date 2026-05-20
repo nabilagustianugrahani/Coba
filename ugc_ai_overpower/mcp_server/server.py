@@ -52,7 +52,7 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="swarm_evaluate_script",
-            description="Swarm AI evaluates and generates Hook, Narration, and Vlog Motion Prompt using live trends",
+            description="Swarm AI evaluates and generates Hook, Multi-Persona Podcast Script, and Vlog Motion Prompt using live trends",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -65,7 +65,7 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="generate_god_tier_video",
-            description="Trigger Stateful Modal B200 to generate Vlog-style AI Influencer Video with F5-TTS, Caching and Auto-Captions",
+            description="Trigger Stateful Modal B200 to generate Multi-Persona Podcast Video with Live Commerce UI, Split-Screen Brainrot, and F5-TTS",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -123,17 +123,19 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     elif name == "generate_god_tier_video":
         try:
             swarm_data = json.loads(arguments.get("swarm_json_string"))
-            narration = swarm_data["narration"]
-            motion_prompt = swarm_data["avatar_motion_prompt"]
+            # Properly updated to handle Multi-Persona JSON structure
+            narration = swarm_data["combined_narration_script"]
+            motion_prompt_a = swarm_data["avatar_a_motion_prompt"]
             b_roll_schedule = swarm_data.get("b_roll_schedule", [])
-            face_bytes = get_face_bytes()
+            live_chat_schedule = swarm_data.get("live_chat_schedule", [])
 
+            face_bytes = get_face_bytes()
             b_roll_data = []
             generator = ModelGenerator()
 
             if os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml")):
                 with modal_app.run():
-                    base_vid_bytes = generator.generate_base_video.remote(motion_prompt)
+                    base_vid_bytes = generator.generate_base_video.remote(motion_prompt_a)
 
                     for b_roll in b_roll_schedule:
                         cached_bytes = get_cached_broll(b_roll["prompt"])
@@ -148,7 +150,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                     audio_bytes = generator.generate_voiceover_f5.remote(narration)
                     synced_vid_bytes = generator.lip_sync_video.remote(swapped_vid_bytes, audio_bytes)
             else:
-                base_vid_bytes = generator.generate_base_video.local(motion_prompt)
+                base_vid_bytes = generator.generate_base_video.local(motion_prompt_a)
 
                 for b_roll in b_roll_schedule:
                     cached_bytes = get_cached_broll(b_roll["prompt"])
@@ -164,7 +166,13 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                 synced_vid_bytes = generator.lip_sync_video.local(swapped_vid_bytes, audio_bytes)
 
             editor = AutoEditor()
-            final_video_bytes = editor.apply_automated_factory_edit(synced_vid_bytes, audio_bytes, narration, b_roll_data)
+            final_video_bytes = editor.apply_automated_factory_edit(
+                synced_vid_bytes,
+                audio_bytes,
+                narration,
+                b_roll_data=b_roll_data,
+                live_chat_data=live_chat_schedule
+            )
 
             video_path = "mcp_output.mp4"
             with open(video_path, "wb") as f:
