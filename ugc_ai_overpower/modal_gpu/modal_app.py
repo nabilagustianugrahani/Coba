@@ -30,7 +30,7 @@ image_env = (
     .run_function(download_models)
 )
 
-@app.cls(image=image_env, gpu="B200", timeout=3600, min_containers=1)
+@app.cls(image=image_env, gpu="B200", timeout=600)
 class ModelGenerator:
     @modal.enter()
     def load_models(self):

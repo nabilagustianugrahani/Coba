@@ -1,0 +1,11 @@
+
+# Generated Output
+output_god_tier_ugc_variant_*.mp4
+mcp_output.mp4
+tmp*TEMP_MPY_*.mp4
+tmp*TEMP_MPY_*.mp3
+broll_cache/
+performance_db.json
+
+# Audio Assets (Generated)
+assets/sfx/*.mp3

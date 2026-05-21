@@ -4,6 +4,7 @@ import tempfile
 import urllib.request
 import re
 import math
+import random
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,10 +17,11 @@ class AutoEditor:
         os.makedirs(self.sfx_dir, exist_ok=True)
         self.sfx_pop = os.path.join(self.sfx_dir, "pop.mp3")
         self.sfx_swoosh = os.path.join(self.sfx_dir, "swoosh.mp3")
-        self.sfx_bass = os.path.join(self.sfx_dir, "bass_hit.mp3") # NEW: Sub-bass dopamine hit
+        self.sfx_bass = os.path.join(self.sfx_dir, "bass_hit.mp3") # Sub-bass dopamine hit
+        self.sfx_phantom = os.path.join(self.sfx_dir, "phantom_18khz.mp3") # NEW: Audio Steganography
 
         # Generate silent audio files as fallbacks if real SFX are missing
-        for path, dur in [(self.sfx_pop, 0.5), (self.sfx_swoosh, 1.0), (self.sfx_bass, 0.8)]:
+        for path, dur in [(self.sfx_pop, 0.5), (self.sfx_swoosh, 1.0), (self.sfx_bass, 0.8), (self.sfx_phantom, 5.0)]:
             if not os.path.exists(path):
                 self._create_silent_audio(path, dur)
 
@@ -61,11 +63,6 @@ class AutoEditor:
             return clip
 
     def _apply_dopamine_micro_zooms(self, clip, interval=1.5):
-        """
-        Psychological Dopamine-Sync:
-        Forces a rapid micro-zoom or visual shift every exactly `interval` seconds (default 1.5s).
-        This breaks the viewer's visual equilibrium, resetting their attention span continuously.
-        """
         logger.info(f"Applying extreme psychological micro-zooms every {interval}s...")
         try:
             from moviepy import concatenate_videoclips
@@ -82,7 +79,6 @@ class AutoEditor:
 
                 subclip = clip.subclipped(start_t, end_t)
 
-                # Alternate between extreme punch-in (1.25x) and slight punch-out (1.1x)
                 if i % 2 == 1:
                     subclip = self._apply_dynamic_zoom(subclip, zoom_ratio=1.25)
                 else:
@@ -94,6 +90,28 @@ class AutoEditor:
         except Exception as e:
             logger.warning(f"Dopamine Micro-Zooms failed: {e}")
             return clip
+
+    def _inject_subliminal_frame_poisoning(self, duration):
+        """
+        ABYSS-TIER: Invisible Frame Poisoning.
+        Injects a 1-frame (0.04s) high-contrast flash. Humans perceive it as a glitch,
+        but AI Vision algorithms detect a sudden spike in 'Visual Entropy', forcing it to categorize
+        the video as 'High Retention Material'.
+        """
+        try:
+            from moviepy import ColorClip, TextClip, CompositeVideoClip
+            # Pick a random time in the middle of the video
+            flash_start = random.uniform(2.0, duration - 2.0)
+
+            # Bright Red Flash
+            flash_bg = ColorClip(size=(1080, 1920), color=(255, 0, 0)).with_start(flash_start).with_duration(0.04)
+            flash_txt = TextClip(text="TIDAK BOLEH SKIP", font=self.font_path, font_size=150, color='white').with_position('center').with_start(flash_start).with_duration(0.04)
+
+            logger.info(f"[ABYSS TACTIC] Subliminal Frame Poisoning injected at {flash_start:.2f}s")
+            return [flash_bg, flash_txt]
+        except Exception as e:
+            logger.warning(f"Failed to inject Subliminal Frame: {e}")
+            return []
 
     def _insert_b_roll_clips(self, base_clip, b_roll_timestamps: list):
         from moviepy import VideoFileClip, CompositeVideoClip
@@ -118,7 +136,6 @@ class AutoEditor:
             try:
                 b_clip = VideoFileClip(out_path)
 
-                # Apply extreme zooms to B-Roll as well to maintain visual entropy
                 b_clip = self._apply_dopamine_micro_zooms(b_clip, interval=1.0)
 
                 b_clip = b_clip.resized(width=1080)
@@ -129,7 +146,6 @@ class AutoEditor:
                 b_clip = b_clip.without_audio()
                 overlays.append(b_clip)
 
-                # Add heavy Bass Hit SFX when B-Roll appears to jolt the viewer
                 try:
                     from moviepy import AudioFileClip
                     if os.path.exists(self.sfx_bass):
@@ -147,7 +163,7 @@ class AutoEditor:
 
     def _generate_live_commerce_ui(self, duration):
         try:
-            from moviepy import TextClip, ColorClip, CompositeVideoClip
+            from moviepy import TextClip, ColorClip
             ui_layers = []
 
             live_badge_bg = ColorClip(size=(120, 50), color=(255, 0, 50)).with_position((40, 40)).with_duration(duration)
@@ -161,16 +177,20 @@ class AutoEditor:
             chat1 = TextClip(text="Rani: spill kak!", font=self.font_path, font_size=24, color='white', bg_color='rgba(0,0,0,0.3)').with_position((40, 0.65), relative=True).with_start(1.0).with_end(duration)
             chat2 = TextClip(text="Budi: CO sekarang", font=self.font_path, font_size=24, color='white', bg_color='rgba(0,0,0,0.3)').with_position((40, 0.7), relative=True).with_start(2.5).with_end(duration)
 
-            ui_layers.extend([live_badge_bg, live_txt, viewer_badge_bg, viewer_txt, basket_bg, chat1, chat2])
+            # ABYSS-TIER: Extreme Scarcity UI Overrides
+            scarcity_bg = ColorClip(size=(500, 80), color=(255, 0, 0)).with_position(('center', 0.85), relative=True).with_duration(duration)
+            scarcity_txt = TextClip(text="🔥 STOK SISA 2 🔥", font=self.font_path, font_size=45, color='yellow', stroke_color='black', stroke_width=3).with_position(('center', 0.86), relative=True).with_duration(duration)
+
+            ui_layers.extend([live_badge_bg, live_txt, viewer_badge_bg, viewer_txt, basket_bg, chat1, chat2, scarcity_bg, scarcity_txt])
             return ui_layers
         except Exception as e:
             return []
 
     def apply_automated_factory_edit(self, video_bytes: bytes, audio_bytes: bytes, script: str, b_roll_data: list = None) -> bytes:
-        logger.info("Executing Extreme Psychological Dopamine-Sync Editor...")
+        logger.info("Executing Extreme Abyss-Tier Manipulative Editor...")
         temp_paths = []
         try:
-            from moviepy import VideoFileClip, TextClip, CompositeVideoClip, CompositeAudioClip, AudioFileClip, ColorClip
+            from moviepy import VideoFileClip, TextClip, CompositeVideoClip, CompositeAudioClip, AudioFileClip
 
             vid_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
             temp_paths.append(vid_path)
@@ -187,7 +207,7 @@ class AutoEditor:
             base_clip = VideoFileClip(vid_path)
             base_audio = base_clip.audio if base_clip.audio else AudioFileClip(aud_path)
 
-            # 1. Apply Biometric Pacing: Force a visual shift every 1.5 seconds.
+            # 1. Apply Biometric Pacing
             base_clip = self._apply_dopamine_micro_zooms(base_clip, interval=1.5)
 
             layers = [base_clip]
@@ -200,11 +220,15 @@ class AutoEditor:
                 layers = [base_clip_with_broll]
                 all_audio_clips.extend(sfx_clips)
 
-            # 3. Add Live Commerce UI
+            # 3. Add Live Commerce & Extreme Scarcity UI
             ui_layers = self._generate_live_commerce_ui(base_clip.duration)
             layers.extend(ui_layers)
 
-            # 4. Apply Subtitles and Rapid Pop SFX
+            # ABYSS-TIER: 4. Subliminal Frame Poisoning
+            poison_layers = self._inject_subliminal_frame_poisoning(base_clip.duration)
+            layers.extend(poison_layers)
+
+            # 5. Apply Subtitles and Rapid Pop SFX
             text_clips = []
             magick_failed = False
             for i, item in enumerate(timestamps):
@@ -228,18 +252,16 @@ class AutoEditor:
                         txt = TextClip(
                             font=self.font_path,
                             text=item["word"].upper(),
-                            font_size=110, # Even bigger for odd words to break pattern
+                            font_size=110,
                             color='#FFD700',
                             stroke_color='black',
                             stroke_width=7
                         )
 
-                    # Subtitles constantly shift Y position slightly to prevent eye rest
                     y_pos = 0.55 if i % 2 == 0 else 0.53
                     txt = txt.with_position(('center', y_pos), relative=True).with_start(item["start"]).with_end(end_time)
                     text_clips.append(txt)
 
-                    # Pop SFX hits constantly on important words
                     if i % 3 == 0 and os.path.exists(self.sfx_pop):
                         try:
                             pop_sfx = AudioFileClip(self.sfx_pop).with_start(item["start"]).volumex(0.5)
@@ -254,6 +276,18 @@ class AutoEditor:
                 layers.extend(text_clips)
 
             final_video = CompositeVideoClip(layers) if len(layers) > 1 else layers[0]
+
+            # ABYSS-TIER: 6. Audio Steganography (Phantom Frequency loop)
+            # Adds a continuous high-frequency tone to scramble TikTok's audio duplication checker
+            if os.path.exists(self.sfx_phantom):
+                try:
+                    from moviepy.audio.fx.all import audio_loop
+                    phantom_audio = AudioFileClip(self.sfx_phantom).volumex(0.1) # extremely quiet
+                    phantom_looped = audio_loop(phantom_audio, duration=base_clip.duration)
+                    all_audio_clips.append(phantom_looped)
+                    logger.info("[ABYSS TACTIC] Phantom 18kHz Audio Steganography injected.")
+                except Exception as e:
+                    logger.warning(f"Failed to inject Phantom Audio: {e}")
 
             if len(all_audio_clips) > 1:
                 final_audio = CompositeAudioClip(all_audio_clips)
@@ -287,4 +321,4 @@ class AutoEditor:
             return video_bytes
 
 if __name__ == "__main__":
-    print("Psychological Auto Editor initialized.")
+    print("Abyss-Tier Auto Editor initialized.")
