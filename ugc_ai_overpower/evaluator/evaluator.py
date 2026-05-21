@@ -70,9 +70,9 @@ class FYPEvaluator:
 
     def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None) -> dict:
         """
-        'Swarm in a Prompt' incorporating Character Sheet Director for flawless consistency.
+        'Swarm in a Prompt' incorporating Character Sheet Director and I2V Motion Prompts.
         """
-        logger.info(f"[Swarm AI] Generating Evolutionary Node-Based Workflow for {product_name}...")
+        logger.info(f"[Swarm AI] Generating Evolutionary I2V Node-Based Workflow for {product_name}...")
 
         trends_context = ""
         if trend_data:
@@ -88,16 +88,17 @@ Task: Create a viral TikTok/Reels UGC video workflow for '{product_name}' (Niche
 {trends_context}
 {rag_context}
 
-You must act as these roles to build a NODE-BASED WORKFLOW JSON:
+You must act as these roles to build an I2V (Image-to-Video) NODE-BASED WORKFLOW JSON:
 
 1. AD ANALYZER: Choose `05_extend_and_stitch` template.
 2. SCRIPTWRITER & COMPLIANCE: Learn from DARWINIAN DATA. No shadowbanned words.
 3. CHARACTER SHEET DIRECTOR (CRITICAL):
    - You MUST design an absolute flawless anchor face/character blueprint.
-   - This prompt must explicitly define age, ethnicity, bone structure, eye color, and clothing.
    - Example: "Portrait of a 24-year-old Indonesian female, high cheekbones, natural skin texture, short black hair, wearing a white minimalist turtleneck, studio lighting, hyper-detailed, 8k resolution, raw photo."
-4. MASTER PROMPT ENGINEER:
-   - Match the video generation prompts EXACTLY to the Character Sheet Director's clothing and styling so there are no morphing artifacts.
+4. MASTER PROMPT ENGINEER (I2V Specialist):
+   - Instead of T2V, write explicit I2V (Image-to-Video) Motion Prompts for `Wan2.1-I2V`.
+   - Your prompts MUST ONLY describe how the character from the anchor image moves.
+   - Example: "The character turns her head slightly to the left while smiling, holding up the product. Smooth camera pan, 15s."
 5. NODE ARCHITECT: Output generation steps using `{{{{node_id}}}}` syntax.
 
 Output ONLY valid JSON matching this schema:
@@ -107,11 +108,11 @@ Output ONLY valid JSON matching this schema:
     "hashtags": ["#tag1"],
     "nodes": [
         {{ "id": "node_character_prompt", "type": "t2i_character_prompt", "value": "Portrait of..." }},
-        {{ "id": "node_part1_prompt", "type": "t2v_prompt", "value": "..." }},
-        {{ "id": "node_part2_prompt", "type": "t2v_prompt", "value": "..." }},
+        {{ "id": "node_part1_prompt", "type": "i2v_motion_prompt", "value": "I2V motion description..." }},
+        {{ "id": "node_part2_prompt", "type": "i2v_motion_prompt", "value": "I2V motion description..." }},
         {{ "id": "node_narration_part1", "type": "text", "value": "Script part 1" }},
         {{ "id": "node_narration_part2", "type": "text", "value": "Script part 2" }},
-        {{ "id": "node_broll_1", "type": "broll_prompt", "value": "...", "start": 2.0, "end": 4.5 }}
+        {{ "id": "node_broll_1", "type": "broll_prompt", "value": "Macro product shot...", "start": 2.0, "end": 4.5 }}
     ],
     "execution_graph": {{
         "generate_character_anchor": "{{{{node_character_prompt}}}}",
@@ -170,13 +171,13 @@ Output ONLY valid JSON matching this schema:
                 },
                 {
                     "id": "node_part1_prompt",
-                    "type": "t2v_prompt",
-                    "value": "15s, 9:16, bright minimal bedroom, morning natural light. 24yo Indonesian woman, clear skin, white minimalist turtleneck. Eye-level, selfie-style handheld camera. No on-screen text. The feeling of fresh morning confidence."
+                    "type": "i2v_motion_prompt",
+                    "value": "The character holds the camera selfie-style, slightly tilting her head and blinking naturally. She points to her cheek. Smooth camera pan, 15s."
                 },
                 {
                     "id": "node_part2_prompt",
-                    "type": "t2v_prompt",
-                    "value": "15s, 9:16, bright minimal bedroom. Eye-level, tripod static camera. 24yo Indonesian woman in white minimalist turtleneck points to her glowing cheek and smiles warmly. No on-screen text. The feeling of lasting radiance."
+                    "type": "i2v_motion_prompt",
+                    "value": "The character smiles warmly and raises an eyebrow enthusiastically, holding the product. Static tripod shot, 15s."
                 },
                 {
                     "id": "node_narration_part1",

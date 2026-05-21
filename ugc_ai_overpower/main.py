@@ -5,6 +5,7 @@ import modal
 import hashlib
 import re
 import tempfile
+import time
 from scraper.scraper import EcommerceScraper, TikTokScraper
 from evaluator.evaluator import FYPEvaluator
 from video_processor.auto_editor import AutoEditor
@@ -50,7 +51,7 @@ def resolve_node_variables(value, nodes):
     return value
 
 def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str = "Host A"):
-    logger.info(f"Connecting to Modal B200 God-Tier Node pipeline for {persona}...")
+    logger.info(f"Connecting to Modal B200 God-Tier I2V pipeline for {persona}...")
     try:
         nodes = swarm_data.get("nodes", [])
         graph = swarm_data.get("execution_graph", {})
@@ -65,7 +66,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
         try:
             if ctx: ctx.__enter__()
 
-            logger.info("Executing 05_extend_and_stitch Template...")
+            logger.info("Executing 05_extend_and_stitch Template via I2V...")
 
             # Resolve Prompts
             char_prompt = resolve_node_variables(graph.get("generate_character_anchor", ""), nodes)
@@ -79,30 +80,27 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
             gen_vid = generator.generate_base_video.remote if is_remote else generator.generate_base_video.local
             gen_aud = generator.generate_voiceover_f5.remote if is_remote else generator.generate_voiceover_f5.local
             sync_vid = generator.lip_sync_video.remote if is_remote else generator.lip_sync_video.local
-            face_swap = generator.face_swap_consistency.remote if is_remote else generator.face_swap_consistency.local
 
-            # Generate Master Face Anchor
+            # Generate Master Face Anchor via SDXL
             logger.info(f"Generating Character Sheet Anchor for {persona}...")
             face_bytes = gen_img(char_prompt)
             if not face_bytes or len(face_bytes) < 100:
                 logger.warning("Character Image Generation failed. Falling back to dummy bytes.")
                 face_bytes = b"dummy_face_bytes"
 
-            # Part 1 Generate
-            logger.info("Generating Part 1...")
-            vid1 = gen_vid(prompt_part1)
-            vid1 = face_swap(vid1, face_bytes)
+            # Part 1 Generate (I2V using face_bytes)
+            logger.info("Generating Part 1 (I2V)...")
+            vid1 = gen_vid(prompt_part1, image_bytes=face_bytes)
             aud1 = gen_aud(audio_text_part1, persona=persona)
             synced_vid1 = sync_vid(vid1, aud1)
 
-            # Part 2 Generate
-            logger.info("Generating Part 2...")
-            vid2 = gen_vid(prompt_part2)
-            vid2 = face_swap(vid2, face_bytes)
+            # Part 2 Generate (I2V using face_bytes)
+            logger.info("Generating Part 2 (I2V)...")
+            vid2 = gen_vid(prompt_part2, image_bytes=face_bytes)
             aud2 = gen_aud(audio_text_part2, persona=persona)
             synced_vid2 = sync_vid(vid2, aud2)
 
-            # B-Roll Generate
+            # B-Roll Generate (T2V, no face anchor needed usually, but can pass dummy)
             b_roll_data = []
             for n in nodes:
                 if n.get("type") == "broll_prompt":
@@ -111,7 +109,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
                     if cached_bytes:
                         b_bytes = cached_bytes
                     else:
-                        b_bytes = gen_vid(b_prompt)
+                        b_bytes = gen_vid(b_prompt, image_bytes=b"dummy_face_bytes")
                         set_cached_broll(b_prompt, b_bytes)
                     b_roll_data.append({"start": n.get("start", 0), "end": n.get("end", 2.0), "clip_bytes": b_bytes})
 
@@ -160,7 +158,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
         return False
 
 def main():
-    logger.info("Starting God-Tier UGC Pipeline (Multi-Persona Network Setup)...")
+    logger.info("Starting God-Tier UGC Pipeline (Multi-Persona I2V Setup)...")
 
     scraper = EcommerceScraper()
     niche = os.getenv("UGC_NICHE", "beauty")
@@ -209,6 +207,16 @@ def main():
             logger.warning(f"Pipeline execution failed for {persona}.")
 
     logger.info("Pipeline completed successfully. All variants awaiting scheduled drip-feed uploads.")
+
+    import schedule
+    # Run the scheduler loop
+    logger.info("Starting schedule execution loop. Press Ctrl+C to stop.")
+    try:
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+    except KeyboardInterrupt:
+        logger.info("Scheduler loop terminated.")
 
 if __name__ == "__main__":
     main()

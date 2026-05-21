@@ -1,13 +1,17 @@
-import sys
-import os
 import asyncio
 import json
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import logging
+import os
+import tempfile
+from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 import mcp.types as types
+
+# Adjust import paths for testing
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scraper.scraper import EcommerceScraper, TikTokScraper
 from evaluator.evaluator import FYPEvaluator
@@ -19,7 +23,7 @@ from modal_gpu.modal_app import (
     ModelGenerator
 )
 from video_processor.auto_editor import AutoEditor
-from main import get_face_bytes, get_cached_broll, set_cached_broll, resolve_node_variables
+from main import get_cached_broll, set_cached_broll, resolve_node_variables, generate_video_modal_remote
 
 scraper = EcommerceScraper()
 tiktok_scraper = TikTokScraper()
@@ -123,94 +127,15 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     elif name == "generate_god_tier_video":
         try:
             swarm_data = json.loads(arguments.get("swarm_json_string"))
-            nodes = swarm_data.get("nodes", [])
-            graph = swarm_data.get("execution_graph", {})
-            template = swarm_data.get("template_type", "01_talking_head")
+            video_path = "mcp_output.mp4"
 
-            face_bytes = get_face_bytes()
-            generator = ModelGenerator()
+            # Delegate generation directly to main.py function so MCP server stays aligned with main pipeline
+            success = generate_video_modal_remote(swarm_data, video_path, persona="MCP Host")
 
-            is_remote = os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml"))
-            final_video_bytes = None
-
-            ctx = modal_app.run() if is_remote else None
-
-            try:
-                if ctx: ctx.__enter__()
-
-                if template == "05_extend_and_stitch":
-                    prompt_part1 = resolve_node_variables(graph.get("generate_part1_video", ""), nodes)
-                    prompt_part2 = resolve_node_variables(graph.get("generate_part2_video", ""), nodes)
-                    audio_text_part1 = resolve_node_variables(graph.get("generate_audio_part1", ""), nodes)
-                    audio_text_part2 = resolve_node_variables(graph.get("generate_audio_part2", ""), nodes)
-
-                    gen_vid = generator.generate_base_video.remote if is_remote else generator.generate_base_video.local
-                    gen_aud = generator.generate_voiceover_f5.remote if is_remote else generator.generate_voiceover_f5.local
-                    sync_vid = generator.lip_sync_video.remote if is_remote else generator.lip_sync_video.local
-                    face_swap = generator.face_swap_consistency.remote if is_remote else generator.face_swap_consistency.local
-
-                    vid1 = gen_vid(prompt_part1)
-                    vid1 = face_swap(vid1, face_bytes)
-                    aud1 = gen_aud(audio_text_part1)
-                    synced_vid1 = sync_vid(vid1, aud1)
-
-                    vid2 = gen_vid(prompt_part2)
-                    vid2 = face_swap(vid2, face_bytes)
-                    aud2 = gen_aud(audio_text_part2)
-                    synced_vid2 = sync_vid(vid2, aud2)
-
-                    editor = AutoEditor()
-
-                    b_roll_data = []
-                    for n in nodes:
-                        if n.get("type") == "broll_prompt":
-                            b_prompt = n.get("value")
-                            cached_bytes = get_cached_broll(b_prompt)
-                            if cached_bytes:
-                                b_bytes = cached_bytes
-                            else:
-                                b_bytes = gen_vid(b_prompt)
-                                set_cached_broll(b_prompt, b_bytes)
-                            b_roll_data.append({"start": n.get("start", 0), "end": n.get("end", 2.0), "clip_bytes": b_bytes})
-
-                    import tempfile
-                    import os as system_os
-                    from moviepy import VideoFileClip, concatenate_videoclips
-
-                    p1_path = tempfile.mktemp(suffix=".mp4")
-                    p2_path = tempfile.mktemp(suffix=".mp4")
-
-                    with open(p1_path, "wb") as f: f.write(synced_vid1)
-                    with open(p2_path, "wb") as f: f.write(synced_vid2)
-
-                    c1 = VideoFileClip(p1_path).resized((720, 1280)).with_fps(30)
-                    c2 = VideoFileClip(p2_path).resized((720, 1280)).with_fps(30)
-
-                    stitched_clip = concatenate_videoclips([c1, c2])
-                    stitched_path = tempfile.mktemp(suffix=".mp4")
-                    stitched_clip.write_videofile(stitched_path, fps=30, codec="libx264", logger=None)
-
-                    with open(stitched_path, "rb") as f:
-                        final_base_bytes = f.read()
-
-                    system_os.remove(p1_path)
-                    system_os.remove(p2_path)
-                    system_os.remove(stitched_path)
-
-                    full_narration = f"{audio_text_part1} {audio_text_part2}"
-                    final_video_bytes = editor.apply_automated_factory_edit(final_base_bytes, b"", full_narration, b_roll_data)
-
-                else:
-                    return [types.TextContent(type="text", text=f"Template {template} logic not fully built.")]
-
-                video_path = "mcp_output.mp4"
-                with open(video_path, "wb") as f:
-                    f.write(final_video_bytes)
-
+            if success:
                 return [types.TextContent(type="text", text=f"Successfully generated God-Tier B200 video remotely. Saved to {video_path}")]
-            finally:
-                if ctx: ctx.__exit__(None, None, None)
-
+            else:
+                return [types.TextContent(type="text", text="Failed to generate God-Tier B200 video remotely.")]
         except Exception as e:
             return [types.TextContent(type="text", text=f"Failed to generate video: {str(e)}")]
 
