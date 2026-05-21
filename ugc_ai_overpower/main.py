@@ -21,13 +21,6 @@ from modal_gpu.modal_app import (
 CACHE_DIR = "broll_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-def get_face_bytes():
-    face_path = "assets/influencer_face.jpg"
-    if os.path.exists(face_path):
-        with open(face_path, "rb") as f:
-            return f.read()
-    return b"dummy_face_bytes"
-
 def get_cached_broll(prompt: str) -> bytes:
     prompt_hash = hashlib.md5(prompt.encode('utf-8')).hexdigest()
     cache_path = os.path.join(CACHE_DIR, f"{prompt_hash}.mp4")
@@ -63,11 +56,10 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
         graph = swarm_data.get("execution_graph", {})
         template = "05_extend_and_stitch"
 
-        face_bytes = get_face_bytes()
         generator = ModelGenerator()
-
         is_remote = os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml"))
         final_video_bytes = None
+
         ctx = modal_app.run() if is_remote else None
 
         try:
@@ -75,31 +67,42 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
 
             logger.info("Executing 05_extend_and_stitch Template...")
 
+            # Resolve Prompts
+            char_prompt = resolve_node_variables(graph.get("generate_character_anchor", ""), nodes)
             prompt_part1 = resolve_node_variables(graph.get("generate_part1_video", ""), nodes)
             prompt_part2 = resolve_node_variables(graph.get("generate_part2_video", ""), nodes)
             audio_text_part1 = resolve_node_variables(graph.get("generate_audio_part1", ""), nodes)
             audio_text_part2 = resolve_node_variables(graph.get("generate_audio_part2", ""), nodes)
 
+            # Map Functions
+            gen_img = generator.generate_character_image.remote if is_remote else generator.generate_character_image.local
             gen_vid = generator.generate_base_video.remote if is_remote else generator.generate_base_video.local
             gen_aud = generator.generate_voiceover_f5.remote if is_remote else generator.generate_voiceover_f5.local
             sync_vid = generator.lip_sync_video.remote if is_remote else generator.lip_sync_video.local
             face_swap = generator.face_swap_consistency.remote if is_remote else generator.face_swap_consistency.local
 
+            # Generate Master Face Anchor
+            logger.info(f"Generating Character Sheet Anchor for {persona}...")
+            face_bytes = gen_img(char_prompt)
+            if not face_bytes or len(face_bytes) < 100:
+                logger.warning("Character Image Generation failed. Falling back to dummy bytes.")
+                face_bytes = b"dummy_face_bytes"
+
+            # Part 1 Generate
             logger.info("Generating Part 1...")
             vid1 = gen_vid(prompt_part1)
             vid1 = face_swap(vid1, face_bytes)
             aud1 = gen_aud(audio_text_part1, persona=persona)
             synced_vid1 = sync_vid(vid1, aud1)
 
+            # Part 2 Generate
             logger.info("Generating Part 2...")
             vid2 = gen_vid(prompt_part2)
             vid2 = face_swap(vid2, face_bytes)
             aud2 = gen_aud(audio_text_part2, persona=persona)
             synced_vid2 = sync_vid(vid2, aud2)
 
-            logger.info("Stitching Part 1 and Part 2 together...")
-            editor = AutoEditor()
-
+            # B-Roll Generate
             b_roll_data = []
             for n in nodes:
                 if n.get("type") == "broll_prompt":
@@ -110,12 +113,10 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
                     else:
                         b_bytes = gen_vid(b_prompt)
                         set_cached_broll(b_prompt, b_bytes)
+                    b_roll_data.append({"start": n.get("start", 0), "end": n.get("end", 2.0), "clip_bytes": b_bytes})
 
-                    b_roll_data.append({
-                        "start": n.get("start", 0),
-                        "end": n.get("end", 2.0),
-                        "clip_bytes": b_bytes
-                    })
+            logger.info("Stitching Part 1 and Part 2 together...")
+            editor = AutoEditor()
 
             import os as system_os
             from moviepy import VideoFileClip, concatenate_videoclips
@@ -178,7 +179,6 @@ def main():
     logger.info("Node-Based Swarm Blueprint Approved:")
     logger.info(json.dumps(swarm_blueprint, indent=2))
 
-    # Generate 3 distinct variants to build a Creator Network
     personas = ["Host A", "Host B", "Host C"]
     uploader = SocialUploader()
 
@@ -191,7 +191,6 @@ def main():
         if success:
             logger.info(f"God-Tier Video {persona} ready at: {video_path}")
 
-            # Recursive FYP Evaluation Loop on Final Video
             final_eval = evaluator.evaluate_final_video(swarm_blueprint, video_path)
             logger.info(f"Final Video {persona} FYP Evaluation Result:")
             try:
@@ -205,7 +204,6 @@ def main():
             tags = " ".join(swarm_blueprint.get("hashtags", []))
             caption = f"{swarm_blueprint['hook']} {tags} #fyp"
 
-            # Pass the variant index so the uploader can schedule them uniquely (drip-feed)
             uploader.schedule_upload(video_path, caption, variant_index=i)
         else:
             logger.warning(f"Pipeline execution failed for {persona}.")

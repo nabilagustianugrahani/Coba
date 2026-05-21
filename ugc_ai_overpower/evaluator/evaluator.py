@@ -46,10 +46,8 @@ class FYPEvaluator:
             return json.load(f).get("history", [])
 
     def log_performance(self, hook: str, score: int):
-        """Logs the hook and its simulated success score for Darwinian Evolution."""
         data = {"history": self._get_history()}
         data["history"].append({"hook": hook, "score": score})
-        # Keep top 100 for memory efficiency
         data["history"] = sorted(data["history"], key=lambda x: x["score"], reverse=True)[:100]
         with open(self.db_path, "w") as f:
             json.dump(data, f, indent=2)
@@ -62,7 +60,7 @@ class FYPEvaluator:
         winning_hooks = [h["hook"] for h in history if h["score"] >= 90][:3]
         losing_hooks = [h["hook"] for h in history if h["score"] < 70][:3]
 
-        ctx = "DARWINIAN AUTO-EVOLUTION DATA (RAG Memory):\n"
+        ctx = "DARWINIAN AUTO-EVOLUTION DATA:\n"
         if winning_hooks:
             ctx += f"SUCCESSFUL HOOKS TO ITERATE ON: {', '.join(winning_hooks)}\n"
         if losing_hooks:
@@ -72,8 +70,7 @@ class FYPEvaluator:
 
     def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None) -> dict:
         """
-        'Swarm in a Prompt' incorporating Darwinian Auto-Evolution (RAG)
-        and Node-Based Workflow generation.
+        'Swarm in a Prompt' incorporating Character Sheet Director for flawless consistency.
         """
         logger.info(f"[Swarm AI] Generating Evolutionary Node-Based Workflow for {product_name}...")
 
@@ -93,16 +90,15 @@ Task: Create a viral TikTok/Reels UGC video workflow for '{product_name}' (Niche
 
 You must act as these roles to build a NODE-BASED WORKFLOW JSON:
 
-1. AD ANALYZER:
-   - Choose `05_extend_and_stitch` template.
-   - For T2V prompts, FORBID words like: cinematic, professional, 8k. End prompts with ("The feeling of..."). Must say "No on-screen text."
-
-2. SCRIPTWRITER & COMPLIANCE:
-   - Learn from the DARWINIAN DATA. Do not use failed hooks. Iterate on successful hooks or use live trends.
-   - No shadowbanned words (use 'Cek keranjang', 'Si Oren').
-
-3. NODE ARCHITECT:
-   - Output the generation steps as interconnected nodes using `{{{{node_id}}}}` syntax.
+1. AD ANALYZER: Choose `05_extend_and_stitch` template.
+2. SCRIPTWRITER & COMPLIANCE: Learn from DARWINIAN DATA. No shadowbanned words.
+3. CHARACTER SHEET DIRECTOR (CRITICAL):
+   - You MUST design an absolute flawless anchor face/character blueprint.
+   - This prompt must explicitly define age, ethnicity, bone structure, eye color, and clothing.
+   - Example: "Portrait of a 24-year-old Indonesian female, high cheekbones, natural skin texture, short black hair, wearing a white minimalist turtleneck, studio lighting, hyper-detailed, 8k resolution, raw photo."
+4. MASTER PROMPT ENGINEER:
+   - Match the video generation prompts EXACTLY to the Character Sheet Director's clothing and styling so there are no morphing artifacts.
+5. NODE ARCHITECT: Output generation steps using `{{{{node_id}}}}` syntax.
 
 Output ONLY valid JSON matching this schema:
 {{
@@ -110,6 +106,7 @@ Output ONLY valid JSON matching this schema:
     "hook": "The first 3 seconds to grab attention",
     "hashtags": ["#tag1"],
     "nodes": [
+        {{ "id": "node_character_prompt", "type": "t2i_character_prompt", "value": "Portrait of..." }},
         {{ "id": "node_part1_prompt", "type": "t2v_prompt", "value": "..." }},
         {{ "id": "node_part2_prompt", "type": "t2v_prompt", "value": "..." }},
         {{ "id": "node_narration_part1", "type": "text", "value": "Script part 1" }},
@@ -117,6 +114,7 @@ Output ONLY valid JSON matching this schema:
         {{ "id": "node_broll_1", "type": "broll_prompt", "value": "...", "start": 2.0, "end": 4.5 }}
     ],
     "execution_graph": {{
+        "generate_character_anchor": "{{{{node_character_prompt}}}}",
         "generate_part1_video": "{{{{node_part1_prompt}}}}",
         "generate_part2_video": "{{{{node_part2_prompt}}}}",
         "generate_audio_part1": "{{{{node_narration_part1}}}}",
@@ -166,14 +164,19 @@ Output ONLY valid JSON matching this schema:
             "hashtags": hashtags,
             "nodes": [
                 {
+                    "id": "node_character_prompt",
+                    "type": "t2i_character_prompt",
+                    "value": "Portrait of a 24-year-old Indonesian female, high cheekbones, natural skin texture, short black hair, wearing a white minimalist turtleneck, studio lighting, hyper-detailed, 8k resolution, raw photo."
+                },
+                {
                     "id": "node_part1_prompt",
                     "type": "t2v_prompt",
-                    "value": "15s, 9:16, bright minimal bedroom, morning natural light. 24yo Indonesian woman, clear skin. Eye-level, selfie-style handheld camera. No on-screen text. The feeling of fresh morning confidence."
+                    "value": "15s, 9:16, bright minimal bedroom, morning natural light. 24yo Indonesian woman, clear skin, white minimalist turtleneck. Eye-level, selfie-style handheld camera. No on-screen text. The feeling of fresh morning confidence."
                 },
                 {
                     "id": "node_part2_prompt",
                     "type": "t2v_prompt",
-                    "value": "15s, 9:16, bright minimal bedroom. Eye-level, tripod static camera. She points to her glowing cheek and smiles warmly. No on-screen text. The feeling of lasting radiance."
+                    "value": "15s, 9:16, bright minimal bedroom. Eye-level, tripod static camera. 24yo Indonesian woman in white minimalist turtleneck points to her glowing cheek and smiles warmly. No on-screen text. The feeling of lasting radiance."
                 },
                 {
                     "id": "node_narration_part1",
@@ -194,6 +197,7 @@ Output ONLY valid JSON matching this schema:
                 }
             ],
             "execution_graph": {
+                "generate_character_anchor": "{{node_character_prompt}}",
                 "generate_part1_video": "{{node_part1_prompt}}",
                 "generate_part2_video": "{{node_part2_prompt}}",
                 "generate_audio_part1": "{{node_narration_part1}}",
@@ -220,7 +224,6 @@ Output ONLY valid JSON:
 """
         res = self._run_prompt(prompt, "Final Video")
 
-        # Log performance into Darwinian DB
         score = 92
         if isinstance(res, dict) and "final_score" in res:
             score = res["final_score"]
