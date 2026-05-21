@@ -158,7 +158,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
         return False
 
 def main():
-    logger.info("Starting God-Tier UGC Pipeline (Multi-Persona I2V Setup)...")
+    logger.info("Starting God-Tier UGC Pipeline (Vampire Engine Setup)...")
 
     scraper = EcommerceScraper()
     niche = os.getenv("UGC_NICHE", "beauty")
@@ -171,10 +171,19 @@ def main():
     tiktok_scraper = TikTokScraper()
     trend_data = tiktok_scraper.get_realtime_trends()
 
-    evaluator = FYPEvaluator()
-    swarm_blueprint = evaluator.swarm_evaluate_and_generate(top_product['product_name'], niche, trend_data)
+    # [NEW] VAMPIRE TACTIC: Hijack a competitor's viral video
+    vampire_data = tiktok_scraper.hijack_competitor_viral_video(niche=niche)
 
-    logger.info("Node-Based Swarm Blueprint Approved:")
+    evaluator = FYPEvaluator()
+    # Pass vampire data to Swarm to clone and outperform
+    swarm_blueprint = evaluator.swarm_evaluate_and_generate(
+        top_product['product_name'],
+        niche,
+        trend_data=trend_data,
+        vampire_data=vampire_data
+    )
+
+    logger.info("Node-Based Swarm Blueprint (Vampire Enhanced) Approved:")
     logger.info(json.dumps(swarm_blueprint, indent=2))
 
     personas = ["Host A", "Host B", "Host C"]
@@ -207,16 +216,6 @@ def main():
             logger.warning(f"Pipeline execution failed for {persona}.")
 
     logger.info("Pipeline completed successfully. All variants awaiting scheduled drip-feed uploads.")
-
-    import schedule
-    # Run the scheduler loop
-    logger.info("Starting schedule execution loop. Press Ctrl+C to stop.")
-    try:
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Scheduler loop terminated.")
 
 if __name__ == "__main__":
     main()

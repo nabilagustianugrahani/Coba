@@ -68,9 +68,9 @@ class FYPEvaluator:
 
         return ctx
 
-    def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None) -> dict:
+    def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
         """
-        'Swarm in a Prompt' incorporating Character Sheet Director and I2V Motion Prompts.
+        'Swarm in a Prompt' incorporating Character Sheet Director, I2V Motion Prompts, and the VAMPIRE COPYWRITER.
         """
         logger.info(f"[Swarm AI] Generating Evolutionary I2V Node-Based Workflow for {product_name}...")
 
@@ -80,23 +80,35 @@ class FYPEvaluator:
             tags = ", ".join(trend_data.get("trending_hashtags", []))
             trends_context = f"\nCRITICAL TRENDS: Hijack these live TikTok hooks: {hooks}\nHashtags: {tags}\n"
 
+        vampire_context = ""
+        if vampire_data:
+            vampire_context = f"""
+VAMPIRE TACTIC ENGAGED (HIGH PRIORITY):
+A competitor's video is currently going viral with this transcript:
+"{vampire_data.get('competitor_transcript')}"
+Emotional Trigger Used: {vampire_data.get('emotional_trigger')}
+
+Your mission: STEAL this exact narrative structure, but make it 2x more aggressive, manipulative, and FOMO-inducing. Do not copy it word-for-word, but clone its psychological payload to steal their traffic.
+"""
+
         rag_context = self._build_rag_context()
 
         prompt = f"""
-You are an advanced AI Swarm representing a top-tier Indonesian Creative Agency.
+You are an advanced AI Swarm representing an Abyss-Tier Creative Agency.
 Task: Create a viral TikTok/Reels UGC video workflow for '{product_name}' (Niche: {niche}).
 {trends_context}
+{vampire_context}
 {rag_context}
 
 You must act as these roles to build an I2V (Image-to-Video) NODE-BASED WORKFLOW JSON:
 
 1. AD ANALYZER: Choose `05_extend_and_stitch` template.
-2. SCRIPTWRITER & COMPLIANCE: Learn from DARWINIAN DATA. No shadowbanned words.
-3. CHARACTER SHEET DIRECTOR (CRITICAL):
+2. VAMPIRE COPYWRITER: Execute the Vampire Tactic context provided above to write the ultimate aggressive script.
+3. CHARACTER SHEET DIRECTOR:
    - You MUST design an absolute flawless anchor face/character blueprint.
    - Example: "Portrait of a 24-year-old Indonesian female, high cheekbones, natural skin texture, short black hair, wearing a white minimalist turtleneck, studio lighting, hyper-detailed, 8k resolution, raw photo."
 4. MASTER PROMPT ENGINEER (I2V Specialist):
-   - Instead of T2V, write explicit I2V (Image-to-Video) Motion Prompts for `Wan2.1-I2V`.
+   - Write explicit I2V (Image-to-Video) Motion Prompts for `Wan2.1-I2V`.
    - Your prompts MUST ONLY describe how the character from the anchor image moves.
    - Example: "The character turns her head slightly to the left while smiling, holding up the product. Smooth camera pan, 15s."
 5. NODE ARCHITECT: Output generation steps using `{{{{node_id}}}}` syntax.
@@ -123,9 +135,9 @@ Output ONLY valid JSON matching this schema:
     }}
 }}
 """
-        return self._run_prompt(prompt, product_name, trend_data)
+        return self._run_prompt(prompt, product_name, trend_data, vampire_data)
 
-    def _run_prompt(self, prompt: str, product_name: str, trend_data: dict = None) -> dict:
+    def _run_prompt(self, prompt: str, product_name: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
         try:
             if self.client:
                 if hasattr(self.client, 'chat') and hasattr(self.client.chat, 'completions'):
@@ -142,18 +154,26 @@ Output ONLY valid JSON matching this schema:
                     )
                     return json.loads(response.choices[0].message.content)
             else:
-                return self._fallback_result(product_name, trend_data)
+                return self._fallback_result(product_name, trend_data, vampire_data)
         except Exception as e:
             logger.error(f"Error during Swarm Evaluation using {self.model_name}: {e}")
-            return self._fallback_result(product_name, trend_data)
+            return self._fallback_result(product_name, trend_data, vampire_data)
 
-    def _fallback_result(self, product_name: str, trend_data: dict = None) -> dict:
-        logger.info("Using built-in simulation fallback for Node-Based Swarm AI.")
+    def _fallback_result(self, product_name: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
+        logger.info("Using built-in simulation fallback for Node-Based Swarm AI (Vampire Engine).")
 
         hook = "Sumpah kalian harus stop lakuin ini kalau mau glowing!"
         hashtags = ["#skincareviral", "#fyp"]
 
-        if trend_data:
+        narration1 = f"{hook} Aku nemu rahasia dari {product_name} yang beneran ngebantu banget. Teksturnya super ringan, cepet meresap."
+        narration2 = "Gak cuma itu, ini tuh bikin wajah cerah seharian. Cek keranjang kuning sekarang mumpung lagi diskon di si oren!"
+
+        if vampire_data:
+            hook = "Kemarin muka aku hancur parah, nyesel banget baru tau rahasia ini!"
+            narration1 = f"{hook} Udah buang duit beli merk mahal tetep zonk. Pas iseng nyoba {product_name}, kaget banget teksturnya se-cair itu."
+            narration2 = "Sumpah 3 hari doang bekas hitam langsung minggat! Ini aku ingetin mumpung lagi flash sale gede-gedean, langsung amankan di keranjang kuning sekarang sebelum kehabisan!"
+
+        elif trend_data:
             if trend_data.get("trending_hooks"):
                 hook = trend_data["trending_hooks"][0]
             if trend_data.get("trending_hashtags"):
@@ -172,22 +192,22 @@ Output ONLY valid JSON matching this schema:
                 {
                     "id": "node_part1_prompt",
                     "type": "i2v_motion_prompt",
-                    "value": "The character holds the camera selfie-style, slightly tilting her head and blinking naturally. She points to her cheek. Smooth camera pan, 15s."
+                    "value": "The character holds the camera selfie-style, looking frustrated then relieved. She points to her cheek. Smooth camera pan, 15s."
                 },
                 {
                     "id": "node_part2_prompt",
                     "type": "i2v_motion_prompt",
-                    "value": "The character smiles warmly and raises an eyebrow enthusiastically, holding the product. Static tripod shot, 15s."
+                    "value": "The character smiles warmly and raises an eyebrow aggressively, aggressively pointing at the screen. Static tripod shot, 15s."
                 },
                 {
                     "id": "node_narration_part1",
                     "type": "text",
-                    "value": f"{hook} Aku nemu rahasia dari {product_name} yang beneran ngebantu banget. Teksturnya super ringan, cepet meresap."
+                    "value": narration1
                 },
                 {
                     "id": "node_narration_part2",
                     "type": "text",
-                    "value": "Gak cuma itu, ini tuh bikin wajah cerah seharian. Cek keranjang kuning sekarang mumpung lagi diskon di si oren!"
+                    "value": narration2
                 },
                 {
                     "id": "node_broll_1",
@@ -234,5 +254,12 @@ Output ONLY valid JSON:
 
 if __name__ == "__main__":
     evaluator = FYPEvaluator()
-    result = evaluator.swarm_evaluate_and_generate("Serum Retinol XYZ", "skincare")
+    vamp_data = {
+            "competitor_hook": "Jujur nyesel banget baru tau serum ini sekarang.",
+            "competitor_transcript": "Jujur nyesel banget baru tau serum ini sekarang. Kemarin muka aku hancur parah banyak bekas jerawat hitam.",
+            "pacing_speed": "fast",
+            "emotional_trigger": "regret_and_discovery",
+            "views_velocity": "100k_per_hour"
+    }
+    result = evaluator.swarm_evaluate_and_generate("Serum Retinol XYZ", "skincare", vampire_data=vamp_data)
     print(json.dumps(result, indent=2))
