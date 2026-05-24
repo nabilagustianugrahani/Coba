@@ -39,6 +39,16 @@ class FYPEvaluator:
         self.collection = None
         self._init_db()
 
+        # Load CAG (Cache-Augmented Generation) Knowledge Base
+        self.cag_context = self._load_cag_knowledge()
+
+    def _load_cag_knowledge(self):
+        cag_path = os.path.join(os.path.dirname(__file__), "cag_knowledge_base.txt")
+        if os.path.exists(cag_path):
+            with open(cag_path, "r") as f:
+                return f.read()
+        return "CAG Knowledge Base missing."
+
     def _init_db(self):
         if self.mongo_uri:
             try:
@@ -96,20 +106,45 @@ class FYPEvaluator:
                 losing_docs = list(self.collection.find({"score": {"$lt": 70}}).limit(3))
 
                 ctx = "DARWINIAN SEMANTIC RAG MEMORY (MONGODB ATLAS):\n"
+
                 if winning_docs:
-                    winners = [doc["hook"] for doc in winning_docs]
-                    ctx += f"SUCCESSFUL HOOKS IN THIS VIBE: {', '.join(winners)}\n"
+                    ctx += "SUCCESSFUL PAST GENERATIONS (MIMIC THESE PATTERNS):\n"
+                    for doc in winning_docs:
+                        hook = doc.get("hook")
+                        dna = doc.get("metadata", {}).get("dna", {})
+                        ctx += f"- Hook: '{hook}' | DNA Used: {json.dumps(dna)}\n"
+
                 if losing_docs:
-                    losers = [doc["hook"] for doc in losing_docs]
-                    ctx += f"FAILED HOOKS TO STRICTLY AVOID: {', '.join(losers)}\n"
+                    ctx += "\nFAILED GENERATIONS (STRICTLY AVOID THESE PATTERNS):\n"
+                    for doc in losing_docs:
+                        hook = doc.get("hook")
+                        dna = doc.get("metadata", {}).get("dna", {})
+                        ctx += f"- Hook: '{hook}' | DNA Avoid: {json.dumps(dna)}\n"
                 return ctx
             except Exception:
                 return "No semantic historical data available yet."
         else:
-            return "DARWINIAN MEMORY NOT FULLY SYNCED."
+            # Enhanced Local JSON RAG Fallback
+            history = self._get_history_json()
+            if not history:
+                return "No historical data available yet."
+
+            winning_docs = [h for h in history if h["score"] >= 85][:3]
+            losing_docs = [h for h in history if h["score"] < 70][:3]
+
+            ctx = "DARWINIAN LOCAL RAG MEMORY:\n"
+            if winning_docs:
+                ctx += "SUCCESSFUL PAST GENERATIONS:\n"
+                for doc in winning_docs:
+                    ctx += f"- Hook: '{doc['hook']}' | DNA Used: {json.dumps(doc.get('metadata', {}).get('dna', {}))}\n"
+            if losing_docs:
+                ctx += "\nFAILED GENERATIONS (AVOID):\n"
+                for doc in losing_docs:
+                    ctx += f"- Hook: '{doc['hook']}' | DNA Avoid: {json.dumps(doc.get('metadata', {}).get('dna', {}))}\n"
+            return ctx
 
     def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
-        logger.info(f"[Swarm AI] Generating Evolutionary I2V Workflow (DNA Editor Active) for {product_name}...")
+        logger.info(f"[Swarm AI] Generating RAG+CAG Augmented I2V Workflow for {product_name}...")
 
         trends_context = ""
         if trend_data:
@@ -128,6 +163,8 @@ Mission: STEAL this exact narrative structure, but make it 2x more aggressive an
         rag_context = self._build_rag_context(niche)
 
         prompt = f"""
+{self.cag_context}
+
 You are an advanced AI Swarm representing an Abyss-Tier Creative Agency.
 Task: Create a viral TikTok UGC video workflow for '{product_name}' (Niche: {niche}).
 {trends_context}
@@ -135,12 +172,12 @@ Task: Create a viral TikTok UGC video workflow for '{product_name}' (Niche: {nic
 {rag_context}
 
 You must act as these roles:
-1. AD ANALYZER: Set template to `05_extend_and_stitch`.
-2. VAMPIRE COPYWRITER: Write the aggressive script.
+1. AD ANALYZER: Set template to `05_extend_and_stitch`. Apply CAG Rule 2.2 (Looping Script).
+2. VAMPIRE COPYWRITER: Write the aggressive script utilizing CAG Module 1 (Neuro-Linguistic Programming).
 3. CHARACTER SHEET DIRECTOR: Design flawless SDXL anchor character (e.g., "Portrait of a 24-year-old Indonesian female, studio lighting, 8k...").
 4. MASTER PROMPT ENGINEER: Write explicit I2V Motion Prompts describing only how the character moves.
-5. ALGORITHMIC MUTATION DIRECTOR (NEW):
-   Generate an `editing_dna` block to future-proof against TikTok algorithm updates.
+5. ALGORITHMIC MUTATION DIRECTOR:
+   Generate an `editing_dna` block based on CAG Module 3 and RAG historical success.
    - `micro_zoom_interval`: float between 0.8s and 2.5s
    - `subliminal_flash_duration`: float between 0.02s and 0.08s
    - `phantom_audio_hz`: integer between 16000 and 19000
@@ -199,16 +236,16 @@ Output ONLY valid JSON matching this schema:
             return self._fallback_result(product_name, trend_data, vampire_data)
 
     def _fallback_result(self, product_name: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
-        logger.info("Using built-in simulation fallback for Node-Based Swarm AI (DNA Engine).")
+        logger.info("Using built-in simulation fallback for Node-Based Swarm AI (RAG+CAG Engine).")
         return {
             "template_type": "05_extend_and_stitch",
             "hook": "Kemarin muka aku hancur parah, nyesel banget!",
             "hashtags": ["#skincareviral", "#fyp"],
             "editing_dna": {
-                "micro_zoom_interval": random.uniform(1.0, 2.0),
+                "micro_zoom_interval": random.uniform(0.8, 1.5), # Faster zoom due to CAG Rules
                 "subliminal_flash_duration": random.uniform(0.02, 0.05),
                 "phantom_audio_hz": random.randint(17000, 19000),
-                "subtitle_color_hex": random.choice(["#FFD700", "#00FFFF", "#FF00FF"])
+                "subtitle_color_hex": random.choice(["#FF0000", "#FFD700"]) # Aggressive colors due to CAG Rules
             },
             "nodes": [
                 {
@@ -234,7 +271,7 @@ Output ONLY valid JSON matching this schema:
                 {
                     "id": "node_narration_part2",
                     "type": "text",
-                    "value": "Sumpah 3 hari doang bekas hitam langsung minggat! Amankan di keranjang kuning sekarang!"
+                    "value": "Sumpah 3 hari doang bekas hitam langsung minggat! Amankan di keranjang kuning sekarang! Soalnya kalau udah abis kalian pasti kemarin muka hancur parah." # Looping script applied
                 },
                 {
                     "id": "node_broll_1",
@@ -261,7 +298,7 @@ Output ONLY valid JSON matching this schema:
             "dna": script_data.get("editing_dna", {})
         }
         self.log_performance(script_data.get('hook', 'unknown'), score, context_meta)
-        return {"is_viral_ready": True, "final_score": score, "critique": "DNA Mutation successful."}
+        return {"is_viral_ready": True, "final_score": score, "critique": "RAG+CAG Mutation successful."}
 
 if __name__ == "__main__":
     evaluator = FYPEvaluator()
