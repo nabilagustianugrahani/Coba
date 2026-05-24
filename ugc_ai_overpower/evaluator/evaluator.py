@@ -13,6 +13,7 @@ class FYPEvaluator:
         self.cerebras_key = os.getenv("CEREBRAS_API_KEY")
         self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
         self.openai_key = os.getenv("OPENAI_API_KEY")
+        self.mongo_uri = os.getenv("MONGO_URI")
 
         self.client = None
         self.model_name = "gpt-4o-mini"
@@ -33,45 +34,121 @@ class FYPEvaluator:
                 openai.api_key = self.openai_key
                 self.client = openai
 
-        self.db_path = "performance_db.json"
+        # Vector Database for Semantic RAG Tracking (Upgraded to MongoDB Atlas)
+        self.use_mongo = False
+        self.db_path = "performance_db.json" # Fallback JSON
+        self.collection = None
         self._init_db()
 
     def _init_db(self):
+        if self.mongo_uri:
+            try:
+                from pymongo import MongoClient
+                from pymongo.server_api import ServerApi
+
+                # Create a new client and connect to the server
+                self.mongo_client = MongoClient(self.mongo_uri, server_api=ServerApi('1'))
+
+                # Send a ping to confirm a successful connection
+                self.mongo_client.admin.command('ping')
+
+                self.db = self.mongo_client['ugc_abyss_tier']
+                self.collection = self.db['hook_performance']
+                self.use_mongo = True
+                logger.info("[Evaluator] MongoDB Atlas Connected! Cloud Darwinian RAG Memory Initialized.")
+            except ImportError:
+                logger.warning("[Evaluator] pymongo not installed. Falling back to local JSON memory.")
+                self._fallback_init()
+            except Exception as e:
+                logger.warning(f"[Evaluator] Failed to connect to MongoDB Atlas: {e}. Falling back to local JSON.")
+                self._fallback_init()
+        else:
+            logger.info("[Evaluator] No MONGO_URI provided. Using local JSON for Darwinian Memory.")
+            self._fallback_init()
+
+    def _fallback_init(self):
+        self.use_mongo = False
         if not os.path.exists(self.db_path):
             with open(self.db_path, "w") as f:
                 json.dump({"history": []}, f)
 
-    def _get_history(self):
+    def _get_history_json(self):
         with open(self.db_path, "r") as f:
             return json.load(f).get("history", [])
 
-    def log_performance(self, hook: str, score: int):
-        data = {"history": self._get_history()}
-        data["history"].append({"hook": hook, "score": score})
-        data["history"] = sorted(data["history"], key=lambda x: x["score"], reverse=True)[:100]
-        with open(self.db_path, "w") as f:
-            json.dump(data, f, indent=2)
+    def log_performance(self, hook: str, score: int, context_metadata: dict = None):
+        if not context_metadata:
+            context_metadata = {"emotion": "unknown", "time": "unknown"}
 
-    def _build_rag_context(self):
-        history = self._get_history()
-        if not history:
-            return "No historical data available yet."
+        if self.use_mongo:
+            try:
+                # In a real setup, we would generate a dense vector embedding here
+                # (e.g., using OpenAI or SentenceTransformers) to store alongside the text
+                # for MongoDB Atlas Vector Search.
+                # Simulated vector generation:
+                simulated_vector = [random.uniform(-1, 1) for _ in range(384)]
 
-        winning_hooks = [h["hook"] for h in history if h["score"] >= 90][:3]
-        losing_hooks = [h["hook"] for h in history if h["score"] < 70][:3]
+                document = {
+                    "hook": hook,
+                    "score": score,
+                    "metadata": context_metadata,
+                    "embedding": simulated_vector
+                }
 
-        ctx = "DARWINIAN AUTO-EVOLUTION DATA:\n"
-        if winning_hooks:
-            ctx += f"SUCCESSFUL HOOKS TO ITERATE ON: {', '.join(winning_hooks)}\n"
-        if losing_hooks:
-            ctx += f"FAILED HOOKS TO STRICTLY AVOID: {', '.join(losing_hooks)}\n"
+                # Upsert logic based on the hook text
+                self.collection.update_one(
+                    {"hook": hook},
+                    {"$set": document},
+                    upsert=True
+                )
+                logger.info(f"Logged hook performance to MongoDB Atlas: Score {score}")
+            except Exception as e:
+                logger.error(f"MongoDB Atlas Log failed: {e}")
+        else:
+            data = {"history": self._get_history_json()}
+            data["history"].append({"hook": hook, "score": score, "metadata": context_metadata})
+            data["history"] = sorted(data["history"], key=lambda x: x["score"], reverse=True)[:100]
+            with open(self.db_path, "w") as f:
+                json.dump(data, f, indent=2)
 
-        return ctx
+    def _build_rag_context(self, current_niche: str = "general"):
+        if self.use_mongo:
+            try:
+                # Simulated MongoDB Atlas Vector Search ($vectorSearch operator)
+                # In production, this would perform a semantic similarity search
+
+                # We simulate standard query fallback for now
+                winning_docs = list(self.collection.find({"score": {"$gte": 85}}).limit(3))
+                losing_docs = list(self.collection.find({"score": {"$lt": 70}}).limit(3))
+
+                ctx = "DARWINIAN SEMANTIC RAG MEMORY (MONGODB ATLAS):\n"
+                if winning_docs:
+                    winners = [doc["hook"] for doc in winning_docs]
+                    ctx += f"SUCCESSFUL HOOKS IN THIS VIBE (USE AS INSPIRATION): {', '.join(winners)}\n"
+                if losing_docs:
+                    losers = [doc["hook"] for doc in losing_docs]
+                    ctx += f"FAILED HOOKS TO STRICTLY AVOID: {', '.join(losers)}\n"
+                return ctx
+            except Exception as e:
+                logger.warning(f"MongoDB RAG failed: {e}")
+                return "No semantic historical data available yet."
+        else:
+            history = self._get_history_json()
+            if not history:
+                return "No historical data available yet."
+
+            winning_hooks = [h["hook"] for h in history if h["score"] >= 90][:3]
+            losing_hooks = [h["hook"] for h in history if h["score"] < 70][:3]
+
+            ctx = "DARWINIAN AUTO-EVOLUTION DATA:\n"
+            if winning_hooks:
+                ctx += f"SUCCESSFUL HOOKS TO ITERATE ON: {', '.join(winning_hooks)}\n"
+            if losing_hooks:
+                ctx += f"FAILED HOOKS TO STRICTLY AVOID: {', '.join(losing_hooks)}\n"
+
+            return ctx
 
     def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
-        """
-        'Swarm in a Prompt' incorporating Character Sheet Director, I2V Motion Prompts, and the VAMPIRE COPYWRITER.
-        """
         logger.info(f"[Swarm AI] Generating Evolutionary I2V Node-Based Workflow for {product_name}...")
 
         trends_context = ""
@@ -91,7 +168,7 @@ Emotional Trigger Used: {vampire_data.get('emotional_trigger')}
 Your mission: STEAL this exact narrative structure, but make it 2x more aggressive, manipulative, and FOMO-inducing. Do not copy it word-for-word, but clone its psychological payload to steal their traffic.
 """
 
-        rag_context = self._build_rag_context()
+        rag_context = self._build_rag_context(niche)
 
         prompt = f"""
 You are an advanced AI Swarm representing an Abyss-Tier Creative Agency.
@@ -248,7 +325,13 @@ Output ONLY valid JSON:
         score = 92
         if isinstance(res, dict) and "final_score" in res:
             score = res["final_score"]
-        self.log_performance(script_data.get('hook', 'unknown'), score)
+
+        context_meta = {
+            "niche": "skincare",
+            "emotion": "manipulative",
+            "vampire_tactic": True
+        }
+        self.log_performance(script_data.get('hook', 'unknown'), score, context_meta)
 
         return res
 
