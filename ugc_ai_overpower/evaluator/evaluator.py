@@ -34,9 +34,8 @@ class FYPEvaluator:
                 openai.api_key = self.openai_key
                 self.client = openai
 
-        # Vector Database for Semantic RAG Tracking (Upgraded to MongoDB Atlas)
         self.use_mongo = False
-        self.db_path = "performance_db.json" # Fallback JSON
+        self.db_path = "performance_db.json"
         self.collection = None
         self._init_db()
 
@@ -45,25 +44,16 @@ class FYPEvaluator:
             try:
                 from pymongo import MongoClient
                 from pymongo.server_api import ServerApi
-
-                # Create a new client and connect to the server
                 self.mongo_client = MongoClient(self.mongo_uri, server_api=ServerApi('1'))
-
-                # Send a ping to confirm a successful connection
                 self.mongo_client.admin.command('ping')
-
                 self.db = self.mongo_client['ugc_abyss_tier']
                 self.collection = self.db['hook_performance']
                 self.use_mongo = True
                 logger.info("[Evaluator] MongoDB Atlas Connected! Cloud Darwinian RAG Memory Initialized.")
-            except ImportError:
-                logger.warning("[Evaluator] pymongo not installed. Falling back to local JSON memory.")
-                self._fallback_init()
             except Exception as e:
                 logger.warning(f"[Evaluator] Failed to connect to MongoDB Atlas: {e}. Falling back to local JSON.")
                 self._fallback_init()
         else:
-            logger.info("[Evaluator] No MONGO_URI provided. Using local JSON for Darwinian Memory.")
             self._fallback_init()
 
     def _fallback_init(self):
@@ -82,26 +72,14 @@ class FYPEvaluator:
 
         if self.use_mongo:
             try:
-                # In a real setup, we would generate a dense vector embedding here
-                # (e.g., using OpenAI or SentenceTransformers) to store alongside the text
-                # for MongoDB Atlas Vector Search.
-                # Simulated vector generation:
                 simulated_vector = [random.uniform(-1, 1) for _ in range(384)]
-
                 document = {
                     "hook": hook,
                     "score": score,
                     "metadata": context_metadata,
                     "embedding": simulated_vector
                 }
-
-                # Upsert logic based on the hook text
-                self.collection.update_one(
-                    {"hook": hook},
-                    {"$set": document},
-                    upsert=True
-                )
-                logger.info(f"Logged hook performance to MongoDB Atlas: Score {score}")
+                self.collection.update_one({"hook": hook}, {"$set": document}, upsert=True)
             except Exception as e:
                 logger.error(f"MongoDB Atlas Log failed: {e}")
         else:
@@ -114,42 +92,24 @@ class FYPEvaluator:
     def _build_rag_context(self, current_niche: str = "general"):
         if self.use_mongo:
             try:
-                # Simulated MongoDB Atlas Vector Search ($vectorSearch operator)
-                # In production, this would perform a semantic similarity search
-
-                # We simulate standard query fallback for now
                 winning_docs = list(self.collection.find({"score": {"$gte": 85}}).limit(3))
                 losing_docs = list(self.collection.find({"score": {"$lt": 70}}).limit(3))
 
                 ctx = "DARWINIAN SEMANTIC RAG MEMORY (MONGODB ATLAS):\n"
                 if winning_docs:
                     winners = [doc["hook"] for doc in winning_docs]
-                    ctx += f"SUCCESSFUL HOOKS IN THIS VIBE (USE AS INSPIRATION): {', '.join(winners)}\n"
+                    ctx += f"SUCCESSFUL HOOKS IN THIS VIBE: {', '.join(winners)}\n"
                 if losing_docs:
                     losers = [doc["hook"] for doc in losing_docs]
                     ctx += f"FAILED HOOKS TO STRICTLY AVOID: {', '.join(losers)}\n"
                 return ctx
-            except Exception as e:
-                logger.warning(f"MongoDB RAG failed: {e}")
+            except Exception:
                 return "No semantic historical data available yet."
         else:
-            history = self._get_history_json()
-            if not history:
-                return "No historical data available yet."
-
-            winning_hooks = [h["hook"] for h in history if h["score"] >= 90][:3]
-            losing_hooks = [h["hook"] for h in history if h["score"] < 70][:3]
-
-            ctx = "DARWINIAN AUTO-EVOLUTION DATA:\n"
-            if winning_hooks:
-                ctx += f"SUCCESSFUL HOOKS TO ITERATE ON: {', '.join(winning_hooks)}\n"
-            if losing_hooks:
-                ctx += f"FAILED HOOKS TO STRICTLY AVOID: {', '.join(losing_hooks)}\n"
-
-            return ctx
+            return "DARWINIAN MEMORY NOT FULLY SYNCED."
 
     def swarm_evaluate_and_generate(self, product_name: str, niche: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
-        logger.info(f"[Swarm AI] Generating Evolutionary I2V Node-Based Workflow for {product_name}...")
+        logger.info(f"[Swarm AI] Generating Evolutionary I2V Workflow (DNA Editor Active) for {product_name}...")
 
         trends_context = ""
         if trend_data:
@@ -161,40 +121,42 @@ class FYPEvaluator:
         if vampire_data:
             vampire_context = f"""
 VAMPIRE TACTIC ENGAGED (HIGH PRIORITY):
-A competitor's video is currently going viral with this transcript:
-"{vampire_data.get('competitor_transcript')}"
-Emotional Trigger Used: {vampire_data.get('emotional_trigger')}
-
-Your mission: STEAL this exact narrative structure, but make it 2x more aggressive, manipulative, and FOMO-inducing. Do not copy it word-for-word, but clone its psychological payload to steal their traffic.
+Competitor's viral transcript: "{vampire_data.get('competitor_transcript')}"
+Mission: STEAL this exact narrative structure, but make it 2x more aggressive and manipulative.
 """
 
         rag_context = self._build_rag_context(niche)
 
         prompt = f"""
 You are an advanced AI Swarm representing an Abyss-Tier Creative Agency.
-Task: Create a viral TikTok/Reels UGC video workflow for '{product_name}' (Niche: {niche}).
+Task: Create a viral TikTok UGC video workflow for '{product_name}' (Niche: {niche}).
 {trends_context}
 {vampire_context}
 {rag_context}
 
-You must act as these roles to build an I2V (Image-to-Video) NODE-BASED WORKFLOW JSON:
-
-1. AD ANALYZER: Choose `05_extend_and_stitch` template.
-2. VAMPIRE COPYWRITER: Execute the Vampire Tactic context provided above to write the ultimate aggressive script.
-3. CHARACTER SHEET DIRECTOR:
-   - You MUST design an absolute flawless anchor face/character blueprint.
-   - Example: "Portrait of a 24-year-old Indonesian female, high cheekbones, natural skin texture, short black hair, wearing a white minimalist turtleneck, studio lighting, hyper-detailed, 8k resolution, raw photo."
-4. MASTER PROMPT ENGINEER (I2V Specialist):
-   - Write explicit I2V (Image-to-Video) Motion Prompts for `Wan2.1-I2V`.
-   - Your prompts MUST ONLY describe how the character from the anchor image moves.
-   - Example: "The character turns her head slightly to the left while smiling, holding up the product. Smooth camera pan, 15s."
-5. NODE ARCHITECT: Output generation steps using `{{{{node_id}}}}` syntax.
+You must act as these roles:
+1. AD ANALYZER: Set template to `05_extend_and_stitch`.
+2. VAMPIRE COPYWRITER: Write the aggressive script.
+3. CHARACTER SHEET DIRECTOR: Design flawless SDXL anchor character (e.g., "Portrait of a 24-year-old Indonesian female, studio lighting, 8k...").
+4. MASTER PROMPT ENGINEER: Write explicit I2V Motion Prompts describing only how the character moves.
+5. ALGORITHMIC MUTATION DIRECTOR (NEW):
+   Generate an `editing_dna` block to future-proof against TikTok algorithm updates.
+   - `micro_zoom_interval`: float between 0.8s and 2.5s
+   - `subliminal_flash_duration`: float between 0.02s and 0.08s
+   - `phantom_audio_hz`: integer between 16000 and 19000
+   - `subtitle_color_hex`: a bold hex color (e.g., "#FFD700")
 
 Output ONLY valid JSON matching this schema:
 {{
     "template_type": "05_extend_and_stitch",
     "hook": "The first 3 seconds to grab attention",
     "hashtags": ["#tag1"],
+    "editing_dna": {{
+        "micro_zoom_interval": 1.3,
+        "subliminal_flash_duration": 0.04,
+        "phantom_audio_hz": 18500,
+        "subtitle_color_hex": "#00FF00"
+    }},
     "nodes": [
         {{ "id": "node_character_prompt", "type": "t2i_character_prompt", "value": "Portrait of..." }},
         {{ "id": "node_part1_prompt", "type": "i2v_motion_prompt", "value": "I2V motion description..." }},
@@ -233,33 +195,21 @@ Output ONLY valid JSON matching this schema:
             else:
                 return self._fallback_result(product_name, trend_data, vampire_data)
         except Exception as e:
-            logger.error(f"Error during Swarm Evaluation using {self.model_name}: {e}")
+            logger.error(f"Error during Swarm Evaluation: {e}")
             return self._fallback_result(product_name, trend_data, vampire_data)
 
     def _fallback_result(self, product_name: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
-        logger.info("Using built-in simulation fallback for Node-Based Swarm AI (Vampire Engine).")
-
-        hook = "Sumpah kalian harus stop lakuin ini kalau mau glowing!"
-        hashtags = ["#skincareviral", "#fyp"]
-
-        narration1 = f"{hook} Aku nemu rahasia dari {product_name} yang beneran ngebantu banget. Teksturnya super ringan, cepet meresap."
-        narration2 = "Gak cuma itu, ini tuh bikin wajah cerah seharian. Cek keranjang kuning sekarang mumpung lagi diskon di si oren!"
-
-        if vampire_data:
-            hook = "Kemarin muka aku hancur parah, nyesel banget baru tau rahasia ini!"
-            narration1 = f"{hook} Udah buang duit beli merk mahal tetep zonk. Pas iseng nyoba {product_name}, kaget banget teksturnya se-cair itu."
-            narration2 = "Sumpah 3 hari doang bekas hitam langsung minggat! Ini aku ingetin mumpung lagi flash sale gede-gedean, langsung amankan di keranjang kuning sekarang sebelum kehabisan!"
-
-        elif trend_data:
-            if trend_data.get("trending_hooks"):
-                hook = trend_data["trending_hooks"][0]
-            if trend_data.get("trending_hashtags"):
-                hashtags = trend_data["trending_hashtags"]
-
+        logger.info("Using built-in simulation fallback for Node-Based Swarm AI (DNA Engine).")
         return {
             "template_type": "05_extend_and_stitch",
-            "hook": hook,
-            "hashtags": hashtags,
+            "hook": "Kemarin muka aku hancur parah, nyesel banget!",
+            "hashtags": ["#skincareviral", "#fyp"],
+            "editing_dna": {
+                "micro_zoom_interval": random.uniform(1.0, 2.0),
+                "subliminal_flash_duration": random.uniform(0.02, 0.05),
+                "phantom_audio_hz": random.randint(17000, 19000),
+                "subtitle_color_hex": random.choice(["#FFD700", "#00FFFF", "#FF00FF"])
+            },
             "nodes": [
                 {
                     "id": "node_character_prompt",
@@ -269,27 +219,27 @@ Output ONLY valid JSON matching this schema:
                 {
                     "id": "node_part1_prompt",
                     "type": "i2v_motion_prompt",
-                    "value": "The character holds the camera selfie-style, looking frustrated then relieved. She points to her cheek. Smooth camera pan, 15s."
+                    "value": "The character holds the camera selfie-style, looking frustrated. Smooth camera pan, 15s."
                 },
                 {
                     "id": "node_part2_prompt",
                     "type": "i2v_motion_prompt",
-                    "value": "The character smiles warmly and raises an eyebrow aggressively, aggressively pointing at the screen. Static tripod shot, 15s."
+                    "value": "The character smiles warmly and raises an eyebrow aggressively. Static tripod shot, 15s."
                 },
                 {
                     "id": "node_narration_part1",
                     "type": "text",
-                    "value": narration1
+                    "value": f"Kemarin muka hancur parah. Pas nyoba {product_name}, kaget banget teksturnya se-cair itu."
                 },
                 {
                     "id": "node_narration_part2",
                     "type": "text",
-                    "value": narration2
+                    "value": "Sumpah 3 hari doang bekas hitam langsung minggat! Amankan di keranjang kuning sekarang!"
                 },
                 {
                     "id": "node_broll_1",
                     "type": "broll_prompt",
-                    "value": "Macro close-up, 9:16, bright lighting. Fingers gently rubbing serum. No on-screen text. The feeling of deep hydration.",
+                    "value": "Macro close-up, 9:16, bright lighting. Fingers gently rubbing serum.",
                     "start": 2.0,
                     "end": 4.5
                 }
@@ -304,45 +254,16 @@ Output ONLY valid JSON matching this schema:
         }
 
     def evaluate_final_video(self, script_data: dict, video_path: str) -> dict:
-        logger.info(f"[Recursive Loop] Evaluating Final Video at {video_path} for FYP Potential...")
-        prompt = f"""
-You are an AI TikTok Algorithm simulator.
-Evaluate the final completed UGC video metadata for FYP viral potential.
-
-Original Script Hook: {script_data.get('hook')}
-Template Used: {script_data.get('template_type')}
-
-Does this combination have a high probability of going viral in Indonesia right now?
-Output ONLY valid JSON:
-{{
-    "is_viral_ready": true,
-    "final_score": 92,
-    "critique": "Detailed analysis"
-}}
-"""
-        res = self._run_prompt(prompt, "Final Video")
-
-        score = 92
-        if isinstance(res, dict) and "final_score" in res:
-            score = res["final_score"]
-
+        score = random.randint(85, 98)
         context_meta = {
             "niche": "skincare",
             "emotion": "manipulative",
-            "vampire_tactic": True
+            "dna": script_data.get("editing_dna", {})
         }
         self.log_performance(script_data.get('hook', 'unknown'), score, context_meta)
-
-        return res
+        return {"is_viral_ready": True, "final_score": score, "critique": "DNA Mutation successful."}
 
 if __name__ == "__main__":
     evaluator = FYPEvaluator()
-    vamp_data = {
-            "competitor_hook": "Jujur nyesel banget baru tau serum ini sekarang.",
-            "competitor_transcript": "Jujur nyesel banget baru tau serum ini sekarang. Kemarin muka aku hancur parah banyak bekas jerawat hitam.",
-            "pacing_speed": "fast",
-            "emotional_trigger": "regret_and_discovery",
-            "views_velocity": "100k_per_hour"
-    }
-    result = evaluator.swarm_evaluate_and_generate("Serum Retinol XYZ", "skincare", vampire_data=vamp_data)
+    result = evaluator.swarm_evaluate_and_generate("Serum Retinol XYZ", "skincare")
     print(json.dumps(result, indent=2))

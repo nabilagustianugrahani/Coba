@@ -55,6 +55,8 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
     try:
         nodes = swarm_data.get("nodes", [])
         graph = swarm_data.get("execution_graph", {})
+        editing_dna = swarm_data.get("editing_dna", {})
+
         template = "05_extend_and_stitch"
 
         generator = ModelGenerator()
@@ -68,39 +70,33 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
 
             logger.info("Executing 05_extend_and_stitch Template via I2V...")
 
-            # Resolve Prompts
             char_prompt = resolve_node_variables(graph.get("generate_character_anchor", ""), nodes)
             prompt_part1 = resolve_node_variables(graph.get("generate_part1_video", ""), nodes)
             prompt_part2 = resolve_node_variables(graph.get("generate_part2_video", ""), nodes)
             audio_text_part1 = resolve_node_variables(graph.get("generate_audio_part1", ""), nodes)
             audio_text_part2 = resolve_node_variables(graph.get("generate_audio_part2", ""), nodes)
 
-            # Map Functions
             gen_img = generator.generate_character_image.remote if is_remote else generator.generate_character_image.local
             gen_vid = generator.generate_base_video.remote if is_remote else generator.generate_base_video.local
             gen_aud = generator.generate_voiceover_f5.remote if is_remote else generator.generate_voiceover_f5.local
             sync_vid = generator.lip_sync_video.remote if is_remote else generator.lip_sync_video.local
 
-            # Generate Master Face Anchor via SDXL
             logger.info(f"Generating Character Sheet Anchor for {persona}...")
             face_bytes = gen_img(char_prompt)
             if not face_bytes or len(face_bytes) < 100:
                 logger.warning("Character Image Generation failed. Falling back to dummy bytes.")
                 face_bytes = b"dummy_face_bytes"
 
-            # Part 1 Generate (I2V using face_bytes)
             logger.info("Generating Part 1 (I2V)...")
             vid1 = gen_vid(prompt_part1, image_bytes=face_bytes)
             aud1 = gen_aud(audio_text_part1, persona=persona)
             synced_vid1 = sync_vid(vid1, aud1)
 
-            # Part 2 Generate (I2V using face_bytes)
             logger.info("Generating Part 2 (I2V)...")
             vid2 = gen_vid(prompt_part2, image_bytes=face_bytes)
             aud2 = gen_aud(audio_text_part2, persona=persona)
             synced_vid2 = sync_vid(vid2, aud2)
 
-            # B-Roll Generate (T2V, no face anchor needed usually, but can pass dummy)
             b_roll_data = []
             for n in nodes:
                 if n.get("type") == "broll_prompt":
@@ -144,7 +140,13 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
             system_os.remove(stitched_path)
 
             full_narration = f"{audio_text_part1} {audio_text_part2}"
-            final_video_bytes = editor.apply_automated_factory_edit(final_base_bytes, b"", full_narration, b_roll_data)
+            final_video_bytes = editor.apply_automated_factory_edit(
+                final_base_bytes,
+                b"",
+                full_narration,
+                b_roll_data,
+                editing_dna=editing_dna # DNA Matrix injected here
+            )
 
             with open(video_path, "wb") as f:
                 f.write(final_video_bytes)
@@ -158,7 +160,7 @@ def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str 
         return False
 
 def main():
-    logger.info("Starting God-Tier UGC Pipeline (Vampire Engine Setup)...")
+    logger.info("Starting God-Tier UGC Pipeline (DNA Mutating Vampire Setup)...")
 
     scraper = EcommerceScraper()
     niche = os.getenv("UGC_NICHE", "beauty")
@@ -171,11 +173,9 @@ def main():
     tiktok_scraper = TikTokScraper()
     trend_data = tiktok_scraper.get_realtime_trends()
 
-    # [NEW] VAMPIRE TACTIC: Hijack a competitor's viral video
     vampire_data = tiktok_scraper.hijack_competitor_viral_video(niche=niche)
 
     evaluator = FYPEvaluator()
-    # Pass vampire data to Swarm to clone and outperform
     swarm_blueprint = evaluator.swarm_evaluate_and_generate(
         top_product['product_name'],
         niche,
@@ -183,7 +183,7 @@ def main():
         vampire_data=vampire_data
     )
 
-    logger.info("Node-Based Swarm Blueprint (Vampire Enhanced) Approved:")
+    logger.info("Node-Based Swarm Blueprint (DNA Mutated) Approved:")
     logger.info(json.dumps(swarm_blueprint, indent=2))
 
     personas = ["Host A", "Host B", "Host C"]
