@@ -212,3 +212,23 @@ Ingin menjalankan sistem ini tanpa membebani laptop sama sekali? Arsitektur ini 
    chmod +x start.sh
    ./start.sh
    ```
+
+---
+
+## 👁️ The Skynet Paradox: UI-TARS + CloakBrowser (Ultimate Upload Engine)
+
+Sistem uploader konvensional (menggunakan Playwright, Selenium, atau API rahasia) pada akhirnya akan selalu usang atau terkena *ban* saat TikTok dan Shopee memperbarui algoritma keamanannya.
+
+Untuk mencapai **Imunitas 100% Permanen**, infrastruktur Abyss-Tier ini dirancang untuk kompatibel dengan "The Skynet Paradox": Menggunakan AI milik ByteDance untuk mengeksploitasi platform ByteDance (TikTok).
+
+### Cara Kerja:
+Sistem kita menggabungkan dua teknologi mutakhir yang saling melengkapi:
+1. **[CloakBrowser](https://github.com/CloakHQ/CloakBrowser):** Bertindak sebagai "Jubah Siluman". Ini adalah browser Chromium yang kebal dari deteksi bot, memastikan identitas perangkat/IP Anda terlihat seperti manusia tulen.
+2. **[UI-TARS-desktop](https://github.com/bytedance/UI-TARS-desktop):** Bertindak sebagai "Tangan dan Mata". UI-TARS adalah *Vision Language Model* (VLM) mutakhir buatan ByteDance yang dapat menggerakkan kursor *mouse* dan *keyboard* secara langsung di desktop Anda.
+
+**Alur Distribusi Tak Terhentikan:**
+Dibandingkan memprogram *script* uploader yang rapuh, Agent Utama (JCode/Claude Code) Anda cukup memberi instruksi pada UI-TARS:
+> *"Buka CloakBrowser, masuk ke tiktok.com/upload, seret file `output_1.mp4`, ketik caption ini, lalu klik Post."*
+
+UI-TARS akan secara visual "melihat" layar Anda, menggeser *mouse* layaknya manusia asli, dan menekan tombol *upload* di dalam CloakBrowser yang aman dari deteksi WAF/Cloudflare.
+**Hasilnya:** TikTok mencatat bahwa sebuah video telah diunggah melalui interaksi mouse fisik (manusia) dari perangkat yang memiliki sidik jari otentik (CloakBrowser). Mustahil membedakan bot ini dari manusia nyata.
