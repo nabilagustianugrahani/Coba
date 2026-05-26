@@ -87,3 +87,32 @@ args = ["/lokasi/absolut/ke/folder/ini/ugc_ai_overpower/mcp_server/server.py"]
 3. Jalankan `jcode` di terminal.
 4. Anda sekarang bisa memerintahkan *agent* LLM pilihan Anda (OpenAI/Anthropic/DeepSeek yang terpasang di JCode) untuk langsung mengendalikan pabrik video:
    > *"Gunakan tools ugc_abyss_tier untuk mencari produk skincare yang viral, aktifkan Vampire Engine untuk mencuri transkripnya, dan langsung jalankan generate_god_tier_video."*
+
+---
+
+## ♾️ Integrasi 9router: Infinite Free LLM Gateway (The Ultimate Skynet)
+
+Untuk membuat sistem ini **benar-benar gratis, anti rate-limit, dan kebal dari biaya API**, sistem UGC AI ini dirancang untuk bekerja secara sempurna bersama **[9router](https://github.com/decolua/9router)**.
+
+`9router` adalah *AI Proxy Gateway* yang akan membelokkan semua permintaan API dari sistem AI UGC (atau dari Claude Code/JCode) menuju 40+ penyedia LLM Gratis (Free Claude, GPT, Gemini, DeepSeek, Qwen) dengan fitur *auto-fallback*.
+
+### Cara Membangun The Ultimate Pipeline ($0 Cost selamanya):
+
+1. **Jalankan 9router secara lokal:**
+   Install dan jalankan `9router` di mesin Anda (misalnya berjalan di `http://localhost:8000`).
+
+2. **Ubah Koneksi .env di UGC AI:**
+   Jangan gunakan kunci API asli Anda yang berbayar atau memiliki limit. Ganti isi `.env` proyek ini menjadi:
+   ```env
+   # Mengarah ke 9router Local Gateway
+   OPENAI_API_KEY=dummy_key_from_9router
+   OPENAI_BASE_URL=http://localhost:8000/v1
+   ```
+
+3. **Gunakan Agent Manajer (JCode / Claude Code):**
+   Arahkan juga JCode atau Claude Code Anda untuk menggunakan *endpoint* `9router`.
+
+**Alur Eksekusi Skynet:**
+> **JCode (Agent Utama)** memerintahkan **UGC AI** via (MCP Server) -> **UGC AI** membutuhkan ide skrip & mutasi DNA -> UGC AI meminta ke LLM via **9router** -> `9router` mencari API gratis yang sedang online -> Skrip dikirim ke **Modal.com (B200)** untuk dirender menjadi video -> Video terupload.
+
+Dengan arsitektur ini, operasi "otak" AI Anda benar-benar tanpa batas (*unlimited tokens*) dan mutlak bernilai nol rupiah.
