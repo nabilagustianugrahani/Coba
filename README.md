@@ -116,3 +116,60 @@ Untuk membuat sistem ini **benar-benar gratis, anti rate-limit, dan kebal dari b
 > **JCode (Agent Utama)** memerintahkan **UGC AI** via (MCP Server) -> **UGC AI** membutuhkan ide skrip & mutasi DNA -> UGC AI meminta ke LLM via **9router** -> `9router` mencari API gratis yang sedang online -> Skrip dikirim ke **Modal.com (B200)** untuk dirender menjadi video -> Video terupload.
 
 Dengan arsitektur ini, operasi "otak" AI Anda benar-benar tanpa batas (*unlimited tokens*) dan mutlak bernilai nol rupiah.
+
+---
+
+## 🥷 100% Shadowban Immunity (CloakBrowser Integration)
+
+Meskipun sistem secara default menginjeksi API via _stealth requests_, algoritma TikTok dan Instagram sering kali memblokir akses massal yang tidak menggunakan antarmuka grafis (GUI).
+
+Untuk menghindari _shadowban_ 100%, sistem **UGC AI** ini terintegrasi secara modular dengan **[CloakBrowser](https://github.com/CloakHQ/CloakBrowser)**.
+
+CloakBrowser bukanlah sekadar Playwright biasa. Ini adalah Chromium yang di-_patch_ dari *source code*-nya langsung untuk lolos 30/30 tes deteksi bot, termasuk mengelabui Cloudflare Turnstile dan reCAPTCHA v3.
+
+### Cara Kerja CloakBrowser di Pabrik Konten Anda:
+Jika Anda telah memasang modul ini, UGC AI Anda akan:
+1. Membuka *headless browser* yang tidak dapat dibedakan dengan Apple Safari asli pengguna.
+2. Membuka tab "Upload Video" di TikTok.
+3. Mengunggah video `mp4` yang dirender, menyalin _caption_ manipulatif dari LLM, dan menekan tombol *Post*.
+4. Platform tidak akan memblokirnya karena sidik jari perangkat, IP, dan perilaku _rendering_-nya sah sebagai "Pengguna Manusia Asli".
+
+Tidak perlu lagi pusing memikirkan risiko akun _burner_ Anda di-_ban_.
+
+---
+
+## 🧠 ECC (Engineered Cognitive Capabilities): Fully Autonomous Mode
+
+Pabrik video Abyss-Tier ini dapat berjalan **sepenuhnya tanpa pengawasan manusia (Otonom 100%)** jika digabungkan dengan **[ECC (affaan-m/ECC)](https://github.com/affaan-m/ECC)**.
+
+ECC adalah sistem optimalisasi kognitif (insting dan memori) yang dipasang ke dalam Agent Harness seperti Claude Code atau JCode. Daripada Anda menyuruh Agent untuk *"Buat video hari ini"*, ECC memberikan AI kemampuan untuk **berpikir, merencanakan, dan mengeksekusi sendiri**.
+
+### Arsitektur Skynet Sempurna:
+
+1. **ECC (The Brain):** Mengingat jam tayang FYP terbaik dan memonitor tren pasar secara konstan.
+2. **JCode / Claude Code (The Manager):** Menerima insting dari ECC dan memanggil server MCP kita.
+3. **9router (The Fuel):** Membayar biaya API kognitif Manager menggunakan 40+ LLM Gratis (Zero Rate-Limit).
+4. **UGC Abyss-Tier (The Factory):** Merender I2V, menulis naskah Vampire, dan memanipulasi DNA video.
+5. **CloakBrowser (The Ninja):** Mengunggah video ke TikTok/IG secara *stealth* tanpa terkena *shadowban*.
+
+### Cara Menjalankan Mode Otonom:
+Pasang modul ECC ke dalam lingkungan Claude Code / JCode Anda.
+Berikan "Skill" atau instruksi statis ke ECC:
+> *"Kamu adalah manajer pemasaran otonom. Setiap 4 jam, periksa tren di niche 'skincare'. Jika menemukan tren yang sedang naik daun, jalankan tools UGC MCP (scrape_products -> hijack_tiktok_trends -> generate_god_tier_video -> schedule_upload). Evaluasi hasilnya besok harinya dan mutasi DNA editannya."*
+
+Selamat! Anda baru saja membangun agensi *Digital Marketing* yang berisi staf kecerdasan buatan kelas dewa, beroperasi 24/7 dengan biaya Rp0.
+
+---
+
+## 🎬 ViMax: Agentic Video Studio Framework
+
+Arsitektur Swarm AI dalam proyek ini (yang bertindak sebagai Director, Screenwriter, dan Prompt Engineer) terinspirasi dan kompatibel dengan kerangka kerja **[ViMax (HKUDS/ViMax)](https://github.com/HKUDS/ViMax)**.
+
+ViMax adalah framework mutakhir (SOTA) untuk *Agentic Video Generation*. Alih-alih menggunakan pipeline generasi video sekuensial biasa yang kaku, ViMax (dan sistem UGC Abyss-Tier ini) mendistribusikan beban kognitif pembuatan video kepada beberapa agen:
+
+1. **Director Agent:** Mengatur tempo (*pacing*), mutasi DNA (*Dopamine-Sync*), dan arahan visual kamera.
+2. **Screenwriter Agent (Vampire Mode):** Menulis naskah dengan retensi tinggi menggunakan *Cache-Augmented Generation (CAG)*.
+3. **Producer Agent:** Berkomunikasi dengan dunia luar (seperti MCP server ke JCode/Claude Code) untuk mendelegasikan *render farm* ke Modal B200 GPU.
+
+**Bagi Pengguna Tingkat Lanjut (Advanced Users):**
+Anda dapat mengganti modul `FYPEvaluator` di `evaluator.py` kami dengan *framework* ViMax seutuhnya untuk skalabilitas produksi konten berukuran studio (misalnya, membuat seri drama atau narasi sinematik 3 menit) yang jauh melampaui batasan UGC TikTok standar.

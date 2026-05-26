@@ -104,7 +104,7 @@ class ModelGenerator:
                     guidance_scale=5.0
                 ).frames[0]
 
-                out_path = tempfile.mktemp(suffix=".mp4")
+                out_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
                 export_to_video(output, out_path, fps=16)
                 with open(out_path, "rb") as f:
                     video_bytes = f.read()
@@ -115,7 +115,7 @@ class ModelGenerator:
 
         print("Falling back to simulated clip.")
         from moviepy import ColorClip
-        out_path = tempfile.mktemp(suffix=".mp4")
+        out_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
         clip = ColorClip(size=(1080, 1920), color=(50, 150, 200), duration=2.0)
         clip.write_videofile(out_path, fps=24, codec="libx264", logger=None)
         with open(out_path, "rb") as f:
@@ -135,7 +135,7 @@ class ModelGenerator:
                 aud_tmp.write(audio_bytes)
                 aud_path = aud_tmp.name
 
-            out_path = tempfile.mktemp(suffix=".mp4")
+            out_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
 
             from moviepy import VideoFileClip, AudioFileClip, concatenate_videoclips
             audio_clip = AudioFileClip(aud_path)
