@@ -173,3 +173,42 @@ ViMax adalah framework mutakhir (SOTA) untuk *Agentic Video Generation*. Alih-al
 
 **Bagi Pengguna Tingkat Lanjut (Advanced Users):**
 Anda dapat mengganti modul `FYPEvaluator` di `evaluator.py` kami dengan *framework* ViMax seutuhnya untuk skalabilitas produksi konten berukuran studio (misalnya, membuat seri drama atau narasi sinematik 3 menit) yang jauh melampaui batasan UGC TikTok standar.
+
+---
+
+## 💻 Hardware Requirements (Sweet Spot)
+
+Salah satu keunggulan terbesar dari arsitektur *Abyss-Tier* ini adalah **kebutuhan spesifikasi komputer lokal yang hampir nol (Ultra-Lightweight)**.
+
+Karena kita mendelegasikan 100% beban rendering GPU ke **Modal.com (Nvidia B200)** dan beban kognitif LLM ke **9Router/JCode**, laptop Anda hanya berfungsi sebagai "Remote Control".
+
+**Spesifikasi Sweet Spot (Lokal):**
+- **Sistem Operasi:** macOS (Apple Silicon sangat direkomendasikan), Linux, atau Windows dengan WSL2.
+- **RAM:** 8GB DDR4/DDR5 (JCode yang berbasis Rust dan script MCP Python berjalan sangat ringan).
+- **Prosesor:** CPU apa pun dalam 5 tahun terakhir (Misal: Intel i3 Gen-8+, Ryzen 3, Apple M1).
+- **Penyimpanan:** 10GB Free Space SSD (Untuk menyimpan hasil unduhan `.mp4` sebelum di-upload).
+- **Koneksi Internet:** Stabil (Tidak perlu super cepat, yang penting tidak sering terputus saat API berkomunikasi).
+
+Anda bisa mengoperasikan "Pabrik AI Raksasa" ini dari laptop paling murah sekalipun dari sebuah kedai kopi.
+
+---
+
+---
+
+## ☁️ Zero-Setup Deployment (GitHub Codespaces)
+
+Ingin menjalankan sistem ini tanpa membebani laptop sama sekali? Arsitektur ini 100% kompatibel dan sangat direkomendasikan untuk dieksekusi di **GitHub Codespaces**.
+
+**Keuntungan menggunakan Codespaces:**
+- Kecepatan internet *backbone* Gigabit Microsoft (Upload/Download instan).
+- Lingkungan Linux Container yang bersih (Bebas error instalasi library OS).
+- Bisa dijalankan lewat browser dari iPad, tablet, atau laptop kantor tanpa perlu instalasi lokal.
+
+**Cara Eksekusi:**
+1. Masuk ke halaman GitHub repositori ini.
+2. Klik tombol hijau **`<> Code`** -> Tab **`Codespaces`** -> **`Create codespace on main`**.
+3. Di dalam terminal Codespace yang muncul, langsung jalankan:
+   ```bash
+   chmod +x start.sh
+   ./start.sh
+   ```
