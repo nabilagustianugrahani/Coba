@@ -5,3 +5,5 @@ schedule
 playwright
 playwright-stealth
 moviepy>=2.0.0
+modal
+mcp

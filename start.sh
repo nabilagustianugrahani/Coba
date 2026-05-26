@@ -13,7 +13,7 @@ echo -e "${GREEN}===================================================${NC}"
 # 1. Check Python installation
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}[X] Error: python3 is not installed.${NC}"
-    # Remove exit to prevent bash sandbox from hanging
+    # Removed exit to prevent bash sandbox from hanging
 fi
 
 # 2. Check Dependencies
@@ -29,13 +29,17 @@ fi
 if [ ! -f ".env" ]; then
     echo -e "${YELLOW}[!] .env file not found. Creating a template...${NC}"
     cat <<ENV_EOF > .env
-# LLM Routing (Isi salah satu saja untuk gratisan)
-GROQ_API_KEY=
-OPENROUTER_API_KEY=
-CEREBRAS_API_KEY=
+# MULTI-KEY ROUTING: Pisahkan dengan koma jika punya lebih dari 1 key (untuk menghindari Rate Limit)
+# Format: key1,key2,key3
+GROQ_API_KEYS=
+OPENROUTER_API_KEYS=
+CEREBRAS_API_KEYS=
 
 # Target Niche (Contoh: skincare, fashion, tekno)
 UGC_NICHE=skincare
+
+# Database Vector RAG
+MONGO_URI=mongodb+srv://simulated:simulated@simulated.mongodb.net
 ENV_EOF
     echo -e "${RED}[X] Please fill in your API keys in the .env file and run this script again.${NC}"
 fi

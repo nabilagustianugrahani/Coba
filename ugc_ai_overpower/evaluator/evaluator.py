@@ -3,36 +3,52 @@ import os
 import logging
 import json
 import random
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FYPEvaluator:
     def __init__(self):
-        self.groq_key = os.getenv("GROQ_API_KEY")
-        self.cerebras_key = os.getenv("CEREBRAS_API_KEY")
-        self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
+        # Read comma-separated keys
+        self.groq_keys = self._parse_keys("GROQ_API_KEYS")
+        self.cerebras_keys = self._parse_keys("CEREBRAS_API_KEYS")
+        self.openrouter_keys = self._parse_keys("OPENROUTER_API_KEYS")
+
+        # Backward compatibility for old .env formats
+        if not self.groq_keys and os.getenv("GROQ_API_KEY"): self.groq_keys = [os.getenv("GROQ_API_KEY")]
+        if not self.cerebras_keys and os.getenv("CEREBRAS_API_KEY"): self.cerebras_keys = [os.getenv("CEREBRAS_API_KEY")]
+        if not self.openrouter_keys and os.getenv("OPENROUTER_API_KEY"): self.openrouter_keys = [os.getenv("OPENROUTER_API_KEY")]
+
         self.openai_key = os.getenv("OPENAI_API_KEY")
         self.mongo_uri = os.getenv("MONGO_URI")
 
-        self.client = None
+        # Primary provider selection
+        self.provider = "openai"
+        self.active_keys = []
         self.model_name = "gpt-4o-mini"
+        self.base_url = None
 
-        if self.groq_key:
-            self.client = openai.OpenAI(api_key=self.groq_key, base_url="https://api.groq.com/openai/v1")
+        if self.groq_keys:
+            self.provider = "groq"
+            self.active_keys = self.groq_keys
             self.model_name = "llama-3.3-70b-versatile"
-        elif self.cerebras_key:
-            self.client = openai.OpenAI(api_key=self.cerebras_key, base_url="https://api.cerebras.ai/v1")
+            self.base_url = "https://api.groq.com/openai/v1"
+        elif self.cerebras_keys:
+            self.provider = "cerebras"
+            self.active_keys = self.cerebras_keys
             self.model_name = "llama3.1-70b"
-        elif self.openrouter_key:
-            self.client = openai.OpenAI(api_key=self.openrouter_key, base_url="https://openrouter.ai/api/v1")
+            self.base_url = "https://api.cerebras.ai/v1"
+        elif self.openrouter_keys:
+            self.provider = "openrouter"
+            self.active_keys = self.openrouter_keys
             self.model_name = "google/gemini-2.0-flash-exp:free"
+            self.base_url = "https://openrouter.ai/api/v1"
         elif self.openai_key:
-            try:
-                self.client = openai.OpenAI(api_key=self.openai_key)
-            except AttributeError:
-                openai.api_key = self.openai_key
-                self.client = openai
+            self.provider = "openai"
+            self.active_keys = [self.openai_key]
+
+        logger.info(f"[Evaluator] Multi-Key Routing initialized. Provider: {self.provider}. Loaded {len(self.active_keys)} keys.")
 
         self.use_mongo = False
         self.db_path = "performance_db.json"
@@ -41,6 +57,26 @@ class FYPEvaluator:
 
         # Load CAG (Cache-Augmented Generation) Knowledge Base
         self.cag_context = self._load_cag_knowledge()
+
+    def _parse_keys(self, env_var_name: str) -> list:
+        raw = os.getenv(env_var_name, "")
+        if not raw:
+            return []
+        # Split by comma, strip whitespace, remove empty strings
+        return [k.strip() for k in raw.split(",") if k.strip()]
+
+    def _get_client_for_key(self, api_key: str):
+        if self.provider == "openai":
+            import openai
+            try:
+                return openai.OpenAI(api_key=api_key)
+            except AttributeError:
+                # Fallback for older openai versions
+                openai.api_key = api_key
+                return openai
+        else:
+            import openai
+            return openai.OpenAI(api_key=api_key, base_url=self.base_url)
 
     def _load_cag_knowledge(self):
         cag_path = os.path.join(os.path.dirname(__file__), "cag_knowledge_base.txt")
@@ -124,7 +160,6 @@ class FYPEvaluator:
             except Exception:
                 return "No semantic historical data available yet."
         else:
-            # Enhanced Local JSON RAG Fallback
             history = self._get_history_json()
             if not history:
                 return "No historical data available yet."
@@ -214,26 +249,50 @@ Output ONLY valid JSON matching this schema:
         return self._run_prompt(prompt, product_name, trend_data, vampire_data)
 
     def _run_prompt(self, prompt: str, product_name: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
-        try:
-            if self.client:
-                if hasattr(self.client, 'chat') and hasattr(self.client.chat, 'completions'):
-                    response = self.client.chat.completions.create(
+        if not self.active_keys:
+            logger.warning("[Evaluator] No API keys loaded. Using simulation.")
+            return self._fallback_result(product_name, trend_data, vampire_data)
+
+        # Multi-Key Round-Robin Routing
+        for attempt, current_key in enumerate(self.active_keys):
+            try:
+                client = self._get_client_for_key(current_key)
+                logger.info(f"[Evaluator] Attempting generation using Key {attempt + 1}/{len(self.active_keys)} ({self.provider})...")
+
+                if hasattr(client, 'chat') and hasattr(client.chat, 'completions'):
+                    response = client.chat.completions.create(
                         model=self.model_name,
                         messages=[{"role": "user", "content": prompt}],
                         response_format={ "type": "json_object" }
                     )
                     return json.loads(response.choices[0].message.content)
                 else:
+                    # Fallback for very old OpenAI SDK versions
+                    import openai
                     response = openai.ChatCompletion.create(
                         model="gpt-4",
                         messages=[{"role": "user", "content": prompt}]
                     )
                     return json.loads(response.choices[0].message.content)
-            else:
-                return self._fallback_result(product_name, trend_data, vampire_data)
-        except Exception as e:
-            logger.error(f"Error during Swarm Evaluation: {e}")
-            return self._fallback_result(product_name, trend_data, vampire_data)
+
+            except Exception as e:
+                # Catch RateLimits, 429s, or Unauthorized errors
+                error_msg = str(e).lower()
+                logger.warning(f"[Evaluator] Key {attempt + 1} failed: {e}")
+
+                if "rate limit" in error_msg or "429" in error_msg or "insufficient" in error_msg:
+                    if attempt < len(self.active_keys) - 1:
+                        logger.info(f"[Evaluator] Rate Limit hit! Rotating to the next available API Key in 3 seconds...")
+                        time.sleep(3)
+                        continue # Try the next key
+                    else:
+                        logger.error("[Evaluator] All provided API keys have been exhausted/rate-limited.")
+                else:
+                    # If it's a structural JSON error or severe network error, don't burn the other keys
+                    logger.error(f"[Evaluator] Severe non-rate-limit error encountered: {e}")
+                    break
+
+        return self._fallback_result(product_name, trend_data, vampire_data)
 
     def _fallback_result(self, product_name: str, trend_data: dict = None, vampire_data: dict = None) -> dict:
         logger.info("Using built-in simulation fallback for Node-Based Swarm AI (RAG+CAG Engine).")
@@ -242,10 +301,10 @@ Output ONLY valid JSON matching this schema:
             "hook": "Kemarin muka aku hancur parah, nyesel banget!",
             "hashtags": ["#skincareviral", "#fyp"],
             "editing_dna": {
-                "micro_zoom_interval": random.uniform(0.8, 1.5), # Faster zoom due to CAG Rules
+                "micro_zoom_interval": random.uniform(0.8, 1.5),
                 "subliminal_flash_duration": random.uniform(0.02, 0.05),
                 "phantom_audio_hz": random.randint(17000, 19000),
-                "subtitle_color_hex": random.choice(["#FF0000", "#FFD700"]) # Aggressive colors due to CAG Rules
+                "subtitle_color_hex": random.choice(["#FF0000", "#FFD700"])
             },
             "nodes": [
                 {
@@ -271,7 +330,7 @@ Output ONLY valid JSON matching this schema:
                 {
                     "id": "node_narration_part2",
                     "type": "text",
-                    "value": "Sumpah 3 hari doang bekas hitam langsung minggat! Amankan di keranjang kuning sekarang! Soalnya kalau udah abis kalian pasti kemarin muka hancur parah." # Looping script applied
+                    "value": "Sumpah 3 hari doang bekas hitam langsung minggat! Amankan di keranjang kuning sekarang! Soalnya kalau udah abis kalian pasti kemarin muka hancur parah."
                 },
                 {
                     "id": "node_broll_1",
