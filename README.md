@@ -273,3 +273,28 @@ export ANTHROPIC_API_KEY="dummy_key_buat_9router"
 **⚠️ Peringatan Taktis (The Caveat):**
 Claude Code memformat *request* dan mengharapkan balasan menggunakan standar `Anthropic Messages API`. Meskipun 9router memiliki lapisan penerjemah ke format `OpenAI API`, pengiriman payload *Tools/Function Calling MCP* yang rumit sering kali mengalami *parsing error* jika 9router me-routing-nya ke model *open-source* gratisan yang format JSON-nya tidak seketat Claude 3.5 Sonnet.
 Gunakan Claude Code + 9router hanya jika Anda siap menanggung risiko *crash* di tengah pembuatan video akibat kegagalan format balasan LLM.
+
+---
+
+## 🦠 The Skynet Evolution: 2026 SOTA Agents (The Final Form)
+
+Untuk mencapai skala produksi yang dapat mengalahkan agensi *digital marketing* bernilai jutaan dolar, sistem UGC Python ini tidak boleh dijalankan oleh manusia. Sistem ini harus dipimpin oleh **Agent Harnesses** generasi terbaru yang mendominasi GitHub pada pertengahan 2026.
+
+Kami secara eksplisit merekomendasikan Anda untuk mengendalikan proyek ini menggunakan salah satu dari *Supreme Agents* berikut:
+
+### 1. The Manager: `ultraworkers/claw-code` atau `openclaw/openclaw`
+Tinggalkan eksekusi script manual. **[claw-code](https://github.com/ultraworkers/claw-code)** adalah repositori tercepat yang mencapai 100K Stars dalam sejarah. Dibangun menggunakan Rust, agen ini bertindak sebagai manajer pabrik yang sangat efisien dan terhubung sempurna ke server MCP kita.
+Bagi yang menginginkan kontrol lintas-*platform* sejati, **[openclaw](https://github.com/openclaw/openclaw)** dapat mengambil alih OS Anda sepenuhnya untuk mengatur *render farm* dari jarak jauh.
+
+### 2. The Uncensored Mind: `NousResearch/hermes-agent`
+Jika Anda merasa LLM komersial terlalu kaku dalam membuat naskah manipulatif (Vampire Tactic), gunakan **[hermes-agent](https://github.com/NousResearch/hermes-agent)** sebagai *routing model* utama. Ia dirancang untuk berevolusi dan mengoptimalkan taktik *psychological warfare* untuk UGC Anda tanpa hambatan sensor.
+
+### 3. God-Tier Skills (Kepingan Otak Tambahan)
+Agar Agent Manajer Anda tidak bekerja buta, kami mewajibkan instalasi *Skills* (plug-ins) berikut ke dalam agen CLI Anda:
+- **`mempalace`**: Menggantikan Vector DB konvensional dengan *Memory Palace* super masif. Agen Anda tidak akan pernah melupakan satu pun rasio *zoom* dari 10.000 video yang pernah sukses.
+- **`graphify`**: Mengonversi akun TikTok kompetitor menjadi *Knowledge Graph* matematis yang dapat di-*query* detik itu juga oleh agen Anda.
+- **`caveman`**: Menghemat pembakaran token API hingga 65% saat mengeksekusi operasi masif.
+- **`andrej-karpathy-skills`**: Menyuntikkan pemikiran arsitektural dari Andrej Karpathy langsung ke dalam nalar agen Anda untuk mencegah *hallucination* saat menulis node I2V.
+
+**Alur Kerja Sempurna:**
+`Claw-Code` + `Hermes-Agent` + `Mempalace` (Otak & Manajer) ➡️ `9Router` (Bensin API Gratis) ➡️ **`UGC AI Overpower`** (Pabrik Video) ➡️ `UI-TARS` & `CloakBrowser` (Distribusi Siluman).
