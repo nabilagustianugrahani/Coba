@@ -251,3 +251,25 @@ Mengapa hanya membatasi afiliasi di Shopee dan TikTok? Melalui integrasi **[yika
 - WeChat Video (Shipinhao)
 
 Jika dipadukan dengan agen F5-TTS yang menyadur *script Vampire* ke dalam bahasa Mandarin (*Zero-shot Voice Cloning*), Anda secara otomatis membuka cabang *digital marketing* lintas negara yang mengumpulkan komisi afiliasi internasional selama 24/7.
+
+---
+
+## ⚖️ The MCP Execution Dilemma: Claude Code vs JCode
+
+Karena sistem UGC ini adalah "Pabrik", Anda memerlukan "Manajer" untuk menjalankannya. Anda memiliki dua opsi Agen CLI (*Command Line Interface*) untuk memanggil Server MCP proyek ini, namun dengan perbedaan fundamental jika Anda ingin mencapai **$0 Operational Cost via 9router**.
+
+### 1. JCode (Rekomendasi Utama & Paling Stabil)
+[JCode](https://github.com/1jehuang/jcode) dirancang agnostic (mendukung format OpenAI maupun Anthropic). Ini menjadikannya pasangan paling sempurna untuk **9router**.
+Anda cukup mengatur JCode untuk menggunakan model *OpenAI-compatible* dan mengarahkannya ke `localhost:8000`. JCode tidak akan *crash* saat 9router membelokkan *prompt* Anda ke Llama-3, DeepSeek, atau Gemini Flash. Ini adalah jalur yang **bulletproof** untuk produksi ratusan video tanpa henti semalaman.
+
+### 2. Claude Code (Dewa UI/UX dengan Syarat "Hacking")
+Secara bawaan, Claude Code dikunci (*vendor-locked*) untuk menggunakan API Anthropic berbayar. Jika Anda ingin UI/UX yang cantik dari Claude Code dengan biaya gratis, Anda *bisa* memaksanya menggunakan 9router dengan memanipulasi *Environment Variable*:
+
+```bash
+export ANTHROPIC_BASE_URL="http://localhost:8000/v1"
+export ANTHROPIC_API_KEY="dummy_key_buat_9router"
+```
+
+**⚠️ Peringatan Taktis (The Caveat):**
+Claude Code memformat *request* dan mengharapkan balasan menggunakan standar `Anthropic Messages API`. Meskipun 9router memiliki lapisan penerjemah ke format `OpenAI API`, pengiriman payload *Tools/Function Calling MCP* yang rumit sering kali mengalami *parsing error* jika 9router me-routing-nya ke model *open-source* gratisan yang format JSON-nya tidak seketat Claude 3.5 Sonnet.
+Gunakan Claude Code + 9router hanya jika Anda siap menanggung risiko *crash* di tengah pembuatan video akibat kegagalan format balasan LLM.
