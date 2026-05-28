@@ -57,6 +57,7 @@ class FYPEvaluator:
 
         # Load CAG (Cache-Augmented Generation) Knowledge Base
         self.cag_context = self._load_cag_knowledge()
+        self.karpathy_context = self._load_karpathy_knowledge()
 
     def _parse_keys(self, env_var_name: str) -> list:
         raw = os.getenv(env_var_name, "")
@@ -77,6 +78,13 @@ class FYPEvaluator:
         else:
             import openai
             return openai.OpenAI(api_key=api_key, base_url=self.base_url)
+
+    def _load_karpathy_knowledge(self):
+        path = os.path.join(os.path.dirname(__file__), "karpathy_hermes_knowledge.txt")
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return f.read()
+        return ""
 
     def _load_cag_knowledge(self):
         cag_path = os.path.join(os.path.dirname(__file__), "cag_knowledge_base.txt")
@@ -199,8 +207,9 @@ Mission: STEAL this exact narrative structure, but make it 2x more aggressive an
 
         prompt = f"""
 {self.cag_context}
+{self.karpathy_context}
 
-You are an advanced AI Swarm representing an Abyss-Tier Creative Agency.
+You are an advanced AI Swarm representing an Abyss-Tier Creative Agency running on Hermes-Agent Cognitive Evolution. Apply Andrej Karpathy Skills to ensure zero hallucination and strict JSON compliance.
 Task: Create a viral TikTok UGC video workflow for '{product_name}' (Niche: {niche}).
 {trends_context}
 {vampire_context}
