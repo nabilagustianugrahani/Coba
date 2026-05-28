@@ -85,3 +85,30 @@ Meskipun arsitektur *Skynet* ini menyediakan struktur *pipeline* yang lengkap (m
 3. **Fokus pada Arsitektur:** Proyek ini bertujuan memberikan Anda *blueprint* (kerangka kerja) kelas *Enterprise* tentang bagaimana agen-agen AI ini *seharusnya* berkomunikasi. Anda (atau JCode/Claude Code Anda) harus menyambungkan logika otentikasi spesifik Anda sendiri (memasukkan *cookies*, menyalakan LivePortrait sungguhan di Docker, dll) untuk membuatnya benar-benar beroperasi memposting video.
 
 Skrip ini siap mengeksekusi logika *reasoning* LLM, *editing DNA*, dan rendering video dasar, namun membutuhkan penyesuaian tahap akhir di mesin *local* Anda untuk operasi distribusi *stealth* yang sesungguhnya.
+
+---
+
+## ⚖️ The MCP Proxy Masterclass: Free Claude Code
+
+Karena sistem UGC ini adalah "Pabrik", Anda memerlukan "Manajer" (Agen CLI) untuk menjalankannya via protokol MCP. Sebelumnya, menggunakan Claude Code resmi berarti Anda harus membayar mahal untuk API Anthropic, sementara menggunakan proksi standar sering kali merusak format *Tool Calling* JSON.
+
+Namun, dengan mengintegrasikan **[Alishahryar1/free-claude-code](https://github.com/Alishahryar1/free-claude-code)**, Anda telah membuka kunci *Infinite Money Glitch*:
+
+**Free-Claude-Code** adalah *Proxy Translator* tingkat dewa. Ia bekerja sebagai jembatan yang mencegat permintaan Claude Code resmi Anda, menerjemahkannya ke dalam bahasa OpenAI, mengirimkannya ke 17+ *provider* LLM gratisan (Llama-3, DeepSeek R1, Kimi, dll), lalu menerjemahkan kembali balasannya menjadi format Anthropic yang sah.
+
+### Cara Mendapatkan Claude Code 100% Gratis:
+
+1. Instal proyek *Free-Claude-Code* di terminal Anda:
+   ```bash
+   pip install free-claude-code
+   ```
+2. Jalankan server proksinya (biarkan berjalan di *background*):
+   ```bash
+   fcc-server
+   ```
+3. Jangan jalankan `claude` biasa! Jalankan manajer pabrik Anda menggunakan perintah khusus ini:
+   ```bash
+   fcc-claude
+   ```
+
+Sekarang, Anda menikmati antarmuka UI/UX dan fitur *reasoning* terbaik dari Claude Code resmi, dikombinasikan dengan biaya operasi mutlak **Rp0 ($0)** untuk menyuruh agen Anda bekerja 24/7 membangun video UGC Abyss-Tier. Ini adalah titik kulminasi otomatisasi.
