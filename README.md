@@ -112,3 +112,24 @@ Namun, dengan mengintegrasikan **[Alishahryar1/free-claude-code](https://github.
    ```
 
 Sekarang, Anda menikmati antarmuka UI/UX dan fitur *reasoning* terbaik dari Claude Code resmi, dikombinasikan dengan biaya operasi mutlak **Rp0 ($0)** untuk menyuruh agen Anda bekerja 24/7 membangun video UGC Abyss-Tier. Ini adalah titik kulminasi otomatisasi.
+
+---
+
+## ⚙️ Eksekusi di VPS (The "No-Bullshit" Guide)
+
+Jika Anda bingung dengan banyaknya agen AI di luaran sana (Claude Code, OpenClaw, ZeroClaw, dll), **lupakan semuanya.**
+
+Kekuatan utama dari proyek ini **bukan** pada agen CLI apa yang Anda gunakan, melainkan pada **Mesin Pabrik Python** (`ugc_ai_overpower/main.py`) yang telah dibangun di repositori ini. Mesin kitalah yang merender video 4K I2V di Modal, menyuntikkan manipulasi psikologis (*Dopamine-Sync*), dan menyimpan memori *hook* di MongoDB.
+
+Agen CLI luar hanyalah **"Tombol Start"**.
+
+### Rekomendasi Tunggal untuk VPS Anda:
+Gunakan **[JCode](https://github.com/1jehuang/jcode)** atau **[Claw-Code](https://github.com/ultraworkers/claw-code)**. Keduanya ditulis menggunakan Rust, hanya memakan RAM ~80MB, dan sangat stabil berjalan di latar belakang server Linux tanpa layar (*headless*).
+
+**Langkah Eksekusi Final:**
+1. Install `JCode` atau `Claw-code` di VPS Anda.
+2. Sambungkan ke **[9router](https://github.com/decolua/9router)** (Agar Anda tidak perlu membayar tagihan API LLM sepeser pun).
+3. Daftarkan server MCP proyek ini (`ugc_ai_overpower/mcp_server/server.py`) ke dalam konfigurasi agen Anda.
+4. Suruh agen tersebut: *"Jalankan pabrik UGC sekarang dan buat 5 video"* lalu tinggalkan VPS Anda.
+
+Itu saja. Pabrik uang afiliasi Anda sekarang 100% otonom, gratis, dan anti-ribet.
