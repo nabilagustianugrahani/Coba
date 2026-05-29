@@ -254,7 +254,7 @@ class AutoEditor:
             out_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
             temp_paths.append(out_path)
 
-            final_video.write_videofile(out_path, fps=30, codec="libx264", audio_codec="aac", logger=None)
+            final_video.write_videofile(out_path, fps=30, codec="libx264", audio_codec="aac", threads=4, preset="ultrafast", logger=None)
 
             with open(out_path, "rb") as f:
                 final_video_bytes = f.read()
