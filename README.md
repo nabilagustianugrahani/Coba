@@ -133,3 +133,17 @@ Gunakan **[JCode](https://github.com/1jehuang/jcode)** atau **[Claw-Code](https:
 4. Suruh agen tersebut: *"Jalankan pabrik UGC sekarang dan buat 5 video"* lalu tinggalkan VPS Anda.
 
 Itu saja. Pabrik uang afiliasi Anda sekarang 100% otonom, gratis, dan anti-ribet.
+
+## 🚀 Eksekusi Pengunggahan (The Last Mile): AiToEarn API
+
+Sebelumnya, proyek ini menyarankan penggunaan kombinasi *CloakBrowser* dan *UI-TARS* untuk mengunggah video. Namun, untuk skala VPS (Headless Server) yang murni, melakukan otomatisasi browser visual tidaklah efisien.
+
+Oleh karena itu, modul distribusi kami telah sepenuhnya dirombak menjadi **AiToEarn API Connector**. Kami menyerahkan kerumitan *anti-bot bypass* dan injeksi *cookies* kepada **[yikart/AiToEarn](https://github.com/yikart/AiToEarn)**, sebuah *framework multi-platform* raksasa untuk distribusi media sosial Asia.
+
+### Cara Kerja:
+1. Skrip `uploader.py` bertindak murni sebagai **Dispatcher**.
+2. Setelah video dirender oleh Modal B200, skrip akan mengirimkan *HTTP POST request* (mengandung file `.mp4`, *caption*, dan target *platforms*: Douyin, Xiaohongshu, Kuaishou, TikTok).
+3. Payload dikirim ke *local server* AiToEarn (secara *default* berjalan di `http://localhost:3000/api/publish`).
+4. AiToEarn mengambil alih *file* tersebut dan melakukan *blast* ke semua akun terafiliasi Anda secara aman dan tanpa terdeteksi.
+
+*Skynet UGC* kini murni berfokus pada apa yang ia lakukan dengan sangat baik: **Kognisi (Prompting), Render Video, dan Mutasi DNA Psikologis.** Sisanya diurus oleh ekosistem terkuat di industri.

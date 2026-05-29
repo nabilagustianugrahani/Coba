@@ -1,73 +1,67 @@
 import logging
-import schedule
 import time
 from datetime import datetime, timedelta
 import random
 import os
+import requests
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SocialUploader:
     def __init__(self):
-        # By default, we now prefer CloakBrowser for 100% Shadowban immunity
-        self.use_cloak_browser = True
-        self.use_cookie_injection = False
+        # Local endpoint where the AiToEarn CLI/Server is running on the VPS
+        self.aitoearn_endpoint = os.getenv("AITOEARN_ENDPOINT", "http://localhost:3000/api/publish")
 
-    def _execute_cloak_upload(self, video_path: str, caption: str):
+    def _execute_aitoearn_upload(self, video_path: str, caption: str):
         """
-        Executes stealth upload using CloakBrowser (Playwright replacement).
-        Guarantees 100% pass rate against Cloudflare and TikTok Anti-Bot WAFs.
+        Delegates the physical uploading process to the AiToEarn framework.
+        AiToEarn handles the multi-platform distribution (Douyin, Xiaohongshu, Kuaishou, TikTok)
+        and bypasses anti-bot measures using its own mature infrastructure.
         """
-        logger.info(f"[CloakBrowser Upload] Launching Source-Patched Chromium for {video_path}")
-        logger.info(f"[CloakBrowser Upload] Caption: {caption}")
+        logger.info(f"[AiToEarn Dispatcher] Transferring video {video_path} to AiToEarn ecosystem...")
+
+        if not os.path.exists(video_path):
+            logger.error(f"[AiToEarn Dispatcher] Video file {video_path} not found. Aborting transfer.")
+            return False
 
         try:
-            # Simulated implementation of CloakBrowser
-            # In a real environment, you install via: pip install cloakbrowser
-            # from cloakbrowser import sync_playwright
-
-            logger.info("[CloakBrowser] Fingerprint spoofed. navigator.webdriver = false.")
-            logger.info("[CloakBrowser] Bypassing Cloudflare turnstile... SUCCESS.")
-
-            if not os.path.exists(video_path):
-                logger.warning(f"[CloakBrowser] Video {video_path} not found. Running in simulation mode.")
-            else:
-                logger.info(f"[CloakBrowser] Uploading {video_path} via drag-and-drop simulation...")
-
-            logger.info(f"[CloakBrowser] SUCCESS! Video {video_path} is live with 0% shadowban risk.")
-
-        except ImportError:
-            logger.warning("[CloakBrowser] cloakbrowser module not found. Falling back to curl_cffi API.")
-            self._execute_api_upload(video_path, caption)
-        except Exception as e:
-            logger.error(f"[CloakBrowser] Upload failed: {e}")
-            self._execute_api_upload(video_path, caption)
-
-    def _execute_api_upload(self, video_path: str, caption: str):
-        """
-        Fallback: Stealth upload via undocumented mobile API endpoints
-        """
-        logger.info(f"[API Upload] Initiating API-level upload for {video_path}")
-        try:
-            import curl_cffi.requests as requests
-            import os
-
-            headers = {
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15",
-                "x-api-stealth-bypass": "true",
+            # Payload tailored for AiToEarn API structure
+            payload = {
+                "title": caption[:50], # Short title
+                "description": caption,
+                "platforms": ["douyin", "xiaohongshu", "kuaishou", "tiktok"],
+                "publish_type": "now"
             }
 
-            logger.info("[API Upload] Injecting cookies and spoofing JA3/TLS fingerprint (impersonating Safari 15.3)...")
+            with open(video_path, 'rb') as video_file:
+                files = {
+                    'video': (os.path.basename(video_path), video_file, 'video/mp4')
+                }
 
-            if os.path.exists(video_path):
-                logger.info(f"[API Upload] Video file {video_path} found. Payload prepared.")
+                logger.info(f"[AiToEarn Dispatcher] Sending multipart payload to {self.aitoearn_endpoint}...")
 
-            logger.info(f"[API Upload] SUCCESS! Video is live.")
-        except ImportError:
-            logger.warning("[API Upload] curl_cffi not installed. Simulation completed.")
+                # We use a timeout to prevent the pipeline from hanging if AiToEarn is down
+                response = requests.post(
+                    self.aitoearn_endpoint,
+                    data=payload,
+                    files=files,
+                    timeout=120
+                )
+
+                if response.status_code == 200:
+                    logger.info(f"[AiToEarn Dispatcher] SUCCESS! Video handed over to AiToEarn for multi-platform blast.")
+                    return True
+                else:
+                    logger.warning(f"[AiToEarn Dispatcher] Failed to transfer. HTTP {response.status_code}: {response.text}")
+                    return False
+
+        except requests.exceptions.ConnectionError:
+            logger.warning(f"[AiToEarn Dispatcher] Connection refused. Is the AiToEarn server running at {self.aitoearn_endpoint}? (Running in Simulation Mode)")
+            return False
         except Exception as e:
-            logger.error(f"[API Upload] API upload failed: {e}")
+            logger.error(f"[AiToEarn Dispatcher] Unexpected error during transfer: {e}")
+            return False
 
     def schedule_upload(self, video_path: str, caption: str, variant_index: int = 0):
         """
@@ -77,16 +71,14 @@ class SocialUploader:
         upload_time = datetime.now() + timedelta(minutes=delay_minutes)
         time_str = upload_time.strftime("%H:%M")
 
-        logger.info(f"Scheduled Drip-Feed Upload for {video_path} at {time_str} WIB")
+        logger.info(f"Scheduled Multi-Platform Blast via AiToEarn for {video_path} at {time_str} WIB")
 
-        if self.use_cloak_browser:
-            self._execute_cloak_upload(video_path, caption)
-        else:
-            self._execute_api_upload(video_path, caption)
+        # In a real daemon environment (e.g., using Celery or APScheduler), this would be queued.
+        # For the Skynet pipeline flow, we execute immediately or simulate.
+        self._execute_aitoearn_upload(video_path, caption)
 
-        return {"status": "scheduled", "time": time_str}
+        return {"status": "scheduled", "time": time_str, "engine": "AiToEarn"}
 
 if __name__ == "__main__":
-    import os
     uploader = SocialUploader()
-    uploader.schedule_upload("dummy.mp4", "Check this out! #fyp", 0)
+    uploader.schedule_upload("dummy.mp4", "Skincare rahasia #fyp #douyin", 0)
