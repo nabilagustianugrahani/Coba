@@ -25,7 +25,8 @@ class AutoEditor:
     def _create_silent_audio(self, path, duration):
         try:
             from moviepy import ColorClip, AudioClip
-            make_frame = lambda t: [0, 0]
+            import numpy as np
+            make_frame = lambda t: np.zeros((2,), dtype=np.float32)
             aud = AudioClip(make_frame, duration=duration, fps=44100)
             aud.write_audiofile(path, logger=None)
         except Exception as e:
