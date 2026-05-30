@@ -36,8 +36,8 @@ UGC_NICHE=skincare
 # DATABASE VECTOR RAG (Mempalace / MongoDB Atlas)
 MONGO_URI=mongodb+srv://simulated:simulated@simulated.mongodb.net
 
-# AGENT HARNESS (Choose your Manager: claw-code | openclaw | jcode)
-ACTIVE_AGENT_MANAGER=claw-code
+# AGENT HARNESS (Choose your Manager: claw-code | jcode | free-claude-code)
+ACTIVE_AGENT_MANAGER=jcode
 ENV_EOF
     echo -e "${RED}[X] Please fill in your API keys in the .env file and run this script again.${NC}"
 fi

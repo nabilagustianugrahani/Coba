@@ -6,18 +6,41 @@ Selamat datang di bentuk final (*The Final Form*) dari pabrik konten **UGC AI In
 
 ## 🧩 The Unified Skynet Architecture (How It Works)
 
-Proyek ini bukanlah sekadar *script Python* statis. Ini adalah jaringan *Microservices* di mana otak, tangan, memori, dan otot komputasinya diserahkan ke komponen terbaik di industri:
+Proyek ini adalah jaringan *Microservices* hibrida yang berjalan 100% secara Python-Native demi stabilitas absolut di VPS/Codespaces:
 
-1. **The Manager (Agent Harness):** `ultraworkers/claw-code` atau `openclaw` (Berbasis Rust). Menggantikan JCode/Claude Code sebagai agen pengambil keputusan dan pengendali OS yang bekerja 24/7.
-2. **The Brain (Routing & Cognition):**
+1. **The Core Orchestrator (Python MCP Server):** Arsitektur dijalankan oleh `mcp_server/server.py` yang menyediakan protokol stdio untuk agen manajemen.
+2. **The Manager (Agent Harness):** `ultraworkers/claw-code` atau `jcode`. Bertindak sebagai asisten CLI yang terhubung ke server MCP.
+3. **The Brain (Routing & Cognition):**
    - **`decolua/9router`**: Proxy gratisan untuk membypass semua *Rate Limits* LLM.
-   - **`NousResearch/hermes-agent` & `andrej-karpathy-skills`**: Disuntikkan langsung ke *System Prompt* pabrik ini, memaksa AI untuk menghilangkan halusinasi dan merancang skrip *copywriting* manipulasi psikologis tingkat dewa.
-3. **The Memory (Darwinian RAG/CAG):**
-   - Memori *short-term* didorong oleh **`mempalace` / CAG (*Cache-Augmented Generation*)**.
-   - Memori *long-term* diletakkan di **MongoDB Atlas Vector Search** untuk mengingat seluruh *DNA Video* (kecepatan zoom, warna UI) yang berhasil masuk FYP TikTok.
-4. **The Muscle (Render Farm):** **Modal.com (Nvidia B200 GPU)** menjalankan SANA (Nvidia Labs) untuk mencetak karakter 4K dan Wan2.1/HunyuanVideo untuk menganimasikan gerak tubuh secara instan dan tanpa biaya (*Burner Account Strategy*).
-5. **The Hands & Eyes (Stealth Upload):** **The Skynet Paradox**. Menggabungkan `CloakBrowser` (Chromium anti-bot) dengan `UI-TARS-desktop` (AI VLM ByteDance) untuk melihat layar Anda dan menggeser mouse secara fisik saat mengunggah video. Ini menjamin **100% Shadowban Immunity**.
-6. **The Amplifier (Global Reach):** Terintegrasi secara konsep dengan `yikart/AiToEarn` untuk menerjemahkan video ke bahasa Mandarin via F5-TTS dan menyebarkannya ke platform raksasa Asia (Douyin, Xiaohongshu, Kuaishou).
+   - **`NousResearch/hermes-agent` & `andrej-karpathy-skills`**: Disuntikkan ke *System Prompt* pabrik, menghilangkan halusinasi dan merancang skrip *copywriting* psikologis.
+4. **The Memory (Darwinian RAG/CAG):**
+   - Memori *short-term* didorong oleh **`mempalace` / CAG**.
+   - Memori *long-term* diletakkan di **MongoDB Atlas Vector Search** untuk mengingat seluruh *DNA Video*.
+5. **The Muscle (Render Farm):** **Modal.com (B200 GPU)** menjalankan SANA/Wan2.1 untuk menganimasikan gerak tubuh tanpa biaya lokal.
+6. **The Hands & Eyes (Stealth Upload):** **The Skynet Paradox** (CloakBrowser + UI-TARS) atau API **AiToEarn** untuk *upload* 100% tanpa *shadowban* lintas platform Asia.
+
+---
+
+### Integrasi Agent-to-Agent (A2A) via MCP
+Tambahkan *MCP server* berikut ke dalam file konfigurasi agen JCode atau Claw-Code Anda:
+
+```toml
+[mcp.servers.ugc_skynet]
+command = "python3"
+args = ["/path/absolut/ke/proyek/ini/ugc_ai_overpower/mcp_server/server.py"]
+```
+
+---
+
+## ⚡ Zig Kernel Integration (Untuk Pengguna Lanjut)
+
+Jika sistem mendeteksi kompiler `zig` terinstal, `start.sh` akan otomatis men-*compile* server MCP ke `ugc_ai_overpower/mcp_server/server` (binary). Pastikan agen JCode Anda kini diatur untuk mengeksekusi binary tersebut langsung, BUKAN via `python3 server.py`:
+
+```toml
+[mcp.servers.ugc_skynet]
+command = "/path/absolut/ke/proyek/ini/ugc_ai_overpower/mcp_server/server"
+args = []
+```
 
 ---
 
