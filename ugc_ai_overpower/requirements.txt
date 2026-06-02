@@ -1,0 +1,13 @@
+modal>=0.62.0
+requests
+beautifulsoup4
+edge-tts
+moviepy>=2.0.0
+openai
+schedule
+fastapi
+uvicorn
+mcp
+curl_cffi
+playwright
+playwright-stealth

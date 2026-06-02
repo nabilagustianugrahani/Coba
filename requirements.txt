@@ -1,1 +1,10 @@
 mcp
+curl_cffi==0.6.2
+pymongo==4.6.2
+openai
+schedule
+playwright
+playwright-stealth
+moviepy>=2.0.0
+modal
+cloakbrowser
