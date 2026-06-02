@@ -1,0 +1,102 @@
+INFO:__main__:Starting God-Tier UGC Pipeline (DNA Mutating Vampire Setup)...
+INFO:scraper.scraper:[Stealth Scraper] Bypassing anti-bot protections for e-commerce... searching niche: beauty
+INFO:scraper.scraper:[TikTok Stealth] Extracting real-time FYP trending hooks and hashtags...
+INFO:scraper.scraper:[VAMPIRE ENGINE] Initiating Competitor Hijacking for niche: beauty...
+INFO:scraper.scraper:[VAMPIRE ENGINE] Target acquired. Viral video detected (1.2M views in 12 hours). Extracting transcript and beat logic...
+INFO:evaluator.evaluator:[Evaluator] Multi-Key Routing initialized. Provider: openai. Loaded 0 keys.
+INFO:evaluator.evaluator:[Swarm AI] Generating RAG+CAG Augmented I2V Workflow for Serum Retinol XYZ 30ml Anti-Aging...
+WARNING:evaluator.evaluator:[Evaluator] No API keys loaded. Using simulation.
+INFO:evaluator.evaluator:Using built-in simulation fallback for Node-Based Swarm AI (RAG+CAG Engine).
+INFO:__main__:Node-Based Swarm Blueprint (DNA Mutated) Approved:
+INFO:__main__:{
+  "template_type": "05_extend_and_stitch",
+  "hook": "Kemarin muka aku hancur parah, nyesel banget!",
+  "hashtags": [
+    "#skincareviral",
+    "#fyp"
+  ],
+  "editing_dna": {
+    "micro_zoom_interval": 1.169036866664129,
+    "subliminal_flash_duration": 0.043707116475903494,
+    "phantom_audio_hz": 18339,
+    "subtitle_color_hex": "#FF0000"
+  },
+  "nodes": [
+    {
+      "id": "node_character_prompt",
+      "type": "t2i_character_prompt",
+      "value": "Portrait of a 24-year-old Indonesian female, high cheekbones, natural skin texture, short black hair, wearing a white minimalist turtleneck, studio lighting, hyper-detailed, 8k resolution, raw photo."
+    },
+    {
+      "id": "node_part1_prompt",
+      "type": "i2v_motion_prompt",
+      "value": "The character holds the camera selfie-style, looking frustrated. Smooth camera pan, 15s."
+    },
+    {
+      "id": "node_part2_prompt",
+      "type": "i2v_motion_prompt",
+      "value": "The character smiles warmly and raises an eyebrow aggressively. Static tripod shot, 15s."
+    },
+    {
+      "id": "node_narration_part1",
+      "type": "text",
+      "value": "Kemarin muka hancur parah. Pas nyoba Serum Retinol XYZ 30ml Anti-Aging, kaget banget teksturnya se-cair itu."
+    },
+    {
+      "id": "node_narration_part2",
+      "type": "text",
+      "value": "Sumpah 3 hari doang bekas hitam langsung minggat! Amankan di keranjang kuning sekarang! Soalnya kalau udah abis kalian pasti kemarin muka hancur parah."
+    },
+    {
+      "id": "node_broll_1",
+      "type": "broll_prompt",
+      "value": "Macro close-up, 9:16, bright lighting. Fingers gently rubbing serum.",
+      "start": 2.0,
+      "end": 4.5
+    }
+  ],
+  "execution_graph": {
+    "generate_character_anchor": "{{node_character_prompt}}",
+    "generate_part1_video": "{{node_part1_prompt}}",
+    "generate_part2_video": "{{node_part2_prompt}}",
+    "generate_audio_part1": "{{node_narration_part1}}",
+    "generate_audio_part2": "{{node_narration_part2}}"
+  }
+}
+INFO:__main__:Triggering AI Video Node Graph for Host A...
+INFO:__main__:Connecting to Modal B200 God-Tier I2V pipeline for Host A...
+INFO:__main__:Executing 05_extend_and_stitch Template via I2V...
+INFO:__main__:Generating Character Sheet Anchor for Host A...
+WARNING:__main__:Character Image Generation failed. Falling back to dummy bytes.
+INFO:__main__:Generating Part 1 (I2V)...
+INFO:__main__:Generating Part 2 (I2V)...
+INFO:__main__:B-Roll Cache Hit for prompt: Macro close-up, 9:16, bright l...
+INFO:__main__:Stitching Part 1 and Part 2 together...
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmpe22x3aqg.mp4, 6220800 bytes wanted but 0 bytes read at frame index 204 (out of a total 204 frames), at time 8.50/8.52 sec. Using the last valid frame instead.
+  warnings.warn(
+INFO:video_processor.auto_editor:Executing DNA Mutated Abyss-Tier Manipulative Editor...
+INFO:video_processor.auto_editor:Applying extreme psychological micro-zooms every 1.169036866664129s...
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 48 (out of a total 48 frames), at time 2.00/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 49 (out of a total 48 frames), at time 2.04/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 50 (out of a total 48 frames), at time 2.08/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 51 (out of a total 48 frames), at time 2.12/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 52 (out of a total 48 frames), at time 2.17/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 53 (out of a total 48 frames), at time 2.21/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 54 (out of a total 48 frames), at time 2.25/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 55 (out of a total 48 frames), at time 2.29/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 56 (out of a total 48 frames), at time 2.33/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 57 (out of a total 48 frames), at time 2.38/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 58 (out of a total 48 frames), at time 2.42/2.00 sec. Using the last valid frame instead.
+  warnings.warn(
+/home/jules/.pyenv/versions/3.12.13/lib/python3.12/site-packages/moviepy/video/io/ffmpeg_reader.py:190: UserWarning: In file /tmp/tmp3cwayuhp.mp4, 6220800 bytes wanted but 0 bytes read at frame index 59 (out of a total 48 frames), at time 2.46/2.00 sec. Using the last valid frame instead.
+  warnings.warn(

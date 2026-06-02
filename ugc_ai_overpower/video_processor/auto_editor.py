@@ -198,8 +198,19 @@ class AutoEditor:
 
 
 
-            # Strip all composite audio completely to ensure absolute stability in mock environment
-            # Use basic compose and append valid audio layers
+            # 3. Apply DNA Dopamine Zoom
+            layers[0] = self._apply_dopamine_micro_zooms(layers[0], interval=zoom_interval)
+
+            # 4. Inject Subliminal Flash
+            subliminal_layers = self._inject_subliminal_frame_poisoning(base_clip.duration, flash_duration)
+            if subliminal_layers:
+                layers.extend(subliminal_layers)
+
+            # 5. Inject Scarcity UI
+            ui_layers = self._generate_live_commerce_ui(base_clip.duration)
+            if ui_layers:
+                layers.extend(ui_layers)
+
             if len(layers) > 1:
                 final_video = CompositeVideoClip(layers)
             else:

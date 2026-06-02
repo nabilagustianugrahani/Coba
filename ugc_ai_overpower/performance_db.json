@@ -23,6 +23,20 @@
     {
       "hook": "Sumpah kalian harus stop lakuin ini",
       "score": 92
+    },
+    {
+      "hook": "Kemarin muka aku hancur parah, nyesel banget!",
+      "score": 90,
+      "metadata": {
+        "niche": "skincare",
+        "emotion": "manipulative",
+        "dna": {
+          "micro_zoom_interval": 1.0864445710509363,
+          "subliminal_flash_duration": 0.041108775207602546,
+          "phantom_audio_hz": 18884,
+          "subtitle_color_hex": "#FF0000"
+        }
+      }
     }
   ]
 }
