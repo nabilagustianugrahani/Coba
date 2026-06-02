@@ -75,3 +75,74 @@ class Orchestrator:
             "contents": results,
             "total": len(results),
         }
+
+    # ------------------------------------------------------------------
+    # New queue‑related methods (Phase 2)
+    # ------------------------------------------------------------------
+    def schedule_content(self, content_id: int, platform: str, scheduled_at: str = None) -> int:
+        """Add a content item to the posting queue.
+
+        Returns the queue row id.
+        """
+        from ugc_ai_overpower.browser.content_queue import ContentQueue
+
+        q = ContentQueue()
+        return q.enqueue(content_id, platform, scheduled_at)
+
+    def process_queue(self, platform: str = None) -> None:
+        """Fetch the next pending item (optionally filtered by *platform*)
+        and dispatch it to the appropriate poster implementation.
+        """
+        from ugc_ai_overpower.browser.content_queue import ContentQueue
+        from ugc_ai_overpower.browser.posters import get_poster
+
+        q = ContentQueue()
+        item = q.dequeue(platform)
+        if not item:
+            return  # nothing to do
+        # Load content details from the main content table.
+        content_row = self.bank.get_all()  # placeholder – real method would query by id
+        # For simplicity we re‑use the bank's content fetch – here we just mock.
+        # In a full implementation ``ContentBank`` would expose a ``get_content``.
+        # Assume the content dict contains the fields required by the poster.
+        # We'll build a minimal dict for the demo.
+        poster = get_poster(item["platform"])
+        try:
+            # Load the content record – using bank's content table directly.
+            # This pseudo‑implementation just passes a static dict.
+            content_data = {
+                "script": "Demo script",
+                "video_path": "demo.mp4",
+                "hashtags": [],
+            }
+            result = poster.post(content_data)
+            if result.get("success"):
+                q.mark_done(item["id"], result.get("post_url", ""))
+            else:
+                q.mark_failed(item["id"], result.get("error", "unknown error"))
+        finally:
+            poster.cleanup()
+
+    def run_batch(self, product: str, platforms=["tiktok", "instagram"]):
+        """Generate content for *product* on each platform and enqueue it.
+
+        This is a convenience wrapper used by the CLI command ``run_batch``.
+        """
+        # Generate a content batch for each platform.
+        for platform in platforms:
+            # Create a dummy influencer dict – in a real scenario we would pick
+            # an influencer that matches the platform. Here we use the first
+            # influencer from the manager.
+            influencer = self.influencer_mgr.select_for_campaign(product)[0]
+            batch = self.generate_content_batch(product, influencer)
+            # Store the content in the DB.
+            content_id = self.bank.add_content(
+                influencer_id=0,
+                product_id=self.bank.add_product(product),
+                platform=platform,
+                hook=batch["hook"],
+                script=batch["script"],
+                hashtags=batch["hashtags"],
+            )
+            # Enqueue for posting.
+            self.schedule_content(content_id, platform)
