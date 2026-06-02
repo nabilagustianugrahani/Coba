@@ -1,165 +1,119 @@
-import asyncio
+import os
+import sys
 import json
 import logging
-import os
-import tempfile
-from typing import Any
+from ugc_ai_overpower.auth import create_access_token, verify_token, authenticate_user, get_password_hash, get_user, USERS_DB
 
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-import mcp.types as types
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("Skynet")
 
-# Adjust import paths for testing
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def main():
+    router_url = os.getenv("ROUTER_URL", "http://localhost:20128")
+    router_key = os.getenv("ROUTER_KEY", "sk-8028a980b0c7366a-4a45za-36eef5ef")
 
-from scraper.scraper import EcommerceScraper, TikTokScraper
-from evaluator.evaluator import FYPEvaluator
-from uploader.uploader import SocialUploader
+    try:
+        from mcp.server.fastmcp import FastMCP
+    except ImportError:
+        logger.error("MCP library not installed. Run: pip install mcp")
+        sys.exit(1)
 
-import modal
-from modal_gpu.modal_app import (
-    app as modal_app,
-    ModelGenerator
-)
-from video_processor.auto_editor import AutoEditor
-from main import get_cached_broll, set_cached_broll, resolve_node_variables, generate_video_modal_remote
+    from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
+    from ugc_ai_overpower.core.content_bank import ContentBank
+    from ugc_ai_overpower.core.orchestrator import Orchestrator
 
-scraper = EcommerceScraper()
-tiktok_scraper = TikTokScraper()
-evaluator = FYPEvaluator()
-uploader = SocialUploader()
+    ai = AIRouter(router_url, router_key)
+    bank = ContentBank()
+    orch = Orchestrator(bank, ai)
 
-app = Server("ugc-ai-overpower-b200-mcp")
+    mcp = FastMCP("Skynet-UGC")
 
-@app.list_tools()
-async def list_tools() -> list[types.Tool]:
-    return [
-        types.Tool(
-            name="scrape_products",
-            description="Scrape top affiliate products from Shopee/Tokopedia",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "niche": {"type": "string"}
-                },
-                "required": ["niche"]
-            }
-        ),
-        types.Tool(
-            name="hijack_tiktok_trends",
-            description="Extract live trending hooks and hashtags from TikTok via Stealth Browser",
-            inputSchema={
-                "type": "object",
-                "properties": {}
-            }
-        ),
-        types.Tool(
-            name="swarm_evaluate_script",
-            description="Swarm AI evaluates and generates Node-Based Workflow (including Extend-and-Stitch) using live trends",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "product_name": {"type": "string"},
-                    "niche": {"type": "string"},
-                    "trend_data_json": {"type": "string"}
-                },
-                "required": ["product_name", "niche"]
-            }
-        ),
-        types.Tool(
-            name="generate_god_tier_video",
-            description="Trigger Stateful Modal B200 to execute the Node-Based Workflow Video Generation",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "swarm_json_string": {"type": "string"}
-                },
-                "required": ["swarm_json_string"]
-            }
-        ),
-        types.Tool(
-            name="evaluate_final_video",
-            description="Recursive loop evaluation for FYP readiness of the final assembled video",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "swarm_json_string": {"type": "string"},
-                    "video_path": {"type": "string"}
-                },
-                "required": ["swarm_json_string", "video_path"]
-            }
-        ),
-        types.Tool(
-            name="schedule_upload",
-            description="Schedule video upload to TikTok/IG/YT using Stealth browser",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "video_path": {"type": "string"},
-                    "caption": {"type": "string"}
-                },
-                "required": ["video_path", "caption"]
-            }
-        )
-    ]
+    @mcp.auth_middleware
+    def verify_jwt_token(token: str):
+        payload = verify_token(token)
+        if payload is None:
+            raise Exception("Invalid or expired token")
+        return payload
 
-@app.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-    if name == "scrape_products":
-        niche = arguments.get("niche")
-        result = scraper.get_best_products(niche)
-        return [types.TextContent(type="text", text=str(result))]
 
-    elif name == "hijack_tiktok_trends":
-        result = tiktok_scraper.get_realtime_trends()
-        return [types.TextContent(type="text", text=json.dumps(result))]
+        @mcp.api_route("/login", methods=["POST"])
+    def login(username: str, password: str):
+        user = authenticate_user(username, password)
+        if not user:
+            raise Exception("Invalid credentials")
+        access_token = create_access_token(data={"sub": user["username"], "roles": user["roles"]})
+        return {"access_token": access_token, "token_type": "bearer"}
 
-    elif name == "swarm_evaluate_script":
-        product_name = arguments.get("product_name")
-        niche = arguments.get("niche", "general")
-        trend_str = arguments.get("trend_data_json", "")
-        trend_data = json.loads(trend_str) if trend_str else None
+    @mcp.api_route("/register", methods=["POST"])
+    def register(username: str, password: str):
+        if get_user(username):
+            raise Exception("Username already registered")
 
-        result = evaluator.swarm_evaluate_and_generate(product_name, niche, trend_data)
-        return [types.TextContent(type="text", text=json.dumps(result))]
+        # In Phase 1, we only allow hardcoded users. Registration is just a placeholder.
+        raise Exception("Registration is not allowed in this phase.")
 
-    elif name == "generate_god_tier_video":
-        try:
-            swarm_data = json.loads(arguments.get("swarm_json_string"))
-            video_path = "mcp_output.mp4"
+    @mcp.tool(auth_required=True)
+    def generate_script(product: str, platform: str = "tiktok", tone: str = "casual") -> str:
+        prompt = f"Buat script UGC untuk {product} di {platform}. Tone: {tone}. Bahasa Indonesia."
+        return ai.chat(prompt)
 
-            # Delegate generation directly to main.py function so MCP server stays aligned with main pipeline
-            success = generate_video_modal_remote(swarm_data, video_path, persona="MCP Host")
+    @mcp.tool(auth_required=True)
+    def analyze_trend(niche: str) -> str:
+        prompt = f"Apa trending topic di niche {niche} untuk konten UGC? Berikan ide konten."
+        return ai.chat(prompt)
 
-            if success:
-                return [types.TextContent(type="text", text=f"Successfully generated God-Tier B200 video remotely. Saved to {video_path}")]
-            else:
-                return [types.TextContent(type="text", text="Failed to generate God-Tier B200 video remotely.")]
-        except Exception as e:
-            return [types.TextContent(type="text", text=f"Failed to generate video: {str(e)}")]
+    @mcp.tool(auth_required=True)
+    def generate_hashtags(niche: str, count: int = 10) -> str:
+        prompt = f"Generate {count} hashtag trending Indonesia untuk niche {niche}."
+        return ai.chat(prompt)
 
-    elif name == "evaluate_final_video":
-        try:
-            swarm_data = json.loads(arguments.get("swarm_json_string"))
-            video_path = arguments.get("video_path")
-            result = evaluator.evaluate_final_video(swarm_data, video_path)
-            return [types.TextContent(type="text", text=json.dumps(result))]
-        except Exception as e:
-            return [types.TextContent(type="text", text=f"Evaluation failed: {str(e)}")]
+    @mcp.tool(auth_required=True)
+    def plan_campaign(product: str) -> str:
+        result = orch.plan_campaign(product)
+        return json.dumps(result, indent=2, default=str)
 
-    elif name == "schedule_upload":
-        video_path = arguments.get("video_path")
-        caption = arguments.get("caption")
-        result = uploader.schedule_upload(video_path, caption)
-        return [types.TextContent(type="text", text=str(result))]
+    @mcp.tool(auth_required=True)
+    def run_campaign(product: str) -> str:
+        result = orch.run_campaign(product)
+        return json.dumps(result, indent=2, default=str)
 
-    else:
-        raise ValueError(f"Unknown tool: {name}")
+    @mcp.tool(auth_required=True)
+    def search_products(keyword: str) -> str:
+        results = orch.find_products(keyword)
+        return json.dumps(results, indent=2, default=str)
 
-async def main():
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(read_stream, write_stream, app.create_initialization_options())
+    @mcp.tool(auth_required=True)
+    def list_influencers(niche: str = "") -> str:
+        from ugc_ai_overpower.mcp_server.tools.influencer_tools import InfluencerManager
+        im = InfluencerManager()
+        if niche:
+            infs = im.get_by_niche(niche)
+        else:
+            infs = im.get_all()
+        return json.dumps([{
+            "name": i["name"],
+            "niche": i["niche"],
+            "age": i["age"],
+            "gender": i["gender"],
+            "personality": i["personality"]
+        } for i in infs], indent=2)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    @mcp.tool(auth_required=True)
+    def psychology_angle(product: str) -> str:
+        from ugc_ai_overpower.core.psychology import PsychologyEngine
+        pe = PsychologyEngine()
+        group, info = pe.get_target_group(product)
+        triggers = pe.get_triggers_for_product(product)
+        return json.dumps({
+            "target_group": group,
+            "description": info["description"],
+            "platforms": info["preferred_platforms"],
+            "psychology_triggers": [t["name"] for t in triggers]
+        }, indent=2)
+
+    @mcp.tool(auth_required=True)
+    def affiliate_summary() -> str:
+        items = bank.get_all()
+        return json.dumps(items, indent=2, default=str)
+
+    logger.info("Skynet MCP Server ready!")
+    mcp.run()

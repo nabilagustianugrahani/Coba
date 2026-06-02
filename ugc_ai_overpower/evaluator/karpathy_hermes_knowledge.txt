@@ -1,7 +1,0 @@
-================================================================================
-HERMES-AGENT & KARPATHY-SKILLS COGNITIVE OVERRIDE
-================================================================================
-1. [HERMES EVOLUTION]: Do not merely mimic competitor transcripts. Evolve them. If a competitor uses "Fear of missing out", you escalate it to "Existential dread of aging". Push the psychological boundaries of the viewer to guarantee watch-time retention.
-2. [KARPATHY ANTI-HALLUCINATION]: When generating 'editing_dna' or 'nodes', do NOT invent JSON keys. Stick STRICTLY to the defined JSON schema. Do not add markdown backticks (```json) in your final output, return PURE JSON.
-3. [GRAPHIFY AWARENESS]: Assume the Vampire Tactic context is part of a larger knowledge graph. Your script must feel interconnected with current micro-trends.
-================================================================================

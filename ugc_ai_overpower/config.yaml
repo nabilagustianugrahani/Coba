@@ -1,0 +1,97 @@
+# Skynet V2.0 Enterprise Configuration
+app:
+  name: "Skynet UGC Empire"
+  version: "2.0.0"
+  environment: "production" # development | staging | production
+  debug: false
+
+server:
+  host: "0.0.0.0"
+  port: 8111
+  workers: 2
+  cors_origins: ["*"]
+  rate_limit: 60 # requests per minute
+
+database:
+  path: "data/skynet.db"
+  backup_enabled: true
+  backup_interval_hours: 6
+  max_backups: 48
+
+router:
+  base_url: "${ROUTER_URL:-http://localhost:20128}"
+  api_key: "${ROUTER_KEY:-}"
+  model_combo: "aio"
+model: "gemini/gemini-2.5-flash"
+  timeout: 30
+  max_retries: 3
+  retry_delay: 2
+
+auth:
+  enabled: true
+  jwt_secret: "${JWT_SECRET:-change-me-in-production}"
+  jwt_expiry_hours: 24
+  admin_users:
+    - username: "admin"
+      password_hash: "${ADMIN_PASSWORD_HASH:-}"
+
+campaigns:
+  max_concurrent: 3
+  default_platforms: ["tiktok", "instagram", "youtube"]
+  min_content_per_campaign: 5
+  max_content_per_campaign: 50
+  auto_schedule: false
+  schedule_interval_minutes: 60
+
+influencers:
+  max_per_campaign: 5
+  content_per_influencer: 3
+  min_delay_between_posts_minutes: 30
+
+psychology:
+  frameworks_enabled:
+    - loss_aversion
+    - social_proof
+    - authority
+    - fear
+    - curiosity
+    - reciprocity
+    - scarcity
+    - aspiration
+
+proxy:
+  enabled: false
+  pool:
+    - ""
+  rotation_strategy: "round-robin" # round-robin | random | performance
+
+gpu:
+  provider: "modal" # modal | kaggle | none
+  modal_token: "${MODAL_TOKEN_ID:-}"
+  modal_secret: "${MODAL_TOKEN_SECRET:-}"
+  fallback_to_cpu: true
+
+monitoring:
+  metrics_enabled: true
+  metrics_port: 9101
+  health_check_interval: 30
+  alert_email: "${ALERT_EMAIL:-}"
+  sentry_dsn: "${SENTRY_DSN:-}"
+
+webhooks:
+  enabled: true
+  retry_max: 3
+  events:
+    - campaign.created
+    - campaign.completed
+    - campaign.failed
+    - content.generated
+    - content.posted
+    - content.failed
+    - error.critical
+
+notifications:
+  enabled: false
+  telegram_bot_token: "${TELEGRAM_BOT_TOKEN:-}"
+  telegram_chat_id: "${TELEGRAM_CHAT_ID:-}"
+  discord_webhook_url: "${DISCORD_WEBHOOK:-}"

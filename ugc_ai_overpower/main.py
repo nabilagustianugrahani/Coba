@@ -1,270 +1,89 @@
-import logging
 import os
+import sys
 import json
-import modal
-import hashlib
-import re
-import tempfile
-import time
-from scraper.scraper import EcommerceScraper, TikTokScraper
-from evaluator.evaluator import FYPEvaluator
-from video_processor.auto_editor import AutoEditor
-from uploader.uploader import SocialUploader
+import logging
+from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-from modal_gpu.modal_app import (
-    app as modal_app,
-    ModelGenerator
-)
-
-CACHE_DIR = "broll_cache"
-os.makedirs(CACHE_DIR, exist_ok=True)
-
-def get_cached_broll(prompt: str) -> bytes:
-    prompt_hash = hashlib.md5(prompt.encode('utf-8')).hexdigest()
-    cache_path = os.path.join(CACHE_DIR, f"{prompt_hash}.mp4")
-    if os.path.exists(cache_path):
-        logger.info(f"B-Roll Cache Hit for prompt: {prompt[:30]}...")
-        with open(cache_path, "rb") as f:
-            return f.read()
-    return None
-
-def set_cached_broll(prompt: str, video_bytes: bytes):
-    prompt_hash = hashlib.md5(prompt.encode('utf-8')).hexdigest()
-    cache_path = os.path.join(CACHE_DIR, f"{prompt_hash}.mp4")
-    with open(cache_path, "wb") as f:
-        f.write(video_bytes)
-    logger.info(f"Saved B-Roll to cache: {cache_path}")
-
-def resolve_node_variables(value, nodes):
-    if not isinstance(value, str):
-        return value
-    pattern = r"\{\{(.*?)\}\}"
-    matches = re.findall(pattern, value)
-    for match in matches:
-        for node in nodes:
-            if node.get("id") == match:
-                value = value.replace(f"{{{{{match}}}}}", node.get("value", ""))
-                break
-    return value
-
-def generate_video_modal_remote(swarm_data: dict, video_path: str, persona: str = "Host A"):
-    logger.info(f"Connecting to Modal B200 God-Tier I2V pipeline for {persona}...")
-    try:
-        nodes = swarm_data.get("nodes", [])
-        graph = swarm_data.get("execution_graph", {})
-        editing_dna = swarm_data.get("editing_dna", {})
-
-        template = "05_extend_and_stitch"
-
-        generator = ModelGenerator()
-        is_remote = os.getenv("MODAL_TOKEN_ID") or os.path.exists(os.path.expanduser("~/.modal.toml"))
-        final_video_bytes = None
-
-        ctx = modal_app.run() if is_remote else None
-
-        try:
-            if ctx: ctx.__enter__()
-
-            logger.info("Executing 05_extend_and_stitch Template via I2V...")
-
-            char_prompt = resolve_node_variables(graph.get("generate_character_anchor", ""), nodes)
-            prompt_part1 = resolve_node_variables(graph.get("generate_part1_video", ""), nodes)
-            prompt_part2 = resolve_node_variables(graph.get("generate_part2_video", ""), nodes)
-            audio_text_part1 = resolve_node_variables(graph.get("generate_audio_part1", ""), nodes)
-            audio_text_part2 = resolve_node_variables(graph.get("generate_audio_part2", ""), nodes)
-
-            gen_img = generator.generate_character_image.remote if is_remote else generator.generate_character_image.local
-            gen_vid = generator.generate_base_video.remote if is_remote else generator.generate_base_video.local
-            gen_aud = generator.generate_voiceover_f5.remote if is_remote else generator.generate_voiceover_f5.local
-            sync_vid = generator.lip_sync_video.remote if is_remote else generator.lip_sync_video.local
-
-            logger.info(f"Generating Character Sheet Anchor for {persona}...")
-            face_bytes = gen_img(char_prompt)
-            if not face_bytes or len(face_bytes) < 100:
-                logger.warning("Character Image Generation failed. Falling back to dummy bytes.")
-                face_bytes = b"dummy_face_bytes"
-
-            logger.info("Generating Part 1 (I2V)...")
-            vid1 = gen_vid(prompt_part1, image_bytes=face_bytes)
-            aud1 = gen_aud(audio_text_part1, persona=persona)
-            synced_vid1 = sync_vid(vid1, aud1)
-
-            logger.info("Generating Part 2 (I2V)...")
-            vid2 = gen_vid(prompt_part2, image_bytes=face_bytes)
-            aud2 = gen_aud(audio_text_part2, persona=persona)
-            synced_vid2 = sync_vid(vid2, aud2)
-
-            b_roll_data = []
-            for n in nodes:
-                if n.get("type") == "broll_prompt":
-                    b_prompt = n.get("value")
-                    cached_bytes = get_cached_broll(b_prompt)
-                    if cached_bytes:
-                        b_bytes = cached_bytes
-                    else:
-                        b_bytes = gen_vid(b_prompt, image_bytes=b"dummy_face_bytes")
-                        set_cached_broll(b_prompt, b_bytes)
-                    b_roll_data.append({"start": n.get("start", 0), "end": n.get("end", 2.0), "clip_bytes": b_bytes})
-
-            logger.info("Stitching Part 1 and Part 2 together...")
-            editor = AutoEditor()
-
-            import os as system_os
-            from moviepy import VideoFileClip, concatenate_videoclips
-
-            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f1:
-                f1.write(synced_vid1)
-                p1_path = f1.name
-            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as f2:
-                f2.write(synced_vid2)
-                p2_path = f2.name
-
-            c1 = VideoFileClip(p1_path).resized((720, 1280)).with_fps(30)
-            c2 = VideoFileClip(p2_path).resized((720, 1280)).with_fps(30)
-
-            stitched_clip = concatenate_videoclips([c1, c2])
-
-            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as fs:
-                stitched_path = fs.name
-
-            stitched_clip.write_videofile(stitched_path, fps=30, codec="libx264", logger=None)
-
-            with open(stitched_path, "rb") as f:
-                final_base_bytes = f.read()
-
-            system_os.remove(p1_path)
-            system_os.remove(p2_path)
-            system_os.remove(stitched_path)
-
-            full_narration = f"{audio_text_part1} {audio_text_part2}"
-            final_video_bytes = editor.apply_automated_factory_edit(
-                final_base_bytes,
-                b"",
-                full_narration,
-                b_roll_data,
-                editing_dna=editing_dna # DNA Matrix injected here
-            )
-
-            with open(video_path, "wb") as f:
-                f.write(final_video_bytes)
-
-        finally:
-            if ctx: ctx.__exit__(None, None, None)
-
-        return True
-    except Exception as e:
-        logger.error(f"Error executing Modal Node pipeline: {e}")
-        return False
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("Skynet")
+    load_dotenv()
 
 def main():
-    logger.info("Starting God-Tier UGC Pipeline (DNA Mutating Vampire Setup)...")
+    logger.info("=" * 50)
+    logger.info("SKYNET V2.0 — Autonomous UGC Empire")
+    logger.info("=" * 50)
 
-    scraper = EcommerceScraper()
-    niche = os.getenv("UGC_NICHE", "beauty")
-    products = scraper.get_best_products(niche=niche)
-    if not products:
-        return
+    router_url = os.getenv("ROUTER_URL", "http://localhost:20128")
+    router_key = os.getenv("ROUTER_KEY", "sk-8028a980b0c7366a-4a45za-36eef5ef")
+    logger.info(f"9Router: {router_url}")
 
-    top_product = products[0]
+    from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
+    from ugc_ai_overpower.core.content_bank import ContentBank
+    from ugc_ai_overpower.core.orchestrator import Orchestrator
+    from ugc_ai_overpower.mcp_server.tools.influencer_tools import InfluencerManager
 
-    tiktok_scraper = TikTokScraper()
-    trend_data = tiktok_scraper.get_realtime_trends()
+    ai = AIRouter(router_url, router_key)
+    bank = ContentBank()
+    orch = Orchestrator(bank, ai)
+    im = InfluencerManager()
 
-    vampire_data = tiktok_scraper.hijack_competitor_viral_video(niche=niche)
+    if len(sys.argv) < 2:
+        logger.info("Usage: python main.py <command> [args]")
+        logger.info("Commands:")
+        logger.info("  campaign <product>  — Running full campaign")
+        logger.info("  analyze <product>   — Analyze product market")
+        logger.info("  search <keyword>    — Search affiliate products")
+        logger.info("  list-influencers    — Show all influencer personas")
+        logger.info("  server              — Start MCP server")
+        logger.info("  generate-personas   — Generate 15 default personas")
+        sys.exit(0)
 
-    evaluator = FYPEvaluator()
-    swarm_blueprint = evaluator.swarm_evaluate_and_generate(
-        top_product['product_name'],
-        niche,
-        trend_data=trend_data,
-        vampire_data=vampire_data
-    )
+    cmd = sys.argv[1]
 
-    logger.info("Node-Based Swarm Blueprint (DNA Mutated) Approved:")
-    logger.info(json.dumps(swarm_blueprint, indent=2))
+    if cmd == "campaign":
+        product = " ".join(sys.argv[2:]) or input("Product name: ")
+        logger.info(f"Starting campaign for: {product}")
+        result = orch.run_campaign(product)
+        logger.info(json.dumps(result, indent=2, default=str))
+        logger.info(f"✅ Campaign created! Content: {result['total']} pieces")
 
-    personas = ["Host A", "Host B", "Host C"]
-    uploader = SocialUploader()
+    elif cmd == "analyze":
+        product = " ".join(sys.argv[2:]) or input("Product: ")
+        analysis = ai.analyze_product(product)
+        logger.info(f"Analysis for {product}:")
+        print(analysis)
 
-    for i, persona in enumerate(personas):
-        video_path = f"output_god_tier_ugc_variant_{i+1}.mp4"
-        logger.info(f"Triggering AI Video Node Graph for {persona}...")
+    elif cmd == "search":
+        keyword = " ".join(sys.argv[2:]) or input("Keyword: ")
+        from ugc_ai_overpower.mcp_server.tools.scraper_tools import ScraperTools
+        st = ScraperTools()
+        results = st.search_best_commission(keyword)
+        print(json.dumps(results, indent=2, default=str))
 
-        success = generate_video_modal_remote(swarm_blueprint, video_path, persona=persona)
+    elif cmd == "list-influencers":
+        for inf in im.get_all():
+            print(f"  {inf['name']:15s} → {inf['niche']:12s} ({inf['age']}th, {inf['gender']})")
 
-        if success:
-            logger.info(f"God-Tier Video {persona} ready at: {video_path}")
+    elif cmd == "server":
+        logger.info("Starting MCP server...")
+        from ugc_ai_overpower.mcp_server import server
+        server.main()
 
-            final_eval = evaluator.evaluate_final_video(swarm_blueprint, video_path)
-            logger.info(f"Final Video {persona} FYP Evaluation Result:")
-            try:
-                if isinstance(final_eval, dict):
-                    logger.info(json.dumps(final_eval, indent=2))
-                else:
-                    logger.info(final_eval)
-            except Exception:
-                logger.info(str(final_eval))
+    elif cmd == "generate-personas":
+        from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
+        ai = AIRouter(router_url, router_key)
+        from ugc_ai_overpower.mcp_server.tools.influencer_tools import InfluencerManager
+        im = InfluencerManager()
+        for inf in im.get_all():
+            result = ai.chat_structured(
+                f"Generate detail persona untuk influencer UGC:\n"
+                f"Nama: {inf['name']}\nNiche: {inf['niche']}\nGender: {inf['gender']}\n"
+                f"Beri backstory detail, gaya bicara, dan rekomendasi produk"
+            )
+            logger.info(f"{inf['name']}: {json.dumps(result, default=str)[:100]}")
 
-            tags = " ".join(swarm_blueprint.get("hashtags", []))
-            caption = f"{swarm_blueprint['hook']} {tags} #fyp"
-
-            uploader.schedule_upload(video_path, caption, variant_index=i)
-        else:
-            logger.warning(f"Pipeline execution failed for {persona}.")
-
-    logger.info("Pipeline completed successfully. All variants awaiting scheduled drip-feed uploads.")
-
+    else:
+        logger.warning(f"Unknown command: {cmd}")
 
 if __name__ == "__main__":
     main()
-
-# =========================================================================
-# THE ABSOLUTE PINNACLE OF OVERKILL: REAL-TIME ENGAGEMENT & LIVE STREAMING
-# =========================================================================
-
-def auto_reply_to_comments(original_video_id: str, product_name: str, niche: str):
-    """
-    THE INFINITE VIRAL LOOP:
-    Simulates monitoring the comment section of a previously uploaded video.
-    If a user asks a question, this function triggers the Modal B200 factory
-    to instantly render a personalized 'Video Reply' addressing the user by name.
-    """
-    logger.info(f"\n[Infinite Viral Loop] Monitoring comments for video {original_video_id}...")
-
-    # Simulated incoming comment
-    incoming_comments = [
-        {"username": "@skincare_addict99", "comment": "Kak ini aman buat kulit berjerawat dan sensitif ga?"}
-    ]
-
-    for c in incoming_comments:
-        logger.info(f"[Infinite Viral Loop] Target locked: {c['username']} asked '{c['comment']}'")
-        logger.info(f"[Infinite Viral Loop] Forcing Swarm AI to generate personalized reply script...")
-
-        reply_hook = f"Halo kak {c['username']}, pertanyaan bagus banget! Buat kulit sensitif ini juara..."
-
-        # In production, this would call evaluator.swarm_evaluate_and_generate with the comment as context
-        # and then call generate_video_modal_remote.
-
-        logger.info(f"[Infinite Viral Loop] Rendering personalized reply video addressing {c['username']}...")
-        time.sleep(2) # Simulated render time
-
-        logger.info(f"[Infinite Viral Loop] SUCCESS! Reply video uploaded. Algorithm boost triggered (+300% FYP velocity).")
-
-def start_24_7_live_commerce_deepfake(rtmp_url: str, stream_key: str):
-    """
-    THE SLEEPLESS HOST:
-    Simulates injecting the output of our Modal B200 (LivePortrait + F5-TTS)
-    directly into a TikTok/Shopee Live RTMP stream using FFmpeg.
-    """
-    logger.info(f"\n[Deepfake Live Commerce] Establishing RTMP connection to {rtmp_url}...")
-    logger.info("[Deepfake Live Commerce] Tying F5-TTS to live chat websocket...")
-    logger.info("[Deepfake Live Commerce] Tying LivePortrait to continuous animation loop...")
-
-    # Simulated FFmpeg subprocess
-    ffmpeg_cmd = f"ffmpeg -re -i - -c:v libx264 -preset ultrafast -f flv {rtmp_url}/{stream_key}"
-    logger.info(f"[Deepfake Live Commerce] Injecting frames via: {ffmpeg_cmd}")
-
-    logger.info("[Deepfake Live Commerce] SYSTEM ONLINE. AI Host is now selling 24/7. Generating infinite passive income.")
