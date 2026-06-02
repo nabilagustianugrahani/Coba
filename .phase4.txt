@@ -1,0 +1,175 @@
+EXECUTE IN ORDER. JANGAN TANYA. LANGSUNG ACTION.
+
+STEP 1: Git push
+Run: git remote set-url origin https://nabilagustianugrahani:TOKEN_PLACEHOLDER@github.com/nabilagustianugrahani/Coba.git
+Run: git push origin main
+Report apakah push berhasil.
+
+STEP 2: Build Phase 4 - Monitoring & Analytics
+
+Buat file-file berikut:
+
+--- ugc_ai_overpower/monitoring/__init__.py (file kosong)
+
+--- ugc_ai_overpower/monitoring/metrics.py
+```
+import sqlite3, json, os, threading
+from datetime import datetime, timedelta, timezone
+from ugc_ai_overpower.core.logging import setup_logging
+
+logger = setup_logging("metrics")
+_lock = threading.Lock()
+
+class MetricsCollector:
+    def __init__(self, db_path="data/metrics.db"):
+        os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
+        self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self):
+        with self._conn() as c:
+            c.execute("""CREATE TABLE IF NOT EXISTS metrics_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                event_data TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )""")
+            c.execute("""CREATE INDEX IF NOT EXISTS idx_metrics_type ON metrics_events(event_type)""")
+
+    def _conn(self):
+        return sqlite3.connect(self.db_path)
+
+    def track(self, event_type, **data):
+        with _lock:
+            with self._conn() as c:
+                c.execute("INSERT INTO metrics_events (event_type, event_data) VALUES (?, ?)",
+                          (event_type, json.dumps(data)))
+        logger.info("Track: %s %s", event_type, data.get("product", ""))
+
+    def track_campaign(self, product, total_content, duration):
+        self.track("campaign", product=product, total=total_content, duration=duration)
+
+    def track_content(self, content_id, platform, action, success=True):
+        self.track("content", content_id=content_id, platform=platform, action=action, success=success)
+
+    def track_gpu(self, job_type, duration, success=True):
+        self.track("gpu", job_type=job_type, duration=duration, success=success)
+
+    def get_daily_stats(self, days=7):
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        with self._conn() as c:
+            rows = c.execute("""SELECT date(created_at) as day, event_type, COUNT(*) as total
+                FROM metrics_events WHERE created_at >= ? GROUP BY day, event_type ORDER BY day""", (since,)).fetchall()
+        result = {}
+        for day, etype, total in rows:
+            if day not in result:
+                result[day] = {}
+            result[day][etype] = total
+        return result
+
+    def get_top_products(self, limit=10):
+        with self._conn() as c:
+            rows = c.execute("""SELECT json_extract(event_data, '$.product') as product, COUNT(*) as total
+                FROM metrics_events WHERE event_type='campaign' AND product IS NOT NULL
+                GROUP BY product ORDER BY total DESC LIMIT ?""", (limit,)).fetchall()
+        return [{"product": r[0], "campaigns": r[1]} for r in rows]
+
+    def get_summary(self):
+        with self._conn() as c:
+            total = c.execute("SELECT COUNT(*) FROM metrics_events").fetchone()[0]
+            campaigns = c.execute("SELECT COUNT(*) FROM metrics_events WHERE event_type='campaign'").fetchone()[0]
+            contents = c.execute("SELECT COUNT(*) FROM metrics_events WHERE event_type='content'").fetchone()[0]
+        return {"total_events": total, "total_campaigns": campaigns, "total_contents": contents}
+
+_metrics_instance = None
+def get_metrics_collector():
+    global _metrics_instance
+    if _metrics_instance is None:
+        _metrics_instance = MetricsCollector()
+    return _metrics_instance
+```
+
+--- ugc_ai_overpower/monitoring/alerts.py
+```
+import os, json, logging
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+
+logger = logging.getLogger("skynet.alerts")
+
+class AlertManager:
+    def __init__(self):
+        self.telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        self.telegram_chat = os.getenv("TELEGRAM_CHAT_ID", "")
+        self.discord_webhook = os.getenv("DISCORD_WEBHOOK", "")
+        self.enabled = bool(self.telegram_token or self.discord_webhook)
+
+    def send_telegram(self, message):
+        if not self.telegram_token or not self.telegram_chat:
+            return False
+        try:
+            url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
+            data = json.dumps({"chat_id": self.telegram_chat, "text": message, "parse_mode": "Markdown"}).encode()
+            req = Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+            with urlopen(req, timeout=10) as resp:
+                return resp.status == 200
+        except Exception as e:
+            logger.warning("Telegram alert failed: %s", e)
+            return False
+
+    def send_discord(self, message):
+        if not self.discord_webhook:
+            return False
+        try:
+            data = json.dumps({"content": message}).encode()
+            req = Request(self.discord_webhook, data=data, headers={"Content-Type": "application/json"}, method="POST")
+            with urlopen(req, timeout=10) as resp:
+                return resp.status == 204
+        except Exception as e:
+            logger.warning("Discord alert failed: %s", e)
+            return False
+
+    def alert(self, message, channels=None):
+        if channels is None:
+            channels = ["telegram", "discord"]
+        results = {}
+        if "telegram" in channels:
+            results["telegram"] = self.send_telegram(message)
+        if "discord" in channels:
+            results["discord"] = self.send_discord(message)
+        return results
+
+    def on_campaign_complete(self, product, total_content):
+        msg = f"✅ *Campaign Complete*\\nProduct: {product}\\nContent: {total_content} pieces"
+        return self.alert(msg)
+
+    def on_campaign_failed(self, product, error):
+        msg = f"❌ *Campaign Failed*\\nProduct: {product}\\nError: {error}"
+        return self.alert(msg)
+
+_alert_instance = None
+def get_alert_manager():
+    global _alert_instance
+    if _alert_instance is None:
+        _alert_instance = AlertManager()
+    return _alert_instance
+```
+
+STEP 3: Update web/dashboard.py
+Tambah import MetricsCollector di AppState, dan 3 route baru:
+- GET /api/v1/analytics/daily -> get_daily_stats
+- GET /api/v1/analytics/top-products -> get_top_products
+- GET /api/v1/analytics/summary -> get_summary
+
+Tambah Chart.js CDN di HTML_DASHBOARD head section:
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+Tambah chart canvas di dashboard HTML: bar chart + pie chart
+
+STEP 4: Test
+python3 -c "from ugc_ai_overpower.monitoring.metrics import MetricsCollector, get_metrics_collector; from ugc_ai_overpower.monitoring.alerts import AlertManager; print('MONITORING OK')"
+
+PENTING:
+- Semua file path: ~/ugc/ugc_ai_overpower/
+- Import dari ugc_ai_overpower.*
+- JANGAN TANYA, execute semua langsung

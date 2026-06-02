@@ -16,6 +16,7 @@ from ugc_ai_overpower.mcp_server.tools.influencer_tools import InfluencerManager
 from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
 from ugc_ai_overpower.core.orchestrator import Orchestrator
 from ugc_ai_overpower.core.psychology import PsychologyEngine
+from ugc_ai_overpower.monitoring.metrics import MetricsCollector, get_metrics_collector
 
 logger = setup_logging("dashboard")
 
@@ -29,7 +30,8 @@ class AppState:
         self.ai = AIRouter(base_url=os.getenv("ROUTER_URL", "http://localhost:20128"), api_key=os.getenv("ROUTER_KEY", ""))
         self.psychology = PsychologyEngine()
         self.orchestrator = Orchestrator(self.bank, self.ai)
-        self.start_time = time.time()
+        self.metrics = get_metrics_collector()
+self.start_time = time.time()
 
 state = AppState()
 
@@ -64,6 +66,7 @@ async function login(e){e.preventDefault();const u=document.getElementById('user
 HTML_DASHBOARD = '''<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Skynet Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh}
@@ -108,6 +111,10 @@ td{padding:.75rem .5rem;border-bottom:1px solid #1e1e2e;font-size:.875rem}
 <div class="section"><h3>Recent Campaigns <button class="refresh-btn" onclick="loadCampaigns()">Refresh</button></h3>
 <table><thead><tr><th>ID</th><th>Product</th><th>Status</th><th>Content</th><th>Created</th></tr></thead>
 <tbody id="campaignTable"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody></table></div>
+<div class="charts" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+<div class="section"><h3>Daily Activity</h3><canvas id="barChart" height="200"></canvas></div>
+<div class="section"><h3>Content Distribution</h3><canvas id="pieChart" height="200"></canvas></div>
+</div>
 <div class="footer">Skynet UGC Empire v2.0.0</div></div>
 <script>
 const TOKEN=()=>localStorage.getItem('token');
@@ -115,7 +122,8 @@ async function api(path){try{const r=await fetch(path,{headers:{'Authorization':
 function logout(){localStorage.removeItem('token');window.location.href='/login'}
 async function loadStats(){const d=await api('/api/v1/analytics/dashboard');if(d){document.getElementById('campaigns').textContent=d.total_campaigns;document.getElementById('contents').textContent=d.total_content;document.getElementById('influencers').textContent=d.influencers;document.getElementById('uptime').textContent=d.uptime_hours+'h'}}
 async function loadCampaigns(){const d=await api('/api/v1/campaigns');const t=document.getElementById('campaignTable');if(d&&d.data){t.innerHTML=d.data.map(c=>'<tr><td>#'+c.id+'</td><td>'+(c.product||'-')+'</td><td><span class="status-badge status-'+c.status+'">'+c.status+'</span></td><td>'+(c.content_count||0)+'</td><td>'+(c.created_at||'-')+'</td></tr>').join('')}else{t.innerHTML='<tr><td colspan="5" class="loading">No data</td></tr>'}}
-if(!TOKEN()){window.location.href='/login'}else{loadStats();loadCampaigns();setInterval(loadStats,10000)}
+async function loadCharts(){const d=await api('/api/v1/analytics/daily');const td=await api('/api/v1/analytics/summary');if(d&&d.data){const labels=Object.keys(d.data);const vals=labels.map(l=>{let s=0;for(let k in d.data[l])s+=d.data[l][k];return s});if(window.barChart){window.barChart.destroy()}window.barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels,datasets:[{label:'Events',data:vals,backgroundColor:'#7b2ff7'}]},options:{responsive:true,plugins:{legend:{labels:{color:'#e0e0e0'}}},scales:{x:{ticks:{color:'#888'}},y:{ticks:{color:'#888'}}}}})}if(td&&td.data){const{total_campaigns,total_contents}=td.data;if(window.pieChart){window.pieChart.destroy()}window.pieChart=new Chart(document.getElementById('pieChart'),{type:'pie',data:{labels:['Content','Campaigns'],datasets:[{data:[total_contents,total_campaigns],backgroundColor:['#00d4ff','#7b2ff7']}]},options:{responsive:true,plugins:{legend:{labels:{color:'#e0e0e0'}}}}})}}
+if(!TOKEN()){window.location.href='/login'}else{loadStats();loadCampaigns();loadCharts();setInterval(function(){loadStats();loadCharts()},10000)}
 </script></body></html>'''
 
 @app.get("/login")
@@ -204,6 +212,18 @@ async def analytics_dashboard(_=Depends(auth_required)):
         "psychology_frameworks": len(state.psychology.frameworks),
         "uptime_hours": round((time.time() - state.start_time)/3600, 1),
     }
+
+@app.get("/api/v1/analytics/daily")
+async def analytics_daily(_=Depends(auth_required)):
+    return {"data": state.metrics.get_daily_stats()}
+
+@app.get("/api/v1/analytics/top-products")
+async def analytics_top_products(_=Depends(auth_required)):
+    return {"data": state.metrics.get_top_products()}
+
+@app.get("/api/v1/analytics/summary")
+async def analytics_summary(_=Depends(auth_required)):
+    return {"data": state.metrics.get_summary()}
 
 def serve():
     host = os.getenv("HOST", "0.0.0.0")

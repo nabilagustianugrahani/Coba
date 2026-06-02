@@ -154,6 +154,85 @@ def generate_voice(
 # Batch generation
 # ---------------------------------------------------------------------------
 
+def generate_with_timing(
+    text: str,
+    voice: str = "id-ID-ArdiNeural",
+    output: str = "output_timed.mp3",
+) -> Optional[dict]:
+    """Generate a voiceover together with per‑word timestamps.
+
+    This is useful for lip‑sync / subtitle alignment.  The function returns
+    a dictionary with the audio path and a list of word‑level segments::
+
+        {
+            "audio_path": "/abs/path/to/file.mp3",
+            "duration": 3.42,
+            "segments": [
+                {"word": "Halo", "start": 0.00, "end": 0.35},
+                {"word": "guys",  "start": 0.35, "end": 0.62},
+                ...
+            ],
+        }
+
+    Parameters
+    ----------
+    text : str
+        Text to be spoken.
+    voice : str
+        Voice identifier (default ``id-ID-ArdiNeural``).
+    output : str
+        Output audio file path.
+
+    Returns
+    -------
+    dict or None
+        The timing dictionary on success, or *None* if generation failed.
+    """
+    output_path = generate_voice(text, voice=voice, output=output)
+    if not output_path:
+        return None
+
+    # Extract word boundaries by measuring word lengths relative to total
+    # duration.  This is a heuristic — in production we would use a forced-
+    # alignment model (e.g. Montreal Forced Aligner or whisperX).
+    try:
+        from mutagen.mp3 import MP3
+
+        audio = MP3(output_path)
+        total_duration = audio.info.length
+    except Exception:
+        total_duration = max(1.0, len(text) / 10)  # rough fallback
+
+    words = text.split()
+    if not words:
+        return {
+            "audio_path": output_path,
+            "duration": total_duration,
+            "segments": [],
+        }
+
+    char_total = sum(len(w) for w in words) + len(words) - 1  # chars + spaces
+    if char_total == 0:
+        char_total = 1
+
+    segments: list[dict[str, object]] = []
+    elapsed = 0.0
+    for word in words:
+        word_dur = (total_duration * (len(word) + 1)) / char_total
+        segments.append({
+            "word": word,
+            "start": round(elapsed, 3),
+            "end": round(elapsed + word_dur, 3),
+        })
+        elapsed += word_dur
+
+    return {
+        "audio_path": output_path,
+        "duration": round(total_duration, 3),
+        "segments": segments,
+    }
+
+
 def batch_generate(
     items: list[tuple[str, str, str]],
 ) -> list[tuple[str, Optional[str]]]:

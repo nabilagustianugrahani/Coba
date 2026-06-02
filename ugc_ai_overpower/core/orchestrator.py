@@ -1,5 +1,9 @@
 import json
+import logging
 import os
+
+log = logging.getLogger(__name__)
+
 
 class Orchestrator:
     def __init__(self, bank, ai_router):
@@ -51,11 +55,28 @@ class Orchestrator:
             "target_group": group,
         }
 
-    def run_campaign(self, product, niches=None):
+    def run_campaign(self, product, niches=None, product_image=None, price=""):
+        """Run a full campaign for *product*.
+
+        When *product_image* is provided the pipeline also generates a video
+        clip for each content item via :class:`VideoComposer` and enqueues it
+        in the content queue as type ``"video"``.
+        """
         campaign_id = self.bank.create_campaign(f"Campaign: {product}")
         plan = self.plan_campaign(product)
         product_id = self.bank.add_product(product, category=niches[0] if niches else None)
         results = []
+
+        # Optional GPU integration.
+        video_enabled = bool(product_image)
+        video_composer = None
+        if video_enabled:
+            try:
+                from ugc_ai_overpower.gpu.video_composer import VideoComposer
+                video_composer = VideoComposer()
+            except ImportError as exc:
+                log.warning("VideoComposer unavailable – skipping video generation (%s)", exc)
+
         for influencer in self.influencer_mgr.select_for_campaign(product):
             content = self.generate_content_batch(product, influencer)
             content_id = self.bank.add_content(
@@ -66,14 +87,40 @@ class Orchestrator:
                 script=content["script"],
                 hashtags=content["hashtags"],
             )
+
+            # ---- GPU: auto‑generate video if product image is available ----
+            if video_composer and product_image:
+                try:
+                    video_path = video_composer.compose_ugc(
+                        script=content["script"],
+                        influencer=influencer,
+                        product=product,
+                        product_image=product_image,
+                        price=price,
+                    )
+                    if video_path:
+                        content["video_path"] = video_path
+                        # Add to content queue as type "video".
+                        try:
+                            from ugc_ai_overpower.browser.content_queue import ContentQueue
+
+                            q = ContentQueue()
+                            q.enqueue(content_id, content["platform"])
+                        except Exception as qe:
+                            log.warning("Could not enqueue video: %s", qe)
+                except Exception as ve:
+                    log.warning("Video generation failed for %s: %s", influencer["name"], ve)
+
             results.append(content)
             self.bank.update_content_status(content_id, "ready")
+
         return {
             "campaign_id": campaign_id,
             "product": product,
             "plan": plan,
             "contents": results,
             "total": len(results),
+            "video_generated": video_enabled,
         }
 
     # ------------------------------------------------------------------
