@@ -39,6 +39,9 @@ def main():
         logger.info("  queue-status           — Show content queue stats")
         logger.info("  process-queue [platf]  — Process next pending item")
         logger.info("  post <id> <platform>   — Queue a content item for posting")
+        logger.info("  scheduler              — Run content scheduler daemon")
+        logger.info("  analytics              — Show analytics dashboard")
+        logger.info("  api                    — Start FastAPI server")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -103,6 +106,15 @@ def main():
         platform = sys.argv[3]
         _cmd_post(bank, orch, content_id, platform)
 
+    elif cmd == "scheduler":
+        _cmd_scheduler()
+
+    elif cmd == "analytics":
+        _cmd_analytics()
+
+    elif cmd == "api":
+        _cmd_api()
+
     else:
         logger.warning(f"Unknown command: {cmd}")
 
@@ -161,7 +173,27 @@ def _cmd_post(bank: ContentBank, orch: Orchestrator, content_id: int, platform: 
         conn.close()
 
     qid = orch.schedule_content(content_id, platform)
-    logger.info(f"✅ Content #{content_id} scheduled for {platform} (queue id={qid})")
+    logger.info(f"✅ Content #{content_id} scheduled for {platform} (queue id={qid})"
+
+
+def _cmd_scheduler() -> None:
+    logger.info("Starting content scheduler daemon...")
+    # TODO: Implement scheduler daemon
+    # For now, we just print a message and exit.
+    logger.info("Scheduler daemon started (placeholder).")
+
+
+def _cmd_analytics() -> None:
+    logger.info("Showing analytics dashboard...")
+    # TODO: Implement analytics dashboard
+    logger.info("Analytics dashboard (placeholder).")
+
+
+def _cmd_api() -> None:
+    logger.info("Starting FastAPI server...")
+    # TODO: Implement FastAPI server
+    # For now, we just print a message.
+    logger.info("FastAPI server started (placeholder).")
 
 
 if __name__ == "__main__":

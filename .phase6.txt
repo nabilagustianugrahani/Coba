@@ -1,0 +1,76 @@
+EXECUTE ALL STEPS. JANGAN TANYA. LANGSUNG KERJA.
+
+STEP 1: Buat file ~/ugc/ugc_ai_overpower/scheduler/__init__.py (kosong)
+
+STEP 2: Buat file ~/ugc/ugc_ai_overpower/scheduler/cron.py
+Berisi:
+- Class ContentScheduler
+  - __init__(self, db_path="data/scheduler.db")
+  - schedule_post(content_id, platform, scheduled_time) -> schedule_id
+  - get_pending_posts() -> list of scheduled posts
+  - mark_as_posted(schedule_id, post_url)
+  - mark_as_failed(schedule_id, error)
+  - get_optimal_time(platform) -> datetime (best time to post)
+  - cleanup_old_schedules(days=30)
+
+STEP 3: Buat file ~/ugc/ugc_ai_overpower/analytics/__init__.py (kosong)
+
+STEP 4: Buat file ~/ugc/ugc_ai_overpower/analytics/engagement.py
+Berisi:
+- Class EngagementTracker
+  - __init__(self, db_path="data/engagement.db")
+  - track_post_metrics(post_id, views, likes, comments, shares, clicks)
+  - calculate_engagement_rate(post_id) -> float
+  - get_top_performing_posts(limit=10) -> list
+  - get_platform_stats(platform) -> dict
+  - track_conversion(post_id, product_id, revenue) -> conversion_id
+  - get_roi_stats(campaign_id) -> dict
+
+STEP 5: Buat file ~/ugc/ugc_ai_overpower/api/__init__.py (kosong)
+
+STEP 6: Buat file ~/ugc/ugc_ai_overpower/api/routes.py
+Berisi FastAPI routes:
+- POST /api/campaigns/create - create new campaign
+- GET /api/campaigns/{id} - get campaign details
+- POST /api/posts/schedule - schedule a post
+- GET /api/posts/pending - get pending posts
+- POST /api/posts/{id}/metrics - update post metrics
+- GET /api/analytics/engagement - get engagement stats
+- GET /api/analytics/roi - get ROI stats
+- POST /api/generate/video - generate video from script
+
+STEP 7: Update ~/ugc/ugc_ai_overpower/main.py
+Tambah command:
+- scheduler: run content scheduler daemon
+- analytics: show analytics dashboard
+- api: start FastAPI server
+
+STEP 8: Buat file ~/ugc/tests/test_scheduler.py
+Berisi test:
+- test_schedule_post: schedule_post returns int
+- test_get_pending_posts: returns list
+- test_mark_as_posted: updates status
+- test_get_optimal_time: returns datetime
+
+STEP 9: Buat file ~/ugc/tests/test_engagement.py
+Berisi test:
+- test_track_metrics: no error
+- test_calculate_engagement_rate: returns float
+- test_get_top_posts: returns list
+- test_track_conversion: returns int
+
+STEP 10: Install dependencies
+pip install --break-system-packages fastapi uvicorn apscheduler
+
+STEP 11: Jalankan test
+cd ~/ugc && python3 -m pytest tests/ -v 2>&1
+
+STEP 12: Git commit & push
+git add -A
+git commit -m "feat: Phase 6 - scheduler, engagement tracking, API routes"
+git push origin main
+
+PENTING:
+- Semua file baru di ~/ugc/
+- Jangan tanya, execute semua
+- Report hasil STEP 11 (pytest output)
