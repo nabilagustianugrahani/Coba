@@ -1,0 +1,53 @@
+EXECUTE ALL STEPS. JANGAN TANYA. LANGSUNG KERJA.
+
+STEP 1: Buat file ~/ugc/.github/workflows/deploy.yml
+Isi GitHub Actions workflow untuk deploy:
+- Trigger: push ke main
+- Checkout repo
+- Setup Python 3.11
+- pip install -r requirements.txt
+- python3 -m py_compile semua .py (syntax check)
+
+STEP 2: Buat file ~/ugc/.github/workflows/test.yml
+- Trigger: pull request ke main
+- Checkout + Python setup
+- pip install dependencies
+- pytest tests/
+
+STEP 3: Buat file ~/ugc/tests/__init__.py (kosong)
+
+STEP 4: Buat file ~/ugc/tests/test_auth.py
+Berisi test:
+- test_verify_user_valid: verify_user("admin", "admin123") harus return dict
+- test_verify_user_invalid: verify_user("admin", "wrong") harus return None
+- test_create_token: create_token("admin", "admin") harus return string
+- test_verify_token_valid: verify_token(token) harus return dict dengan key "sub"
+- test_verify_token_invalid: verify_token("invalid") harus return None
+
+STEP 5: Buat file ~/ugc/tests/test_psychology.py
+Berisi test:
+- test_get_target_group: return tuple (str, dict)
+- test_get_triggers: return list
+- test_frameworks_count: len(engine.frameworks) == 8
+
+STEP 6: Buat file ~/ugc/tests/test_content_bank.py
+Berisi test:
+- test_create_campaign: return int
+- test_add_product: return int
+- test_add_content: return int
+
+STEP 7: Install pytest
+pip install --break-system-packages pytest
+
+STEP 8: Jalankan test
+cd ~/ugc && python3 -m pytest tests/ -v 2>&1
+
+STEP 9: Git push
+git add -A
+git commit -m "feat: Phase 5 - CI/CD workflows, unit tests"
+git push origin main
+
+PENTING:
+- Semua file baru di ~/ugc/
+- Jangan tanya, execute semua
+- Report hasil STEP 8 (pytest output)
