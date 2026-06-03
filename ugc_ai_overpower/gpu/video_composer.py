@@ -1,6 +1,8 @@
-import os, random, requests, asyncio, datetime, logging
-from moviepy.editor import *
-from moviepy.video.fx.all import fadein, fadeout
+"""UGC Video Composer — ffmpeg + Pillow + edge-tts (zero moviepy dependency)."""
+import os, random, subprocess, json, asyncio, datetime, logging, shutil, tempfile, uuid, concurrent.futures
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+
 import edge_tts
 
 log = logging.getLogger(__name__)
@@ -72,6 +74,7 @@ class VideoComposer:
             return cached
 
         try:
+            import requests
             resp = requests.get(
                 "https://api.pexels.com/videos/search",
                 params={"query": query, "per_page": 5, "orientation": "portrait"},
@@ -96,27 +99,120 @@ class VideoComposer:
         await communicate.save(output_path)
         return output_path
 
-    def _split_into_segments(self, text, max_chars=120):
-        import re
-        sentences = re.split(r'(?<=[.!?])\s+', text)
-        segments = []
-        current = ""
-        for s in sentences:
-            if len(current) + len(s) <= max_chars:
-                current += " " + s if current else s
-            else:
-                if current:
-                    segments.append(current)
-                current = s
-        if current:
-            segments.append(current)
-        return segments if segments else [text]
+    def _get_audio_duration(self, audio_path: str) -> float:
+        """Get audio duration using ffprobe."""
+        cmd = [
+            "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+            "-of", "csv=p=0", audio_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return float(result.stdout.strip())
 
-    def _time_per_segment(self, total_duration, num_segments):
-        if num_segments == 0:
-            return []
-        each = total_duration / num_segments
-        return [(i * each, (i + 1) * each) for i in range(num_segments)]
+    def _generate_frame(self, text: str, size=(720, 1280), theme=None, product_image=None, watermark=None) -> Image.Image:
+        """Generate a single frame with background, text, product image, watermark."""
+        theme = theme or self.default_theme
+        width, height = size
+        
+        # Create background gradient
+        img = Image.new("RGB", size, theme["bg"])
+        draw = ImageDraw.Draw(img)
+        
+        # Add vertical gradient overlay
+        for y in range(height):
+            ratio = y / height
+            r = int(theme["bg"][0] * (1 - ratio) + int(theme["accent"][1:3], 16) * ratio * 0.3)
+            g = int(theme["bg"][1] * (1 - ratio) + int(theme["accent"][3:5], 16) * ratio * 0.3)
+            b = int(theme["bg"][2] * (1 - ratio) + int(theme["accent"][5:7], 16) * ratio * 0.3)
+            draw.line([(0, y), (width, y)], fill=(r, g, b))
+        
+        # Add product image if provided
+        if product_image and os.path.exists(product_image):
+            try:
+                prod_img = Image.open(product_image).convert("RGBA")
+                max_size = (width // 3, height // 4)
+                prod_img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                
+                # Center product image
+                px = (width - prod_img.width) // 2
+                py = height // 6
+                img.paste(prod_img, (px, py), prod_img)
+            except Exception as e:
+                log.warning("Product image failed: %s", e)
+        
+        # Add text with font
+        try:
+            font_path = self._find_font()
+            font = ImageFont.truetype(font_path, 42)
+        except:
+            font = ImageFont.load_default()
+
+        # Wrap text and draw
+        lines = self._wrap_text(text, font, width - 40)
+        line_height = 50
+        start_y = height // 3 if product_image else height // 4
+        
+        for i, line in enumerate(lines[:4]):
+            y_pos = start_y + i * line_height
+            # Draw outline
+            for dx, dy in [(-2,-2), (-2,0), (-2,2), (0,-2), (0,2), (2,-2), (2,0), (2,2)]:
+                draw.text((width//2 + dx, y_pos + dy), line, fill=theme["stroke"], font=font, anchor="mt")
+            # Draw main text
+            draw.text((width//2, y_pos), line, fill=theme["text"], font=font, anchor="mt")
+
+        # Add watermark
+        if watermark:
+            try:
+                watermark_font = ImageFont.truetype(font_path, 20) if font_path else ImageFont.load_default()
+                bbox = draw.textbbox((0, 0), watermark, font=watermark_font)
+                text_width = bbox[2] - bbox[0]
+                pos_x = width - text_width - 20
+                pos_y = height - 40
+                draw.text((pos_x, pos_y), watermark, fill="white", font=watermark_font)
+            except:
+                pass
+        
+        return img
+
+    def _wrap_text(self, text: str, font, max_width: int) -> list:
+        """Wrap text to fit within max_width."""
+        import textwrap
+        lines = textwrap.wrap(text, width=30)
+        return lines
+
+    def _find_font(self) -> str:
+        candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+        return ""
+
+    def _render_video_from_frame(self, frame_path: str, audio_path: str, output_path: str, 
+                                 duration: float = None, zoom_effect: bool = True):
+        """Render video from single frame + audio using ffmpeg."""
+        if duration is None:
+            duration = self._get_audio_duration(audio_path)
+        
+        # Calculate zoom factor based on duration
+        zoom_factor = f"min(zoom+0.001,1.1)" if zoom_effect else "zoom"
+        zoom_duration = int(duration * 25)  # 25fps * seconds
+        
+        cmd = [
+            "ffmpeg", "-y", "-loop", "1", "-i", frame_path,
+            "-i", audio_path,
+            "-vf", f"zoompan=z='{zoom_factor}':d={zoom_duration}:fps=25,scale=720:1280:flags=lanczos",
+            "-c:v", "libx264", "-c:a", "aac", "-shortest",
+            "-pix_fmt", "yuv420p", "-preset", "ultrafast",
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg failed: {result.stderr}")
 
     def create_ugc_video(
         self,
@@ -133,88 +229,45 @@ class VideoComposer:
         voice = random.choice(VOICES.get(gender, VOICES["male"]))
         bg_queries = BG_QUERIES.get(niche, BG_QUERIES["lifestyle"])
 
-        # Voiceover
+        # Generate voiceover
         voiceover_path = os.path.join(self.output_dir, f"vo_{influencer}_{random.randint(1000,9999)}.mp3")
         asyncio.run(self._generate_voiceover(script, voiceover_path, voice))
-        audio_clip = AudioFileClip(voiceover_path)
-        audio_duration = audio_clip.duration
-
-        # Build final script with intro/outro
+        
+        # Build full script with intro/outro
         full_text = script
         if add_intro:
             full_text = random.choice(TEMPLATE_INTROS) + " " + full_text
         if add_outro:
             full_text = full_text + " " + random.choice(TEMPLATE_OUTROS)
-
-        # Background
-        background = self._download_stock_video(bg_queries, int(audio_duration))
-        if background:
-            bg_clip = VideoFileClip(background).loop(duration=audio_duration)
-            bg_clip = bg_clip.resize((720, 1280))
-            if bg_clip.duration > audio_duration:
-                bg_clip = bg_clip.subclip(0, audio_duration)
-        else:
-            bg_clip = ColorClip(size=(720, 1280), color=theme["bg"], duration=audio_duration)
-
-        bg_clip = bg_clip.set_audio(audio_clip)
-        bg_clip = fadein(bg_clip, 0.3).fx(fadeout, 0.5)
-
-        overlay_clips = [bg_clip]
-        segments = self._split_into_segments(full_text)
-        times = self._time_per_segment(audio_duration, len(segments))
-
-        y_pos = 550
-        for i, seg in enumerate(segments):
-            start_t, end_t = times[i] if i < len(times) else (0, audio_duration)
-            txt = TextClip(
-                seg, fontsize=42, color=theme["text"],
-                stroke_color=theme["stroke"], stroke_width=2,
-                method="caption", size=(660, None), align="center"
-            ).set_position(("center", y_pos)).set_duration(end_t - start_t).set_start(start_t)
-            overlay_clips.append(txt)
-
-        # Product image overlay
-        if product_image and os.path.exists(product_image):
-            img = (ImageClip(product_image)
-                   .resize(height=140)
-                   .set_position(("center", 50))
-                   .set_duration(audio_duration))
-            overlay_clips.append(img)
-
-        # Watermark
-        if self.watermark_text:
-            wm = (TextClip(self.watermark_text, fontsize=18, color="white", stroke_color="black", stroke_width=1)
-                  .set_position(("right", "bottom"))
-                  .set_duration(audio_duration)
-                  .set_opacity(0.6))
-            overlay_clips.append(wm)
-
-        final = CompositeVideoClip(overlay_clips, size=(720, 1280))
-        final = final.subclip(0, min(final.duration, 75))
-
+        
+        # Generate frame
+        frame_path = os.path.join(self.output_dir, f"frame_{influencer}_{uuid.uuid4().hex[:8]}.png")
+        frame = self._generate_frame(full_text, (720, 1280), theme, product_image, self.watermark_text)
+        frame.save(frame_path)
+        
+        # Render video
         output = os.path.join(
             self.output_dir,
             f"ugc_{influencer}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_{random.randint(100,999)}.mp4"
         )
-        final.write_videofile(
-            output, codec="libx264", audio_codec="aac",
-            fps=20, threads=2, preset="ultrafast",
-            logger=None
-        )
-        final.close()
-        audio_clip.close()
+        
+        self._render_video_from_frame(frame_path, voiceover_path, output)
+        
+        # Cleanup temp files
         try:
+            os.remove(frame_path)
             os.remove(voiceover_path)
         except OSError:
             pass
+        
+        log.info("UGC video created: %s", output)
         return output
 
     def create_batch_videos(self, scripts: list, product_image: str = "", niche: str = "lifestyle",
                             max_workers: int = 4) -> list:
         """Generate videos for multiple scripts using ThreadPool."""
-        from concurrent.futures import ThreadPoolExecutor, as_completed
         results = []
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
             fut_map = {}
             for i, item in enumerate(scripts):
                 fut = pool.submit(
@@ -229,7 +282,7 @@ class VideoComposer:
                     theme_override=item.get("theme"),
                 )
                 fut_map[fut] = i
-            for fut in as_completed(fut_map):
+            for fut in concurrent.futures.as_completed(fut_map):
                 idx = fut_map[fut]
                 try:
                     path = fut.result()

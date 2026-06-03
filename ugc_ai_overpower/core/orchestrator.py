@@ -364,3 +364,65 @@ class Orchestrator:
             )
             # Enqueue for posting.
             self.schedule_content(content_id, platform)
+
+    # ═══════════════════════════════════════════════════════════════
+    # ENTERPRISE FEATURES — TTS, thumbnails, images, engage, trends
+    # ═══════════════════════════════════════════════════════════════
+
+    def tts_voiceover(self, script: str, gender: str = "male", output_path: str = None) -> str:
+        """Generate AI voiceover for a script."""
+        from ugc_ai_overpower.gpu.tts_engine import TTSEngine
+        return TTSEngine().synthesize_sync(script, gender, output_path)
+
+    def generate_thumbnail(self, hook: str, product: str = "", platform: str = "tiktok",
+                           theme: str = "default", product_image: str = None) -> str:
+        """Generate a branded thumbnail."""
+        from ugc_ai_overpower.gpu.thumbnail import ThumbnailGenerator
+        tg = ThumbnailGenerator(theme=theme)
+        return tg.generate(hook, product, platform, product_image)
+
+    def scrape_product_images(self, url: str, max_images: int = 3) -> list[str]:
+        """Download product images from e-commerce URL."""
+        from ugc_ai_overpower.core.product_images import ProductImageScraper
+        return ProductImageScraper().scrape(url, max_images)
+
+    def auto_engage(self, niche: str, platform: str = "tiktok",
+                    likes: int = 20, follows: int = 5, comments: int = 3) -> dict:
+        """Auto like/comment/follow in a niche."""
+        from ugc_ai_overpower.browser.bu_engage import BUEngageAgent
+        import asyncio
+        agent = BUEngageAgent()
+        return asyncio.run(agent.batch_engage(niche, platform, likes, follows, comments))
+
+    def scrape_trends(self, niche: str, platform: str = "tiktok") -> dict:
+        """Scrape trending hashtags and viral posts."""
+        from ugc_ai_overpower.browser.bu_scraper import BUScraperAgent
+        import asyncio
+        agent = BUScraperAgent()
+        hashtags = asyncio.run(agent.trending_hashtags(niche, 20))
+        if not hashtags.success:
+            return {"hashtags": [], "viral": ""}
+        viral = asyncio.run(agent.viral_posts(niche, platform, 5))
+        return {
+            "hashtags": hashtags.output.split(", ") if hashtags.output else [],
+            "viral_insights": viral.output,
+        }
+
+    def register_farm_account(self, platform: str, profile_name: str) -> dict:
+        """Auto-create platform account via temp mail + browser-use."""
+        from ugc_ai_overpower.browser.farm_registrar import BUFarmRegistrar
+        import asyncio
+        agent = BUFarmRegistrar()
+        if platform == "tiktok":
+            result = asyncio.run(agent.register_tiktok(profile_name))
+        elif platform == "instagram":
+            result = asyncio.run(agent.register_instagram(profile_name))
+        else:
+            return {"success": False, "error": f"Unsupported platform: {platform}"}
+        return {"success": result.success, "profile": profile_name, "platform": platform,
+                "output": result.output, "error": result.error}
+
+    def alert(self, message: str, severity: str = "info", source: str = ""):
+        """Send alert via configured channels."""
+        from ugc_ai_overpower.core.alerter import alerter
+        alerter.send(message, severity, source)
