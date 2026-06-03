@@ -40,10 +40,15 @@ def main():
         logger.info("  process-queue [platf]  — Process next pending item")
         logger.info("  post <id> <platform>   — Queue a content item for posting")
         logger.info("  scheduler              — Run content scheduler daemon")
+        logger.info("  schedule-campaign <product> <interval_min> [max_runs] — Schedule recurring campaign")
+        logger.info("  unschedule <job_id>    — Stop a scheduled campaign")
+        logger.info("  list-jobs              — Show active scheduled jobs")
         logger.info("  analytics              — Show analytics dashboard")
         logger.info("  api                    — Start FastAPI server")
         logger.info("  generate-video <script> [img] — Generate UGC video from script")
         logger.info("  post-video <path> <platform>  — Post video to platform")
+        logger.info("  cookie-save <platform> [profile] — Save cookies to profile")
+        logger.info("  cookie-list            — List saved cookie profiles")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -127,6 +132,35 @@ def main():
             logger.error("Usage: post-video <video_path> <platform>")
             sys.exit(1)
         _cmd_post_video(sys.argv[2], sys.argv[3])
+
+    elif cmd == "schedule-campaign":
+        if len(sys.argv) < 3:
+            logger.error("Usage: schedule-campaign <product> <interval_min> [max_runs]")
+            sys.exit(1)
+        product = sys.argv[2]
+        interval = int(sys.argv[3]) if len(sys.argv) > 3 else 1440
+        max_runs = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+        _cmd_schedule_campaign(orch, product, interval, max_runs)
+
+    elif cmd == "unschedule":
+        if len(sys.argv) < 3:
+            logger.error("Usage: unschedule <job_id>")
+            sys.exit(1)
+        _cmd_unschedule(sys.argv[2])
+
+    elif cmd == "list-jobs":
+        _cmd_list_jobs()
+
+    elif cmd == "cookie-save":
+        if len(sys.argv) < 3:
+            logger.error("Usage: cookie-save <platform> [profile]")
+            sys.exit(1)
+        platform = sys.argv[2]
+        profile = sys.argv[3] if len(sys.argv) > 3 else "default"
+        _cmd_cookie_save(platform, profile)
+
+    elif cmd == "cookie-list":
+        _cmd_cookie_list()
 
     elif cmd == "api":
         _cmd_api()
@@ -224,6 +258,49 @@ def _cmd_post_video(video_path: str, platform: str) -> None:
             logger.error(f"Failed: {result.get('error')}")
     finally:
         poster.cleanup()
+
+def _cmd_schedule_campaign(orch, product: str, interval_min: int, max_runs: int) -> None:
+    from ugc_ai_overpower.scheduler.engine import SkynetScheduler
+    sched = SkynetScheduler()
+    job_id = sched.schedule_campaign(product, interval_min, max_runs)
+    logger.info(f"Scheduled campaign '{product}' every {interval_min}min (job: {job_id})")
+    sched.start()
+
+def _cmd_unschedule(job_id: str) -> None:
+    from ugc_ai_overpower.scheduler.engine import SkynetScheduler
+    sched = SkynetScheduler()
+    sched.unschedule_campaign(job_id)
+    logger.info(f"Unscheduled: {job_id}")
+
+def _cmd_list_jobs() -> None:
+    from ugc_ai_overpower.scheduler.engine import SkynetScheduler
+    sched = SkynetScheduler()
+    jobs = sched.list_jobs()
+    if not jobs:
+        print("  No active jobs.")
+        return
+    for j in jobs:
+        print(f"  {j['id']:30s} {j['name']:20s} next: {j['next_run'] or 'N/A'}")
+
+def _cmd_cookie_save(platform: str, profile: str) -> None:
+    from ugc_ai_overpower.browser.cookies import CookieManager
+    cm = CookieManager()
+    try:
+        cm.save(platform, profile)
+        print(f"✅ Cookies saved for {platform} profile '{profile}'")
+    except Exception as e:
+        print(f"❌ {e}")
+
+def _cmd_cookie_list() -> None:
+    from ugc_ai_overpower.browser.cookies import CookieManager
+    cm = CookieManager()
+    profiles = cm.list_profiles()
+    if not profiles:
+        print("  No cookie profiles found.")
+        return
+    print("  Cookie profiles:")
+    for p in profiles:
+        print(f"    - {p}")
 
 def _cmd_api() -> None:
     logger.info("Starting FastAPI server...")
