@@ -25,6 +25,7 @@ from ugc_ai_overpower.browser.stealth import (
     load_cookies,
     random_delay,
 )
+from ugc_ai_overpower.browser.cookies import CookieManager
 
 log = logging.getLogger(__name__)
 
@@ -55,6 +56,12 @@ class BasePoster(abc.ABC):
     def __init__(self, platform_name: str):
         self.platform_name = platform_name
         self._browser_ctx = None  # set during login / post
+        self._cookie_profile = None
+        self._cookie_mgr = None
+
+    def set_cookie_profile(self, profile_name: str) -> None:
+        self._cookie_profile = profile_name
+        self._cookie_mgr = CookieManager()
 
     # ------------------------------------------------------------------
     # Public interface
@@ -118,12 +125,16 @@ class BasePoster(abc.ABC):
     def _save_session(self) -> None:
         if self._browser_ctx is not None:
             save_cookies(self._browser_ctx, self._cookie_name())
+            if self._cookie_mgr and self._cookie_profile:
+                self._cookie_mgr.save(self.platform_name, self._cookie_profile)
 
     def _load_session(self) -> bool:
         if self._browser_ctx is not None:
-            # We need to load cookies into a context – the actual loading
-            # happens implicitly via ``add_cookies``.  For this helper we
-            # just check that the file exists.
+            profile = self._cookie_profile or "default"
+            if self._cookie_mgr:
+                cookies = self._cookie_mgr.load(self.platform_name, profile)
+                if cookies:
+                    return True
             cookie_path = _COOKIE_DIR / f"{self._cookie_name()}.json"
             return cookie_path.is_file()
         return False
