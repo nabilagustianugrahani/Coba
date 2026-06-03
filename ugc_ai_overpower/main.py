@@ -42,6 +42,8 @@ def main():
         logger.info("  scheduler              — Run content scheduler daemon")
         logger.info("  analytics              — Show analytics dashboard")
         logger.info("  api                    — Start FastAPI server")
+        logger.info("  generate-video <script> [img] — Generate UGC video from script")
+        logger.info("  post-video <path> <platform>  — Post video to platform")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -112,6 +114,20 @@ def main():
     elif cmd == "analytics":
         _cmd_analytics()
 
+    elif cmd == "generate-video":
+        if len(sys.argv) < 3:
+            logger.error("Usage: generate-video <script> [product_image]")
+            sys.exit(1)
+        script = sys.argv[2]
+        img = sys.argv[3] if len(sys.argv) > 3 else None
+        _cmd_generate_video(script, img)
+
+    elif cmd == "post-video":
+        if len(sys.argv) < 4:
+            logger.error("Usage: post-video <video_path> <platform>")
+            sys.exit(1)
+        _cmd_post_video(sys.argv[2], sys.argv[3])
+
     elif cmd == "api":
         _cmd_api()
 
@@ -173,7 +189,7 @@ def _cmd_post(bank: ContentBank, orch: Orchestrator, content_id: int, platform: 
         conn.close()
 
     qid = orch.schedule_content(content_id, platform)
-    logger.info(f"✅ Content #{content_id} scheduled for {platform} (queue id={qid})"
+    logger.info(f"Content #{content_id} scheduled for {platform} (queue id={qid})")
 
 
 def _cmd_scheduler() -> None:
@@ -189,11 +205,31 @@ def _cmd_analytics() -> None:
     logger.info("Analytics dashboard (placeholder).")
 
 
+def _cmd_generate_video(script: str, product_image: str = None) -> None:
+    from ugc_ai_overpower.gpu.video_composer import VideoComposer
+    vc = VideoComposer()
+    logger.info(f"Generating video from script ({len(script)} chars)...")
+    path = vc.create_ugc_video(script, "cli_user", product_image)
+    logger.info(f"Video saved: {path}")
+
+def _cmd_post_video(video_path: str, platform: str) -> None:
+    from ugc_ai_overpower.browser.posters import get_poster
+    logger.info(f"Posting {video_path} to {platform}...")
+    poster = get_poster(platform)
+    try:
+        result = poster.post({"video_path": video_path, "script": "", "hashtags": []})
+        if result.get("success"):
+            logger.info(f"Posted! URL: {result.get('post_url')}")
+        else:
+            logger.error(f"Failed: {result.get('error')}")
+    finally:
+        poster.cleanup()
+
 def _cmd_api() -> None:
     logger.info("Starting FastAPI server...")
-    # TODO: Implement FastAPI server
-    # For now, we just print a message.
-    logger.info("FastAPI server started (placeholder).")
+    import uvicorn
+    from ugc_ai_overpower.api.routes import app
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
 
 if __name__ == "__main__":

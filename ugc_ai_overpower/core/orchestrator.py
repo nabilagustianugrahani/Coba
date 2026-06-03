@@ -91,19 +91,18 @@ class Orchestrator:
             # ---- GPU: auto‑generate video if product image is available ----
             if video_composer and product_image:
                 try:
-                    video_path = video_composer.compose_ugc(
-                        script=content["script"],
-                        influencer=influencer,
-                        product=product,
-                        product_image=product_image,
-                        price=price,
+                    import asyncio
+                    video_path = asyncio.run(
+                        video_composer.create_ugc_video(
+                            script=content["script"],
+                            influencer=influencer["name"],
+                            product_image=product_image,
+                        )
                     )
                     if video_path:
                         content["video_path"] = video_path
-                        # Add to content queue as type "video".
                         try:
                             from ugc_ai_overpower.browser.content_queue import ContentQueue
-
                             q = ContentQueue()
                             q.enqueue(content_id, content["platform"])
                         except Exception as qe:

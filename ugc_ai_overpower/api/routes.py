@@ -149,14 +149,13 @@ async def get_roi_stats(campaign_id: str):
 @app.post("/api/generate/video")
 async def generate_video(request: VideoGenerateRequest):
     """Generate a video from a script."""
-    # Placeholder: In a real app, this would call a video generation service
-    video_id = str(uuid.uuid4())
-    return {
-        "video_id": video_id,
-        "status": "processing",
-        "message": "Video generation started",
-        "estimated_completion": datetime.utcnow().isoformat()
-    }
+    try:
+        from ugc_ai_overpower.gpu.video_composer import VideoComposer
+        vc = VideoComposer()
+        path = vc.create_ugc_video(request.script, "api_user", None)
+        return {"video_id": os.path.basename(path), "path": path, "status": "completed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Health check
 @app.get("/health")
