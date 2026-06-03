@@ -32,9 +32,15 @@ def main():
         logger.info("Commands:")
         logger.info("  campaign <product>     — Running full campaign")
         logger.info("  auto-campaign <product> [image] [platforms] — Auto: script → video → post")
+        logger.info("  overkill <product>     — OVERKILL MODE: parallel × series × recycle × farm × post")
         logger.info("  analyze <product>      — Analyze product market")
         logger.info("  search <keyword>       — Search affiliate products")
         logger.info("  list-influencers       — Show all influencer personas")
+        logger.info("  search-content <q>     — Full-text search in content bank")
+        logger.info("  top-content [platform] — Top performing content")
+        logger.info("  ab-test <product>      — Generate A/B test hooks")
+        logger.info("  analyze-times          — Find optimal posting times")
+        logger.info("  series-plan <product>  — Create structured content series")
         logger.info("  server                 — Start MCP server")
         logger.info("  generate-personas      — Generate 15 default personas")
         logger.info("  queue-status           — Show content queue stats")
@@ -77,6 +83,19 @@ def main():
         logger.info(json.dumps(result, indent=2, default=str))
         logger.info(f"✅ Auto campaign done! Posted to: {result['posted_to']}")
 
+    elif cmd == "overkill":
+        product = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else input("Product: ")
+        count = int(input("How many content pieces? ") or "50")
+        img = input("Product image path (or Enter to skip): ") or ""
+        platforms = (input("Platforms (comma-separated, default: tiktok,instagram): ") or "tiktok,instagram").split(",")
+        logger.info(f"🔥 OVERKILL MODE: {product} × {count} pieces!")
+        result = orch.overkill_mode(
+            product=product, count=count, platforms=platforms,
+            product_image=img, use_farm=False
+        )
+        logger.info(json.dumps(result, indent=2, default=str))
+        logger.info(f"✅ Overkill done: {result['generated']} generated, {result.get('posted', 0)} posted in {result.get('elapsed_seconds', 0)}s")
+
     elif cmd == "analyze":
         product = " ".join(sys.argv[2:]) or input("Product: ")
         analysis = ai.analyze_product(product)
@@ -93,6 +112,49 @@ def main():
     elif cmd == "list-influencers":
         for inf in im.get_all():
             print(f"  {inf['name']:15s} → {inf['niche']:12s} ({inf['age']}th, {inf['gender']})")
+
+    elif cmd == "search-content":
+        query = " ".join(sys.argv[2:]) or input("Search: ")
+        from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+        results = ContentBankV2().search_content(query)
+        for r in results[:10]:
+            print(f"  #{r['id']} {r['hook'][:50]:50s} score={r.get('engagement_score', 0)}")
+
+    elif cmd == "top-content":
+        plat = sys.argv[2] if len(sys.argv) > 2 else ""
+        from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+        for c in ContentBankV2().get_top_performing(platform=plat, limit=10):
+            print(f"  #{c['id']} {c['hook'][:45]:45s} eng={c.get('engagement_score', 0):.1f}% views={c.get('views', 0)}")
+
+    elif cmd == "ab-test":
+        product = " ".join(sys.argv[2:]) or input("Product: ")
+        from ugc_ai_overpower.core.optimizer import AnalyticsOptimizer
+        from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+        opt = AnalyticsOptimizer(ContentBankV2())
+        test = opt.setup_ab_test(ai, product)
+        print("  A/B Test untuk:", product)
+        print(f"  Group A (Hook): {test['group_a']['hook']}")
+        print(f"  Group B (Hook): {test['group_b']['hook']}")
+
+    elif cmd == "analyze-times":
+        from ugc_ai_overpower.core.optimizer import AnalyticsOptimizer
+        from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+        opt = AnalyticsOptimizer(ContentBankV2())
+        analysis = opt.analyze_posting_times()
+        print("  Best posting times:")
+        for plat, times in analysis.get("platform_recommendations", {}).items():
+            print(f"    {plat:12s}: {', '.join(times[:3])}")
+
+    elif cmd == "series-plan":
+        product = " ".join(sys.argv[2:]) or input("Product: ")
+        niche = input("Niche (e.g. skincare, fashion, food): ") or "general"
+        ep = int(input("Total episodes: ") or "10")
+        from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+        from ugc_ai_overpower.core.series import SeriesEngine
+        se = SeriesEngine(ContentBankV2())
+        plan = se.create_series_plan(product, niche, total_episodes=ep)
+        print(json.dumps(plan, indent=2, default=str))
+        print(f"✅ Series #{plan['series_id']} created with {plan['total_episodes']} episodes")
 
     elif cmd == "server":
         logger.info("Starting MCP server...")

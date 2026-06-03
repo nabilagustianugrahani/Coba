@@ -264,6 +264,138 @@ class Orchestrator:
             "total_queued": campaign_result.get("queued", 0),
         }
 
+    # ═══════════════════════════════════════════════════════════════
+    # OVERKILL MODE — parallel × farm × series × optimizer × everything
+    # ═══════════════════════════════════════════════════════════════
+
+    def overkill_mode(
+        self,
+        product: str,
+        count: int = 50,
+        platforms: list = None,
+        product_image: str = "",
+        use_farm: bool = True,
+        use_series: bool = True,
+        use_recycle: bool = True,
+        use_optimizer: bool = True,
+    ) -> dict:
+        """Supercharged campaign using ALL overkill features."""
+        platforms = platforms or ["tiktok", "instagram"]
+        start_time = __import__("time").time()
+        results = {}
+
+        # 1. Batch generate massive content
+        logger.info("🔥 OVERKILL MODE: %s — generating %d pieces...", product, count)
+        from ugc_ai_overpower.core.parallel import ParallelBatch
+        from ugc_ai_overpower.mcp_server.tools.influencer_tools import InfluencerManager
+
+        im = InfluencerManager()
+        influencers = im.select_for_campaign(product)
+        batch = ParallelBatch(max_workers=min(count, 20))
+        contents = batch.generate_batch(
+            self.ai, product, influencers,
+            platforms=platforms, count=count
+        )
+        results["generated"] = len(contents)
+        logger.info("✅ Generated %d scripts", len(contents))
+
+        # 2. Generate videos in parallel if image provided
+        if product_image:
+            logger.info("🎬 Generating videos in parallel...")
+            video_contents = batch.generate_videos_batch(None, contents, product_image, max_workers=4)
+            for c in video_contents:
+                if c.get("video_path"):
+                    try:
+                        from ugc_ai_overpower.browser.content_queue import ContentQueue
+                        q = ContentQueue()
+                        q.enqueue(0, c.get("platform", "tiktok"))
+                    except Exception:
+                        pass
+            results["videos"] = sum(1 for c in video_contents if c.get("video_path"))
+        else:
+            video_contents = contents
+
+        # 3. Save to content bank
+        from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+        bank_v2 = ContentBankV2()
+        product_id = bank_v2.add_product(product)
+        for c in video_contents:
+            bank_v2.add_content(
+                hook=c.get("hook", ""),
+                script=c.get("script", ""),
+                platform=c.get("platform", "tiktok"),
+                hashtags=c.get("hashtags", []),
+                product_id=product_id,
+                status="ready",
+                tags=["overkill", product.lower().replace(" ", "_")],
+            )
+        results["saved"] = len(video_contents)
+
+        # 4. Series plan
+        if use_series:
+            try:
+                from ugc_ai_overpower.core.series import SeriesEngine
+                se = SeriesEngine(bank_v2)
+                plan = se.create_series_plan(product, "general", platforms[0],
+                                              total_episodes=min(count, 10))
+                results["series_id"] = plan.get("series_id")
+                logger.info("📺 Series created: %d episodes", plan["total_episodes"])
+            except Exception as e:
+                logger.warning("Series plan failed: %s", e)
+
+        # 5. Recycle old content
+        if use_recycle:
+            try:
+                from ugc_ai_overpower.core.recycler import ContentRecycler
+                rc = ContentRecycler(bank_v2)
+                recycled = rc.auto_recycle(self.ai, platforms[0], variations_per=2)
+                results["recycled"] = len(recycled)
+                logger.info("♻️ Recycled %d old content pieces", len(recycled))
+            except Exception as e:
+                logger.warning("Recycle failed: %s", e)
+
+        # 6. Account farm rotation
+        farm = None
+        if use_farm:
+            try:
+                from ugc_ai_overpower.browser.farm import AccountFarm
+                farm = AccountFarm()
+                results["farm_stats"] = farm.get_stats()
+                logger.info("👥 Farm: %d profiles available", farm.get_stats().get("healthy", 0))
+            except Exception as e:
+                logger.warning("Farm check failed: %s", e)
+
+        # 7. Auto-post with farm rotation
+        posted = 0
+        if farm:
+            from ugc_ai_overpower.browser.posters import get_poster
+            for c in video_contents[:10]:  # Post first 10
+                prof = farm.rotate(c.get("platform", "tiktok"))
+                if not prof:
+                    continue
+                try:
+                    poster = get_poster(c.get("platform", "tiktok"))
+                    poster.set_cookie_profile(prof.name)
+                    payload = {
+                        "script": c.get("script", ""),
+                        "video_path": c.get("video_path", ""),
+                        "hashtags": c.get("hashtags", []),
+                    }
+                    post_result = poster.post(payload)
+                    success = post_result.get("success", False)
+                    farm.record_result(prof.platform, prof.name, success)
+                    if success:
+                        posted += 1
+                    poster.cleanup()
+                except Exception as e:
+                    logger.warning("Post failed for %s: %s", prof.name, e)
+
+        results["posted"] = posted
+        results["elapsed_seconds"] = round(__import__("time").time() - start_time, 1)
+        logger.info("🏁 OVERKILL DONE: %d generated, %d posted in %.1fs",
+                    len(contents), posted, results["elapsed_seconds"])
+        return results
+
     def run_batch(self, product: str, platforms=["tiktok", "instagram"]):
         """Generate content for *product* on each platform and enqueue it.
 
