@@ -302,16 +302,22 @@ class Orchestrator:
         # 2. Generate videos in parallel if image provided
         if product_image:
             logger.info("🎬 Generating videos in parallel...")
-            video_contents = batch.generate_videos_batch(None, contents, product_image, max_workers=4)
-            for c in video_contents:
-                if c.get("video_path"):
-                    try:
-                        from ugc_ai_overpower.browser.content_queue import ContentQueue
-                        q = ContentQueue()
-                        q.enqueue(0, c.get("platform", "tiktok"))
-                    except Exception:
-                        pass
-            results["videos"] = sum(1 for c in video_contents if c.get("video_path"))
+            try:
+                from ugc_ai_overpower.gpu.video_composer import VideoComposer
+                vc = VideoComposer()
+                video_contents = batch.generate_videos_batch(vc, contents, product_image, max_workers=min(4, count))
+                for c in video_contents:
+                    if c.get("video_path"):
+                        try:
+                            from ugc_ai_overpower.browser.content_queue import ContentQueue
+                            q = ContentQueue()
+                            q.enqueue(0, c.get("platform", "tiktok"))
+                        except Exception:
+                            pass
+                results["videos"] = sum(1 for c in video_contents if c.get("video_path"))
+            except Exception as ve:
+                logger.warning("Video batch failed: %s", ve)
+                video_contents = contents
         else:
             video_contents = contents
 

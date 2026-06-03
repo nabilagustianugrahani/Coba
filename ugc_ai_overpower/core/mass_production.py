@@ -1,0 +1,282 @@
+"""UGC Mass Production — one command → 100 viral-ready UGC videos."""
+import os, json, time, random, logging, concurrent.futures
+from datetime import datetime
+from typing import Optional
+
+log = logging.getLogger(__name__)
+
+
+class UGCMassProduction:
+    """Factory for mass-producing UGC content at scale.
+
+    Flow: generate scripts → generate voiceovers → compose videos → queue → post
+    All steps run in parallel with configurable worker counts.
+    """
+
+    def __init__(self, output_dir: str = "output/videos/mass", max_workers: dict = None):
+        self.output_dir = output_dir
+        os.makedirs(output_dir, exist_ok=True)
+        self.max_workers = max_workers or {
+            "scripts": 20,   # parallel AI calls
+            "videos": 4,     # parallel video rendering (CPU-bound)
+            "posts": 3,      # parallel posting
+        }
+
+    # ── Templates ────────────────────────────────────────────────
+    UGC_TEMPLATES = {
+        "honest_review": {
+            "angle": "jujur tanpa drama",
+            "structure": ["Hook", "Kenalan sama produk", "First impression", "Dipakai rutin", "Hasil", "Kesimpulan", "CTA"],
+        },
+        "storytelling": {
+            "angle": "cerita personal relateable",
+            "structure": ["Masalah", "Ketemu produk", "Pake pertama", "Transformasi", "Testimoni", "CTA"],
+        },
+        "comparison": {
+            "angle": "sebelum-sesudah / vs kompetitor",
+            "structure": ["Hook perbandingan", "Produk A", "Produk B", "Head to head", "Pemenang", "CTA"],
+        },
+        "tutorial_hack": {
+            "angle": "tips & trik rahasia",
+            "structure": ["Hook hack", "Yang salah selama ini", "Cara bener", "Hasil maksimal", "Pro tip", "CTA"],
+        },
+        "challenge": {
+            "angle": "tantangan X hari",
+            "structure": ["Hook challenge", "Day 1", "Day 3", "Day 7", "Hasil akhir", "CTA"],
+        },
+        "myth_busting": {
+            "angle": "mitos vs fakta",
+            "structure": ["Mitos umum", "Fakta sebenarnya", "Bukti nyata", "Penjelasan", "Kesimpulan", "CTA"],
+        },
+        "asmr_unboxing": {
+            "angle": "ASMR unboxing satisfying",
+            "structure": ["Unboxing", "Look pertama", "Tekstur", "Coba langsung", "First reaction", "CTA"],
+        },
+        "day_in_life": {
+            "angle": "daily routine with product",
+            "structure": ["Pagi", "Pertengahan hari", "Sore", "Malam", "Refleksi", "CTA"],
+        },
+    }
+
+    UGC_HOOKS = {
+        "skincare": [
+            "Jangan beli {product} sebelum nonton ini!",
+            "Dokter bilang {product} ini berbahaya!",
+            "Gue pake {product} selama 30 hari, ini hasilnya...",
+            "{product} bikin gue shock!",
+            "Ini skincare termurah yang ever gue cobain!",
+        ],
+        "fashion": [
+            "Outfit pake {product} langsung disukai gebetan!",
+            "{product} ini bikin lo keliatan kaya!",
+            "Gak nyangka {product} sekualitas ini!",
+            "Styling {product} untuk pemula!",
+            "Review {product}: worth it atau overrated?",
+        ],
+        "food": [
+            "Resep {product} paling enak se-Indonesia!",
+            "Gue coba {product} viral, ini kejujuran!",
+            "Berapa harga {product}? Jawabannya bikin kaget!",
+            "Ini {product} terenak yang pernah gue makan!",
+        ],
+        "tech": [
+            "{product} review paling jujur!",
+            "5 fitur {product} yang gak lo tau!",
+            "Apakah {product} worth it? Gue spill semua!",
+            "Ini dia {product} yang lagi viral di TikTok!",
+        ],
+        "general": [
+            "STOP! Jangan beli {product} kalo belum nonton ini!",
+            "Gue baru nemu {product} yang bikin nagih!",
+            "Review {product} dari pembeli beneran!",
+            "Ini alasan kenapa {product} lagi hits!",
+            "Coba {product} dulu baru percaya!",
+        ],
+    }
+
+    UGC_CTA = [
+        "Komen pendapat lo di bawah!",
+        "Share ke temen yang butuh!",
+        "Follow buat review lainnya!",
+        "Save dulu biar gak ilang!",
+        "Tag temen lo yang harus liat ini!",
+        "Yang udah coba, komen dong!",
+    ]
+
+    def get_hooks_for_niche(self, niche: str, product: str, count: int = 5) -> list:
+        hooks_pool = self.UGC_HOOKS.get(niche, self.UGC_HOOKS["general"])
+        return [h.format(product=product) for h in random.sample(hooks_pool, min(count, len(hooks_pool)))]
+
+    # ── Script Generation (Parallel) ─────────────────────────────
+    def generate_scripts(self, ai_router, product: str, niche: str, count: int,
+                          platforms: list = None, hooks: list = None) -> list:
+        """Generate *count* unique UGC scripts in parallel."""
+        platforms = platforms or ["tiktok"]
+        hooks = hooks or self.get_hooks_for_niche(niche, product, count)
+        influencers_pool = ["sari", "budi", "dian", "rudi", "intan", "agus", "dewi", "fikri", "rina", "tono"]
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(self.max_workers["scripts"], count)
+        ) as pool:
+            futures = []
+            for i in range(count):
+                template = random.choice(list(self.UGC_TEMPLATES.values()))
+                influencer = random.choice(influencers_pool)
+                platform = random.choice(platforms)
+                hook = hooks[i % len(hooks)]
+                gender = "female" if influencer in ["sari", "dian", "intan", "dewi", "rina"] else "male"
+
+                prompt = (
+                    f"Buat script UGC episode ke-{i+1} untuk {product} (niche: {niche}).\n\n"
+                    f"Influencer: {influencer} ({gender})\n"
+                    f"Platform: {platform}\n"
+                    f"Hook: \"{hook}\"\n"
+                    f"Angle: {template['angle']}\n"
+                    f"Struktur: {', '.join(template['structure'])}\n\n"
+                    f"CTA: {random.choice(self.UGC_CTA)}\n\n"
+                    f"Durasi: 30-60 detik. Bahasa Indonesia santai. Natural, kayak ngomong sama temen."
+                )
+
+                futures.append(pool.submit(
+                    self._gen_script, ai_router, prompt, {
+                        "influencer": influencer, "gender": gender,
+                        "platform": platform, "hook": hook,
+                        "angle": template["angle"], "template": template["structure"],
+                    }
+                ))
+
+            results = []
+            for fut in concurrent.futures.as_completed(futures):
+                try:
+                    r = fut.result()
+                    if r:
+                        results.append(r)
+                except Exception as e:
+                    log.warning("Script gen failed: %s", e)
+
+        # Sort to maintain some semblance of order
+        return results
+
+    def _gen_script(self, ai_router, prompt: str, meta: dict) -> Optional[dict]:
+        try:
+            script = ai_router.chat(prompt)
+            if not script or len(script) < 30:
+                return None
+
+            # Generate hashtags
+            h_prompt = f"Generate 8 hashtag trending Indonesia untuk konten: {meta['hook']}. Pisahkan dengan koma."
+            h_raw = ai_router.chat(h_prompt)
+            hashtags = [h.strip().lstrip("#") for h in h_raw.split(",") if h.strip()][:8]
+
+            return {
+                "script": script,
+                "hook": meta["hook"],
+                "influencer": meta["influencer"],
+                "gender": meta["gender"],
+                "platform": meta["platform"],
+                "angle": meta.get("angle", ""),
+                "hashtags": hashtags,
+                "add_intro": True,
+                "add_outro": True,
+            }
+        except Exception as e:
+            log.warning("_gen_script error: %s", e)
+            return None
+
+    # ── Full Pipeline ─────────────────────────────────────────────
+    def run(
+        self,
+        ai_router,
+        product: str,
+        niche: str = "general",
+        count: int = 50,
+        platforms: list = None,
+        product_image: str = "",
+        generate_video: bool = False,
+        auto_post: bool = False,
+        theme: str = "default",
+        watermark: str = "",
+    ) -> dict:
+        """Run the complete UGC mass production pipeline.
+
+        Returns stats dict with paths to all generated assets.
+        """
+        start = time.time()
+
+        # Phase 1: Generate scripts
+        log.info("📝 Phase 1: Generating %d scripts...", count)
+        scripts = self.generate_scripts(ai_router, product, niche, count, platforms)
+        log.info("✅ %d scripts generated", len(scripts))
+
+        # Phase 2: Generate videos
+        videos = []
+        if generate_video and scripts:
+            log.info("🎬 Phase 2: Generating %d videos...", len(scripts))
+            try:
+                from ugc_ai_overpower.gpu.video_composer import VideoComposer
+                vc = VideoComposer(output_dir=self.output_dir, watermark_text=watermark)
+                if theme:
+                    vc.set_theme(theme)
+
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=min(self.max_workers["videos"], len(scripts))
+                ) as pool:
+                    fut_map = {}
+                    for i, s in enumerate(scripts):
+                        fut = pool.submit(
+                            vc.create_ugc_video,
+                            script=s["script"],
+                            influencer=s["influencer"],
+                            product_image=product_image or None,
+                            niche=niche,
+                            gender=s.get("gender", "male"),
+                            add_intro=s.get("add_intro", True),
+                            add_outro=s.get("add_outro", True),
+                            theme_override=theme if theme != "default" else None,
+                        )
+                        fut_map[fut] = i
+                    for fut in concurrent.futures.as_completed(fut_map):
+                        idx = fut_map[fut]
+                        try:
+                            path = fut.result()
+                            scripts[idx]["video_path"] = path
+                            videos.append(path)
+                        except Exception as e:
+                            log.warning("Video %d failed: %s", idx, e)
+            except Exception as e:
+                log.warning("Video generation skipped: %s", e)
+
+        # Phase 3: Queue & post
+        posted = 0
+        if auto_post:
+            log.info("📤 Phase 3: Auto-posting...")
+            try:
+                from ugc_ai_overpower.browser.content_queue import ContentQueue
+                q = ContentQueue()
+                for s in scripts:
+                    if s.get("video_path"):
+                        q.enqueue(0, s.get("platform", "tiktok"))
+                        posted += 1
+                log.info("✅ %d content queued for posting", posted)
+            except Exception as e:
+                log.warning("Auto-post failed: %s", e)
+
+        elapsed = round(time.time() - start, 1)
+        log.info("🏁 UGC Mass Production complete in %.1fs", elapsed)
+
+        # Save manifest
+        manifest = {
+            "product": product,
+            "niche": niche,
+            "count_target": count,
+            "scripts_generated": len(scripts),
+            "videos_generated": len(videos),
+            "queued": posted,
+            "elapsed_seconds": elapsed,
+            "generated_at": datetime.now().isoformat(),
+        }
+        manifest_path = os.path.join(self.output_dir, f"manifest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=2)
+
+        return manifest

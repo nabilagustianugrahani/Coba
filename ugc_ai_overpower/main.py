@@ -33,6 +33,7 @@ def main():
         logger.info("  campaign <product>     — Running full campaign")
         logger.info("  auto-campaign <product> [image] [platforms] — Auto: script → video → post")
         logger.info("  overkill <product>     — OVERKILL MODE: parallel × series × recycle × farm × post")
+        logger.info("  mass-produce           — UGC mass production: 1 cmd → 100+ videos")
         logger.info("  analyze <product>      — Analyze product market")
         logger.info("  search <keyword>       — Search affiliate products")
         logger.info("  list-influencers       — Show all influencer personas")
@@ -95,6 +96,28 @@ def main():
         )
         logger.info(json.dumps(result, indent=2, default=str))
         logger.info(f"✅ Overkill done: {result['generated']} generated, {result.get('posted', 0)} posted in {result.get('elapsed_seconds', 0)}s")
+
+    elif cmd == "mass-produce":
+        product = sys.argv[2] if len(sys.argv) > 2 else input("Product: ")
+        niche = input("Niche (skincare/fashion/food/tech/general) [general]: ") or "general"
+        count = int(input("How many UGC videos? [50]: ") or "50")
+        platforms = (input("Platforms [tiktok,instagram]: ") or "tiktok,instagram").split(",")
+        image = input("Product image path (or Enter to skip): ") or ""
+        generate_video = input("Generate videos? (y/N): ").lower() == "y"
+        theme = input("Theme (default/dark/warm/fresh/luxury/bright) [default]: ") or "default"
+        watermark = input("Watermark text (or Enter to skip): ") or ""
+
+        logger.info(f"🔥 MASS PRODUCTION: {count} UGC videos for {product}")
+        from ugc_ai_overpower.core.mass_production import UGCMassProduction
+        factory = UGCMassProduction()
+        result = factory.run(
+            ai_router=ai, product=product, niche=niche,
+            count=count, platforms=platforms,
+            product_image=image, generate_video=generate_video,
+            auto_post=False, theme=theme, watermark=watermark,
+        )
+        print(json.dumps(result, indent=2, default=str))
+        print(f"✅ {result['scripts_generated']} scripts, {result['videos_generated']} videos in {result['elapsed_seconds']}s")
 
     elif cmd == "analyze":
         product = " ".join(sys.argv[2:]) or input("Product: ")
