@@ -1,6 +1,13 @@
 mcp
 requests
-moviepy>=2.0.0
+moviepy==1.0.3
 edge-tts
 openai
 schedule
+playwright
+apscheduler
+fastapi
+uvicorn
+python-dotenv
+pyyaml
+pytest
