@@ -1,0 +1,20 @@
+[Unit]
+Description=Skynet Scheduler Daemon
+After=network.target 9router.service
+Wants=9router.service
+
+[Service]
+Type=simple
+User=aer
+WorkingDirectory=/home/aer/ugc/ugc_ai_overpower
+Environment=ROUTER_URL=http://localhost:20128
+Environment=ROUTER_KEY=sk-8028a980b0c7366a-4a45za-36eef5ef
+ExecStart=/usr/bin/python3 deploy/run_scheduler.py
+Restart=always
+RestartSec=10
+SupplementaryGroups=
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -16,3 +16,10 @@ logs/
 __pycache__/
 *.pyc
 .DS_Store
+# Runtime data
+data/campaign_queue.json
+data/pids/
+data/logs/
+*.db-shm
+*.db-wal
+output/

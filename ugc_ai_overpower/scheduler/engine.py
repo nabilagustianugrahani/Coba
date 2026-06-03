@@ -26,8 +26,7 @@ class SkynetScheduler:
     def __init__(self):
         self.scheduler = BackgroundScheduler({
             "apscheduler.jobstores.default": {
-                "type": "sqlalchemy",
-                "url": "sqlite:///data/scheduler.db",
+                "type": "memory",
             },
             "apscheduler.executors.default": {
                 "class": "apscheduler.executors.pool:ThreadPoolExecutor",
@@ -73,6 +72,24 @@ class SkynetScheduler:
                     item.get("max_runs", 0),
                 )
             logger.info("Loaded %d queued campaigns", len(queue))
+
+    def schedule_campaign_daily(self, product: str, hour: int = 8, minute: int = 0):
+        """Schedule a daily recurring campaign at a specific time."""
+        job_id = f"campaign_daily_{product.replace(' ', '_')}"
+
+        def run():
+            logger.info("Daily campaign for %s", product)
+            try:
+                result = self.orchestrator.auto_campaign(product)
+                logger.info("Daily campaign done: %s", result.get("total_content", 0))
+            except Exception as e:
+                logger.error("Daily campaign failed: %s", e)
+
+        trigger = CronTrigger(hour=hour, minute=minute, timezone="Asia/Jakarta")
+        self.scheduler.add_job(run, trigger=trigger, id=job_id, name=f"Daily: {product}")
+        logger.info("Daily campaign '%s' scheduled at %02d:%02d WIB", product, hour, minute)
+        self._persist_queue()
+        return job_id
 
     def schedule_campaign(self, product: str, interval_minutes: int = 60, max_runs: int = 0):
         job_id = f"campaign_{hash(product)}_{int(time.time())}"

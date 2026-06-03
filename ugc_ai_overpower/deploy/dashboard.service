@@ -1,0 +1,22 @@
+[Unit]
+Description=Skynet UGC Dashboard
+After=network.target 9router.service
+Wants=9router.service
+
+[Service]
+Type=simple
+User=aer
+WorkingDirectory=/home/aer/ugc/ugc_ai_overpower
+Environment=ROUTER_URL=http://localhost:20128
+Environment=ROUTER_KEY=sk-8028a980b0c7366a-4a45za-36eef5ef
+Environment=HOST=0.0.0.0
+Environment=PORT=8111
+ExecStart=/usr/bin/python3 -m uvicorn web.dashboard:app --host 0.0.0.0 --port 8111
+Restart=always
+RestartSec=5
+SupplementaryGroups=
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

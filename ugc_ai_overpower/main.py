@@ -50,6 +50,10 @@ def main():
         logger.info("  post-video <path> <platform>  — Post video to platform")
         logger.info("  cookie-save <platform> [profile] — Save cookies to profile")
         logger.info("  cookie-list            — List saved cookie profiles")
+        logger.info("  set-affiliate <platform> <id> [track] — Set affiliate link ID")
+        logger.info("  list-affiliates        — Show affiliate platform configs")
+        logger.info("  daily-schedule [product] — Schedule/set daily campaign schedule")
+        logger.info("  start-daemon           — Start scheduler daemon with daily campaigns")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -131,6 +135,43 @@ def main():
 
     elif cmd == "analytics":
         _cmd_analytics()
+
+    # ── Affiliate commands ──────────────────────────────────────────
+    elif cmd == "set-affiliate":
+        if len(sys.argv) < 4:
+            logger.error("Usage: set-affiliate <platform> <af_id> [track_id]")
+            sys.exit(1)
+        platform = sys.argv[2]
+        af_id = sys.argv[3]
+        track_id = sys.argv[4] if len(sys.argv) > 4 else ""
+        from ugc_ai_overpower.core.affiliate import AffiliateManager
+        am = AffiliateManager()
+        am.set_affiliate_id(platform, af_id, track_id)
+        print(f"✅ {platform} affiliate ID set: {af_id}")
+
+    elif cmd == "list-affiliates":
+        from ugc_ai_overpower.core.affiliate import AffiliateManager
+        am = AffiliateManager()
+        configs = am.get_all_configs()
+        print("  Affiliate configs:")
+        for plat, cfg in configs.items():
+            print(f"    {plat:12s} → {cfg.get('af_id', '(not set)')}")
+
+    # ── Daily schedule commands ─────────────────────────────────────
+    elif cmd == "daily-schedule":
+        from ugc_ai_overpower.scheduler.engine import SkynetScheduler
+        sched = SkynetScheduler()
+        if len(sys.argv) >= 3:
+            product = " ".join(sys.argv[2:])
+            job_id = sched.schedule_campaign_daily(product, hour=8, minute=0)
+            print(f"✅ Daily campaign scheduled: {product} at 08:00 WIB (job: {job_id})")
+        else:
+            for j in sched.list_jobs():
+                print(f"  {j['id']:35s} {j['name']:25s} next: {j['next_run'] or 'N/A'}")
+
+    elif cmd == "start-daemon":
+        logger.info("Starting scheduler daemon with daily campaigns...")
+        _cmd_scheduler()
 
     elif cmd == "generate-video":
         if len(sys.argv) < 3:

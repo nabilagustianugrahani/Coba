@@ -31,7 +31,7 @@ class AppState:
         self.psychology = PsychologyEngine()
         self.orchestrator = Orchestrator(self.bank, self.ai)
         self.metrics = get_metrics_collector()
-self.start_time = time.time()
+        self.start_time = time.time()
 
 state = AppState()
 
