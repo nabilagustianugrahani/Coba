@@ -73,6 +73,60 @@ class SkynetScheduler:
                 )
             logger.info("Loaded %d queued campaigns", len(queue))
 
+    def schedule_mass_production_daily(self, product: str, niche: str = "general",
+                                         count: int = 50, hour: int = 8, minute: int = 0,
+                                         platforms: list = None, generate_video: bool = False,
+                                         theme: str = "default"):
+        """Schedule daily UGC mass production at a specific WIB time."""
+        job_id = f"massprod_daily_{product.replace(' ', '_')}"
+        platforms = platforms or ["tiktok", "instagram"]
+
+        def run():
+            logger.info("Daily mass production for %s (%d videos)", product, count)
+            try:
+                from ugc_ai_overpower.core.mass_production import UGCMassProduction
+                from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
+                import os
+                ai = AIRouter(
+                    base_url=os.getenv("ROUTER_URL", "http://localhost:20128"),
+                    api_key=os.getenv("ROUTER_KEY", ""),
+                )
+                factory = UGCMassProduction()
+                result = factory.run(
+                    ai_router=ai, product=product, niche=niche,
+                    count=count, platforms=platforms,
+                    generate_video=generate_video, theme=theme,
+                )
+                logger.info("Mass production done: %d scripts, %d videos in %.1fs",
+                            result["scripts_generated"], result["videos_generated"],
+                            result["elapsed_seconds"])
+
+                # Auto-queue for posting
+                from ugc_ai_overpower.browser.content_queue import ContentQueue
+                from ugc_ai_overpower.browser.queue_processor import QueueProcessor
+                q = ContentQueue()
+                enqueued = 0
+                for i in range(result["scripts_generated"]):
+                    for plat in platforms:
+                        q.enqueue(i, plat)
+                        enqueued += 1
+                logger.info("Enqueued %d items for posting", enqueued)
+
+                # Auto-process queue
+                processor = QueueProcessor()
+                post_result = processor.process_all()
+                logger.info("Posted: %d success, %d failed",
+                            post_result.get("success", 0), post_result.get("failed", 0))
+            except Exception as e:
+                logger.error("Daily mass production failed: %s", e)
+
+        trigger = CronTrigger(hour=hour, minute=minute, timezone="Asia/Jakarta")
+        self.scheduler.add_job(run, trigger=trigger, id=job_id,
+                                name=f"MassProd: {product}")
+        logger.info("Daily mass production '%s' scheduled at %02d:%02d WIB × %d videos",
+                    product, hour, minute, count)
+        return job_id
+
     def schedule_campaign_daily(self, product: str, hour: int = 8, minute: int = 0):
         """Schedule a daily recurring campaign at a specific time."""
         job_id = f"campaign_daily_{product.replace(' ', '_')}"
