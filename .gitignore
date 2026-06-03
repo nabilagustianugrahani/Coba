@@ -17,11 +17,22 @@ __pycache__/
 *.pyc
 .DS_Store
 # Runtime data
+data/
+data/*
 data/campaign_queue.json
 data/pids/
 data/pids/*
+data/pids/*.pid
 data/logs/
 data/logs/*
+ugc_ai_overpower/data/
+ugc_ai_overpower/data/*
+ugc_ai_overpower/data/campaign_queue.json
+ugc_ai_overpower/data/pids/
+ugc_ai_overpower/data/pids/*
+ugc_ai_overpower/data/pids/*.pid
+ugc_ai_overpower/data/logs/
+ugc_ai_overpower/data/logs/*
 
 # Temp / test media
 test_*.mp4
