@@ -19,7 +19,15 @@ __pycache__/
 # Runtime data
 data/campaign_queue.json
 data/pids/
+data/pids/*
 data/logs/
+data/logs/*
+
+# Temp / test media
+test_*.mp4
+test_*.mp3
+tmp*.mp4
+tmp*.mp3
 *.db-shm
 *.db-wal
 output/

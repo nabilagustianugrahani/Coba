@@ -1,5 +1,5 @@
 """UGC Mass Production — one command → 100 viral-ready UGC videos."""
-import os, json, time, random, logging, concurrent.futures
+import os, json, time, random, logging, concurrent.futures, re
 from datetime import datetime
 from typing import Optional
 
@@ -127,14 +127,20 @@ class UGCMassProduction:
                 gender = "female" if influencer in ["sari", "dian", "intan", "dewi", "rina"] else "male"
 
                 prompt = (
-                    f"Buat script UGC episode ke-{i+1} untuk {product} (niche: {niche}).\n\n"
+                    f"[INST] Tulis SCRIPT UGC EPISODE #{i+1} untuk produk '{product}'.\n\n"
                     f"Influencer: {influencer} ({gender})\n"
                     f"Platform: {platform}\n"
                     f"Hook: \"{hook}\"\n"
                     f"Angle: {template['angle']}\n"
-                    f"Struktur: {', '.join(template['structure'])}\n\n"
-                    f"CTA: {random.choice(self.UGC_CTA)}\n\n"
-                    f"Durasi: 30-60 detik. Bahasa Indonesia santai. Natural, kayak ngomong sama temen."
+                    f"Struktur: {', '.join(template['structure'])}\n"
+                    f"CTA: {random.choice(self.UGC_CTA)}\n"
+                    f"Durasi: 30-60 detik | Bahasa: Indonesia santai, natural\n\n"
+                    f"RULES:\n"
+                    f"- TULIS ONLY the script, NO intro/penjelasan/formatting\n"
+                    f"- Langsung dialog dari influencer, jangan pake tanda petik\n"
+                    f"- Natural, kayak ngomong temen, include filler kayak 'nih', 'si', 'deh'\n"
+                    f"- Akhiri dengan CTA di atas\n"
+                    f"- Every word harus bisa diucapkan (buat voiceover) [/INST]"
                 )
 
                 futures.append(pool.submit(
@@ -157,16 +163,36 @@ class UGCMassProduction:
         # Sort to maintain some semblance of order
         return results
 
+    @staticmethod
+    def _clean_script(raw: str) -> str:
+        lines = raw.split("\n")
+        cleaned = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if re.match(r'^(berikut|tentu|oke|ok|baik|ini dia|halo|hai|hallo)', stripped, re.I):
+                continue
+            if re.match(r'^##?\s', stripped):
+                continue
+            if re.match(r'^\[/', stripped):
+                continue
+            cleaned.append(stripped)
+        return "\n".join(cleaned) if cleaned else raw
+
     def _gen_script(self, ai_router, prompt: str, meta: dict) -> Optional[dict]:
         try:
-            script = ai_router.chat(prompt)
-            if not script or len(script) < 30:
+            raw = ai_router.chat(prompt)
+            if not raw or len(raw) < 30:
                 return None
+            script = self._clean_script(raw)
 
             # Generate hashtags
-            h_prompt = f"Generate 8 hashtag trending Indonesia untuk konten: {meta['hook']}. Pisahkan dengan koma."
+            h_prompt = f"Generate 8 hashtag. Format: #tag1 #tag2 #tag3 (NO other text). Konten: {meta['hook']}"
             h_raw = ai_router.chat(h_prompt)
-            hashtags = [h.strip().lstrip("#") for h in h_raw.split(",") if h.strip()][:8]
+            hashtags = re.findall(r'#(\w+)', h_raw)[:8]
+            if not hashtags:
+                hashtags = [h.strip().lstrip("#") for h in h_raw.replace("\n", ",").split(",") if h.strip()][:8]
 
             return {
                 "script": script,
