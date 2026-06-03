@@ -64,6 +64,18 @@ class SkynetConfig:
                 "output_dir": str(Path(__file__).resolve().parents[1] / "output"),
                 "assets_dir": str(Path(__file__).resolve().parents[1] / "assets"),
             },
+            "modal": {
+                "accounts": [],
+                "default_gpu": "A10G",
+                "timeout": 600,
+            },
+            "avatar": {
+                "engine": "happyhorse",  # nava | happyhorse | soulx
+                "use_avatar": False,
+                "use_video_editor": True,
+                "face_image": "",
+                "face_image_dir": str(Path(__file__).resolve().parents[1] / "data" / "faces"),
+            },
             "platforms": {
                 "tiktok": {"upload_url": "https://www.tiktok.com/upload", "login_url": "https://www.tiktok.com/login"},
                 "instagram": {"create_url": "https://www.instagram.com/create", "login_url": "https://www.instagram.com/accounts/login/"},

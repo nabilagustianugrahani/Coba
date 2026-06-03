@@ -70,6 +70,7 @@ gpu:
   modal_token: "${MODAL_TOKEN_ID:-}"
   modal_secret: "${MODAL_TOKEN_SECRET:-}"
   fallback_to_cpu: true
+  avatar_engine: "happyhorse"  # 2026 SOTA: nava | happyhorse | soulx
 
 monitoring:
   metrics_enabled: true
