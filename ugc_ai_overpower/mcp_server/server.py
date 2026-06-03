@@ -34,8 +34,7 @@ def main():
             raise Exception("Invalid or expired token")
         return payload
 
-
-        @mcp.api_route("/login", methods=["POST"])
+    @mcp.api_route("/login", methods=["POST"])
     def login(username: str, password: str):
         user = authenticate_user(username, password)
         if not user:
