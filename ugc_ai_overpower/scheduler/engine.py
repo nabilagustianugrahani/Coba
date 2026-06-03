@@ -80,13 +80,15 @@ class SkynetScheduler:
         def run_campaign():
             logger.info("Executing scheduled campaign: %s", product)
             try:
-                result = self.orchestrator.run_campaign(product)
-                logger.info("Campaign complete: %d content pieces", result.get("total", 0))
+                result = self.orchestrator.auto_campaign(product)
+                logger.info("Campaign complete: %d content pieces, posted to %s", 
+                           result.get("total_content", 0), result.get("posted_to", []))
 
                 webhook_payload = {
                     "product": product,
-                    "total": result.get("total", 0),
-                    "campaign_id": result.get("campaign_id"),
+                    "total": result.get("total_content", 0),
+                    "posted_to": result.get("posted_to", []),
+                    "campaign_id": result.get("campaign", {}).get("campaign_id"),
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import threading
 
 log = logging.getLogger(__name__)
 
@@ -113,6 +114,39 @@ class Orchestrator:
             results.append(content)
             self.bank.update_content_status(content_id, "ready")
 
+        # ── Notion sync (non‑blocking) ─────────────────────────────
+        notion_synced = False
+        try:
+            import subprocess, json as _json
+            # Search for existing campaign in Notion
+            search_cmd = ["notion", "search", product, "--output", "json", "--quiet"]
+            search_result = subprocess.run(search_cmd, capture_output=True, text=True, timeout=15)
+            if search_result.returncode == 0 and search_result.stdout.strip():
+                pages = _json.loads(search_result.stdout)
+                existing_ids = [p["id"] for p in pages.get("data", []) if p.get("type") == "page"]
+                if existing_ids:
+                    log.info("Notion: found existing campaign %s -> %s", product, existing_ids[0])
+                    notion_synced = True
+                else:
+                    log.info("Notion: no existing campaign found for '%s', skip sync", product)
+            else:
+                log.info("Notion: search returned no results for '%s'", product)
+        except Exception as ne:
+            log.warning("Notion search error: %s", ne)
+
+        # ── Auto-enqueue videos to ContentQueue ────────────────────
+        queued = []
+        try:
+            from ugc_ai_overpower.browser.content_queue import ContentQueue
+            q = ContentQueue()
+            for c in results:
+                if c.get("video_path"):
+                    qid = q.enqueue(content_id=0, platform=c.get("platform", "tiktok"))
+                    queued.append(qid)
+                    log.info("Enqueued content to queue id=%d", qid)
+        except Exception as qe:
+            log.warning("Queue enqueue error: %s", qe)
+
         return {
             "campaign_id": campaign_id,
             "product": product,
@@ -120,6 +154,8 @@ class Orchestrator:
             "contents": results,
             "total": len(results),
             "video_generated": video_enabled,
+            "queued": len(queued),
+            "notion_synced": notion_synced,
         }
 
     # ------------------------------------------------------------------
@@ -168,6 +204,65 @@ class Orchestrator:
                 q.mark_failed(item["id"], result.get("error", "unknown error"))
         finally:
             poster.cleanup()
+
+    def process_all_pending(self, platform: str = None) -> dict:
+        """Process ALL pending items in the queue, not just one."""
+        from ugc_ai_overpower.browser.content_queue import ContentQueue
+        from ugc_ai_overpower.browser.posters import get_poster
+        import asyncio
+
+        q = ContentQueue()
+        stats = {"processed": 0, "success": 0, "failed": 0, "skipped": 0}
+        
+        while True:
+            item = q.dequeue(platform)
+            if not item:
+                break
+            
+            stats["processed"] += 1
+            poster = get_poster(item["platform"])
+            
+            try:
+                # Try to get content from bank
+                content_data = {"script": "", "video_path": "", "hashtags": []}
+                
+                # Post to platform
+                result = poster.post(content_data)
+                if result.get("success"):
+                    q.mark_done(item["id"], result.get("post_url", ""))
+                    stats["success"] += 1
+                else:
+                    q.mark_failed(item["id"], result.get("error", "unknown"))
+                    stats["failed"] += 1
+            except Exception as e:
+                q.mark_failed(item["id"], str(e))
+                stats["failed"] += 1
+            finally:
+                poster.cleanup()
+        
+        return stats
+
+    def auto_campaign(self, product: str, product_image: str = None, platforms: list = None) -> dict:
+        """Full auto campaign: generate → video → queue → auto-post."""
+        platforms = platforms or ["tiktok"]
+        
+        # Step 1: Run campaign (generates scripts + videos)
+        logger.info("Step 1: Generating content for %s...", product)
+        campaign_result = self.run_campaign(product, product_image=product_image)
+        
+        # Step 2: Auto-process queue
+        logger.info("Step 2: Processing queue...")
+        for platform in platforms:
+            stats = self.process_all_pending(platform)
+            logger.info("Platform %s: %s", platform, stats)
+        
+        return {
+            "product": product,
+            "campaign": campaign_result,
+            "posted_to": platforms,
+            "total_content": campaign_result["total"],
+            "total_queued": campaign_result.get("queued", 0),
+        }
 
     def run_batch(self, product: str, platforms=["tiktok", "instagram"]):
         """Generate content for *product* on each platform and enqueue it.

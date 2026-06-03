@@ -115,6 +115,9 @@ td{padding:.75rem .5rem;border-bottom:1px solid #1e1e2e;font-size:.875rem}
 <div class="section"><h3>Daily Activity</h3><canvas id="barChart" height="200"></canvas></div>
 <div class="section"><h3>Content Distribution</h3><canvas id="pieChart" height="200"></canvas></div>
 </div>
+<div class="section"><h3>Content Queue <button class="refresh-btn" onclick="loadQueue()">Refresh</button></h3>
+<table><thead><tr><th>ID</th><th>Content</th><th>Platform</th><th>Status</th><th>Scheduled</th><th>Post URL</th></tr></thead>
+<tbody id="queueTable"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody></table></div>
 <div class="footer">Skynet UGC Empire v2.0.0</div></div>
 <script>
 const TOKEN=()=>localStorage.getItem('token');
@@ -123,7 +126,8 @@ function logout(){localStorage.removeItem('token');window.location.href='/login'
 async function loadStats(){const d=await api('/api/v1/analytics/dashboard');if(d){document.getElementById('campaigns').textContent=d.total_campaigns;document.getElementById('contents').textContent=d.total_content;document.getElementById('influencers').textContent=d.influencers;document.getElementById('uptime').textContent=d.uptime_hours+'h'}}
 async function loadCampaigns(){const d=await api('/api/v1/campaigns');const t=document.getElementById('campaignTable');if(d&&d.data){t.innerHTML=d.data.map(c=>'<tr><td>#'+c.id+'</td><td>'+(c.product||'-')+'</td><td><span class="status-badge status-'+c.status+'">'+c.status+'</span></td><td>'+(c.content_count||0)+'</td><td>'+(c.created_at||'-')+'</td></tr>').join('')}else{t.innerHTML='<tr><td colspan="5" class="loading">No data</td></tr>'}}
 async function loadCharts(){const d=await api('/api/v1/analytics/daily');const td=await api('/api/v1/analytics/summary');if(d&&d.data){const labels=Object.keys(d.data);const vals=labels.map(l=>{let s=0;for(let k in d.data[l])s+=d.data[l][k];return s});if(window.barChart){window.barChart.destroy()}window.barChart=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels,datasets:[{label:'Events',data:vals,backgroundColor:'#7b2ff7'}]},options:{responsive:true,plugins:{legend:{labels:{color:'#e0e0e0'}}},scales:{x:{ticks:{color:'#888'}},y:{ticks:{color:'#888'}}}}})}if(td&&td.data){const{total_campaigns,total_contents}=td.data;if(window.pieChart){window.pieChart.destroy()}window.pieChart=new Chart(document.getElementById('pieChart'),{type:'pie',data:{labels:['Content','Campaigns'],datasets:[{data:[total_contents,total_campaigns],backgroundColor:['#00d4ff','#7b2ff7']}]},options:{responsive:true,plugins:{legend:{labels:{color:'#e0e0e0'}}}}})}}
-if(!TOKEN()){window.location.href='/login'}else{loadStats();loadCampaigns();loadCharts();setInterval(function(){loadStats();loadCharts()},10000)}
+if(!TOKEN()){window.location.href='/login'}else{loadStats();loadCampaigns();loadCharts();loadQueue();setInterval(function(){loadStats();loadCharts();loadQueue()},10000)}
+async function loadQueue(){const d=await api('/api/v1/queue/status');const t=document.getElementById('queueTable');if(d&&d.items){t.innerHTML=d.items.map(i=>'<tr><td>#'+i.id+'</td><td>'+i.content_id+'</td><td>'+i.platform+'</td><td><span class="status-badge status-'+i.status+'">'+i.status+'</span></td><td>'+(i.scheduled_at||'-')+'</td><td>'+(i.post_url||'-')+'</td></tr>').join('')}else{t.innerHTML='<tr><td colspan="6" class="loading">No data</td></tr>'}}
 </script></body></html>'''
 
 @app.get("/login")
@@ -224,6 +228,21 @@ async def analytics_top_products(_=Depends(auth_required)):
 @app.get("/api/v1/analytics/summary")
 async def analytics_summary(_=Depends(auth_required)):
     return {"data": state.metrics.get_summary()}
+
+@app.get("/api/v1/queue/status")
+async def queue_status(_=Depends(auth_required)):
+    from ugc_ai_overpower.browser.content_queue import ContentQueue
+    q = ContentQueue()
+    stats = q.get_stats()
+    items = q.list_items(limit=20)
+    return {"stats": stats, "items": items}
+
+@app.post("/api/v1/queue/process")
+async def process_queue(request: Request, _=Depends(auth_required)):
+    body = await request.json()
+    platform = body.get("platform")
+    result = state.orchestrator.process_all_pending(platform)
+    return {"data": result}
 
 def serve():
     host = os.getenv("HOST", "0.0.0.0")

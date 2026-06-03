@@ -31,6 +31,7 @@ def main():
         logger.info("Usage: python main.py <command> [args]")
         logger.info("Commands:")
         logger.info("  campaign <product>     — Running full campaign")
+        logger.info("  auto-campaign <product> [image] [platforms] — Auto: script → video → post")
         logger.info("  analyze <product>      — Analyze product market")
         logger.info("  search <keyword>       — Search affiliate products")
         logger.info("  list-influencers       — Show all influencer personas")
@@ -59,6 +60,18 @@ def main():
         result = orch.run_campaign(product)
         logger.info(json.dumps(result, indent=2, default=str))
         logger.info(f"✅ Campaign created! Content: {result['total']} pieces")
+
+    elif cmd == "auto-campaign":
+        if len(sys.argv) < 3:
+            logger.error("Usage: auto-campaign <product> [image_path] [platforms]")
+            sys.exit(1)
+        product = sys.argv[2]
+        image_path = sys.argv[3] if len(sys.argv) > 3 else None
+        platforms = sys.argv[4].split(",") if len(sys.argv) > 4 else ["tiktok"]
+        logger.info(f"Starting AUTO campaign for: {product}")
+        result = orch.auto_campaign(product, product_image=image_path, platforms=platforms)
+        logger.info(json.dumps(result, indent=2, default=str))
+        logger.info(f"✅ Auto campaign done! Posted to: {result['posted_to']}")
 
     elif cmd == "analyze":
         product = " ".join(sys.argv[2:]) or input("Product: ")
@@ -164,6 +177,27 @@ def main():
 
     elif cmd == "api":
         _cmd_api()
+
+    # ── Notion commands ────────────────────────────────────────────
+    elif cmd == "notion-init":
+        _cmd_notion_init()
+
+    elif cmd == "notion-status":
+        _cmd_notion_status()
+
+    elif cmd == "notion-campaigns":
+        _cmd_notion_campaigns()
+
+    elif cmd == "notion-daily-report":
+        date_str = sys.argv[2] if len(sys.argv) > 2 else None
+        _cmd_notion_daily_report(date_str)
+
+    elif cmd == "notion-sync":
+        product = " ".join(sys.argv[2:])
+        if not product:
+            logger.error("Usage: notion-sync <product>")
+            sys.exit(1)
+        _cmd_notion_sync(orch, product)
 
     else:
         logger.warning(f"Unknown command: {cmd}")
@@ -307,6 +341,80 @@ def _cmd_api() -> None:
     import uvicorn
     from ugc_ai_overpower.api.routes import app
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+
+
+# ======================================================================
+# Notion handlers
+# ======================================================================
+
+def _get_notion():
+    from ugc_ai_overpower.core.notion_sync import NotionDashboard
+    nd = NotionDashboard()
+    if not nd.ready:
+        logger.error("Notion not configured. Set NOTION_TOKEN env var.")
+        return None
+    return nd
+
+
+def _cmd_notion_init():
+    nd = _get_notion()
+    if not nd:
+        return
+    logger.info("Auto-creating Notion databases...")
+    created = nd.auto_create_databases()
+    if created:
+        for name, db_id in created.items():
+            print(f"  ✅ {name}: {db_id}")
+        print("\n  Add these to your .env:\n"
+              f"  NOTION_CAMPAIGN_DB={nd.campaign_db}\n"
+              f"  NOTION_CONTENT_DB={nd.content_db}\n"
+              f"  NOTION_ANALYTICS_DB={nd.analytics_db}")
+    else:
+        print("  ❌ No databases created. Check NOTION_PARENT_PAGE env var.")
+
+
+def _cmd_notion_status():
+    nd = NotionDashboard()
+    print(f"  Token configured : {'✅' if nd.token else '❌'}")
+    print(f"  Campaign DB      : {'✅' if nd.campaign_db else '❌'} {nd.campaign_db or ''}")
+    print(f"  Content DB       : {'✅' if nd.content_db else '❌'} {nd.content_db or ''}")
+    print(f"  Analytics DB     : {'✅' if nd.analytics_db else '❌'} {nd.analytics_db or ''}")
+    print(f"  Parent Page      : {os.getenv('NOTION_PARENT_PAGE', '(not set)')}")
+
+
+def _cmd_notion_campaigns():
+    nd = _get_notion()
+    if not nd:
+        return
+    campaigns = nd.get_all_campaigns()
+    if not campaigns:
+        print("  No campaigns found.")
+        return
+    print(f"  {'Name':25s} {'Status':12s} {'Content':>8} {'Posts':>6} {'Created'}")
+    print(f"  {'-'*25} {'-'*12} {'-'*8} {'-'*6} {'-'*12}")
+    for c in campaigns:
+        print(f"  {c['name'][:25]:25s} {c['status']:12s} {c['content_generated']:>8} {c['posts_published']:>6} {c['created_at'][:10]}")
+
+
+def _cmd_notion_daily_report(date_str: str = None):
+    nd = _get_notion()
+    if not nd:
+        return
+    rid = nd.create_daily_report(date_str)
+    if rid:
+        print(f"  ✅ Daily report created: {rid}")
+    else:
+        print("  ❌ Failed to create daily report")
+
+
+def _cmd_notion_sync(orch, product: str):
+    nd = _get_notion()
+    if not nd:
+        return
+    logger.info(f"Syncing campaign '{product}' to Notion...")
+    result = orch.run_campaign(product)
+    print(f"  ✅ Synced! Campaign ID: {result.get('notion_synced', '?')}")
+    print(f"     Total content: {result['total']} pieces")
 
 
 if __name__ == "__main__":
