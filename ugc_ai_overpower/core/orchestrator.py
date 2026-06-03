@@ -171,76 +171,15 @@ class Orchestrator:
         q = ContentQueue()
         return q.enqueue(content_id, platform, scheduled_at)
 
-    def process_queue(self, platform: str = None) -> None:
-        """Fetch the next pending item (optionally filtered by *platform*)
-        and dispatch it to the appropriate poster implementation.
-        """
-        from ugc_ai_overpower.browser.content_queue import ContentQueue
-        from ugc_ai_overpower.browser.posters import get_poster
-
-        q = ContentQueue()
-        item = q.dequeue(platform)
-        if not item:
-            return  # nothing to do
-        # Load content details from the main content table.
-        content_row = self.bank.get_all()  # placeholder – real method would query by id
-        # For simplicity we re‑use the bank's content fetch – here we just mock.
-        # In a full implementation ``ContentBank`` would expose a ``get_content``.
-        # Assume the content dict contains the fields required by the poster.
-        # We'll build a minimal dict for the demo.
-        poster = get_poster(item["platform"])
-        try:
-            # Load the content record – using bank's content table directly.
-            # This pseudo‑implementation just passes a static dict.
-            content_data = {
-                "script": "Demo script",
-                "video_path": "demo.mp4",
-                "hashtags": [],
-            }
-            result = poster.post(content_data)
-            if result.get("success"):
-                q.mark_done(item["id"], result.get("post_url", ""))
-            else:
-                q.mark_failed(item["id"], result.get("error", "unknown error"))
-        finally:
-            poster.cleanup()
+    def process_queue(self, platform: str = None) -> dict:
+        """Process next pending item via QueueProcessor."""
+        from ugc_ai_overpower.browser.queue_processor import QueueProcessor
+        return QueueProcessor().process_one(platform)
 
     def process_all_pending(self, platform: str = None) -> dict:
-        """Process ALL pending items in the queue, not just one."""
-        from ugc_ai_overpower.browser.content_queue import ContentQueue
-        from ugc_ai_overpower.browser.posters import get_poster
-        import asyncio
-
-        q = ContentQueue()
-        stats = {"processed": 0, "success": 0, "failed": 0, "skipped": 0}
-        
-        while True:
-            item = q.dequeue(platform)
-            if not item:
-                break
-            
-            stats["processed"] += 1
-            poster = get_poster(item["platform"])
-            
-            try:
-                # Try to get content from bank
-                content_data = {"script": "", "video_path": "", "hashtags": []}
-                
-                # Post to platform
-                result = poster.post(content_data)
-                if result.get("success"):
-                    q.mark_done(item["id"], result.get("post_url", ""))
-                    stats["success"] += 1
-                else:
-                    q.mark_failed(item["id"], result.get("error", "unknown"))
-                    stats["failed"] += 1
-            except Exception as e:
-                q.mark_failed(item["id"], str(e))
-                stats["failed"] += 1
-            finally:
-                poster.cleanup()
-        
-        return stats
+        """Process ALL pending items via QueueProcessor."""
+        from ugc_ai_overpower.browser.queue_processor import QueueProcessor
+        return QueueProcessor().process_all(platform)
 
     def auto_campaign(self, product: str, product_image: str = None, platforms: list = None) -> dict:
         """Full auto campaign: generate → video → queue → auto-post."""
