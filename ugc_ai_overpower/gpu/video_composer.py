@@ -81,11 +81,11 @@ class VideoComposer:
         background = self._download_stock_video("lifestyle", int(audio_duration))
         if background:
             bg_clip = VideoFileClip(background).loop(duration=audio_duration)
-            bg_clip = bg_clip.resize((1080, 1920))
+            bg_clip = bg_clip.resize((720, 1280))
             if bg_clip.duration > audio_duration:
                 bg_clip = bg_clip.subclip(0, audio_duration)
         else:
-            bg_clip = ColorClip(size=(1080, 1920), color=(30, 30, 40), duration=audio_duration)
+            bg_clip = ColorClip(size=(720, 1280), color=(30, 30, 40), duration=audio_duration)
 
         bg_clip = bg_clip.set_audio(audio_clip)
         bg_clip = fadein(bg_clip, 0.5).fx(fadeout, 0.5)
@@ -94,31 +94,30 @@ class VideoComposer:
         segments = self._split_into_segments(script)
         times = self._time_per_segment(audio_duration, len(segments))
 
-        y_pos = 800
+        y_pos = 600
         for i, seg in enumerate(segments):
             start_t, end_t = times[i] if i < len(times) else (0, audio_duration)
             txt = TextClip(
-                seg, fontsize=55, color="white",
-                stroke_color="black", stroke_width=3,
-                font="sans-serif-bold", method="caption",
-                size=(900, None), align="center"
+                seg, fontsize=40, color="white",
+                stroke_color="black", stroke_width=2,
+                method="caption", size=(650, None), align="center"
             ).set_position(("center", y_pos)).set_duration(end_t - start_t).set_start(start_t)
             overlay_clips.append(txt)
 
         if product_image and os.path.exists(product_image):
             img = (ImageClip(product_image)
-                   .resize(height=200)
-                   .set_position(("center", 100))
+                   .resize(height=150)
+                   .set_position(("center", 60))
                    .set_duration(audio_duration))
             overlay_clips.append(img)
 
-        final = CompositeVideoClip(overlay_clips, size=(1080, 1920))
+        final = CompositeVideoClip(overlay_clips, size=(720, 1280))
         final = final.subclip(0, min(final.duration, 60))
 
         output = os.path.join(
             self.output_dir,
             f"{influencer}_ugc_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.mp4"
         )
-        final.write_videofile(output, codec="libx264", audio_codec="aac", fps=24, threads=2)
+        final.write_videofile(output, codec="libx264", audio_codec="aac", fps=20, threads=2, preset="ultrafast")
         final.close()
         return output
