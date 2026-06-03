@@ -1,6 +1,7 @@
 """UGC Video Composer — ffmpeg + Pillow + edge-tts (zero moviepy dependency)."""
 import os, random, subprocess, json, asyncio, datetime, logging, shutil, tempfile, uuid, concurrent.futures
 from pathlib import Path
+from typing import Optional
 from PIL import Image, ImageDraw, ImageFont
 
 import edge_tts
@@ -50,10 +51,12 @@ TEMPLATE_OUTROS = [
 
 
 class VideoComposer:
-    def __init__(self, output_dir="output/videos", default_theme="default", watermark_text=""):
+    def __init__(self, output_dir="output/videos", default_theme="default", watermark_text="", use_avatar=False):
         self.output_dir = output_dir
         self.default_theme = THEMES.get(default_theme, THEMES["default"])
         self.watermark_text = watermark_text
+        self.use_avatar = use_avatar
+        self._avatar_engine = None
         os.makedirs(output_dir, exist_ok=True)
         self._cache_dir = os.path.join(output_dir, ".cache")
         os.makedirs(self._cache_dir, exist_ok=True)
@@ -224,48 +227,62 @@ class VideoComposer:
         add_intro=False,
         add_outro=False,
         theme_override=None,
+        face_image=None,
     ) -> str:
         theme = THEMES.get(theme_override, self.default_theme) if theme_override else self.default_theme
         voice = random.choice(VOICES.get(gender, VOICES["male"]))
         bg_queries = BG_QUERIES.get(niche, BG_QUERIES["lifestyle"])
 
-        # Generate voiceover
-        voiceover_path = os.path.join(self.output_dir, f"vo_{influencer}_{random.randint(1000,9999)}.mp3")
-        asyncio.run(self._generate_voiceover(script, voiceover_path, voice))
-        
         # Build full script with intro/outro
         full_text = script
         if add_intro:
             full_text = random.choice(TEMPLATE_INTROS) + " " + full_text
         if add_outro:
             full_text = full_text + " " + random.choice(TEMPLATE_OUTROS)
-        
-        # Generate frame
-        frame_path = os.path.join(self.output_dir, f"frame_{influencer}_{uuid.uuid4().hex[:8]}.png")
-        frame = self._generate_frame(full_text, (720, 1280), theme, product_image, self.watermark_text)
-        frame.save(frame_path)
-        
-        # Render video
+
+        # Generate voiceover
+        voiceover_path = os.path.join(self.output_dir, f"vo_{influencer}_{random.randint(1000,9999)}.mp3")
+        asyncio.run(self._generate_voiceover(full_text, voiceover_path, voice))
+
         output = os.path.join(
             self.output_dir,
             f"ugc_{influencer}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_{random.randint(100,999)}.mp4"
         )
-        
+
+        if self.use_avatar and face_image and os.path.exists(face_image):
+            avatar_path = self._render_avatar(face_image, voiceover_path, influencer)
+            if avatar_path:
+                log.info("UGC video created (avatar): %s", output)
+                return avatar_path
+
+        # Generate frame
+        frame_path = os.path.join(self.output_dir, f"frame_{influencer}_{uuid.uuid4().hex[:8]}.png")
+        frame = self._generate_frame(full_text, (720, 1280), theme, product_image, self.watermark_text)
+        frame.save(frame_path)
+
         self._render_video_from_frame(frame_path, voiceover_path, output)
-        
-        # Cleanup temp files
+
         try:
             os.remove(frame_path)
             os.remove(voiceover_path)
         except OSError:
             pass
-        
+
         log.info("UGC video created: %s", output)
         return output
 
+    def _render_avatar(self, face_image: str, audio_path: str, influencer: str) -> Optional[str]:
+        if self._avatar_engine is None:
+            from ugc_ai_overpower.gpu.avatar_engine import AvatarEngine
+            self._avatar_engine = AvatarEngine(output_dir=self.output_dir)
+        output = os.path.join(
+            self.output_dir,
+            f"avatar_{influencer}_{uuid.uuid4().hex[:8]}.mp4"
+        )
+        return self._avatar_engine.generate_avatar(face_image, audio_path, output)
+
     def create_batch_videos(self, scripts: list, product_image: str = "", niche: str = "lifestyle",
-                            max_workers: int = 4) -> list:
-        """Generate videos for multiple scripts using ThreadPool."""
+                            max_workers: int = 4, face_image: str = None) -> list:
         results = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
             fut_map = {}
@@ -280,6 +297,7 @@ class VideoComposer:
                     add_intro=item.get("add_intro", True),
                     add_outro=item.get("add_outro", True),
                     theme_override=item.get("theme"),
+                    face_image=face_image or item.get("face_image"),
                 )
                 fut_map[fut] = i
             for fut in concurrent.futures.as_completed(fut_map):

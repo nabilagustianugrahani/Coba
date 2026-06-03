@@ -3,6 +3,8 @@ import os, json, time, random, logging, concurrent.futures, re
 from datetime import datetime
 from typing import Optional
 
+from ugc_ai_overpower.core.config import skynet_config
+
 log = logging.getLogger(__name__)
 
 
@@ -222,6 +224,8 @@ class UGCMassProduction:
         auto_post: bool = False,
         theme: str = "default",
         watermark: str = "",
+        use_affiliate: bool = True,
+        affiliate_niche: str = "",
     ) -> dict:
         """Run the complete UGC mass production pipeline.
 
@@ -234,41 +238,37 @@ class UGCMassProduction:
         scripts = self.generate_scripts(ai_router, product, niche, count, platforms)
         log.info("✅ %d scripts generated", len(scripts))
 
+        # Phase 1.5: Auto affiliate
+        affiliate_matched = 0
+        if use_affiliate and scripts:
+            try:
+                from ugc_ai_overpower.core.affiliator import Affiliator
+                aff = Affiliator()
+                aff_niche = affiliate_niche or niche or product
+                matches = aff.run_pipeline(scripts, aff_niche, ai_router)
+                for m in matches:
+                    if m.injected_script:
+                        scripts[m.script_index]["script"] = m.injected_script
+                        scripts[m.script_index]["affiliate_link"] = m.affiliate_link
+                        scripts[m.script_index]["affiliate_product"] = m.product.name
+                        affiliate_matched += 1
+            except Exception as e:
+                log.warning("Affiliate pipeline skipped: %s", e)
+        log.info("💰 %d scripts matched with affiliate products", affiliate_matched)
+
         # Phase 2: Generate videos
         videos = []
         if generate_video and scripts:
             log.info("🎬 Phase 2: Generating %d videos...", len(scripts))
+            use_editor = skynet_config.get("avatar", "use_video_editor", default=True)
+            face_image = skynet_config.get("avatar", "face_image", default="")
+            if face_image and not os.path.exists(face_image):
+                face_image = ""
             try:
-                from ugc_ai_overpower.gpu.video_composer import VideoComposer
-                vc = VideoComposer(output_dir=self.output_dir, watermark_text=watermark)
-                if theme:
-                    vc.set_theme(theme)
-
-                with concurrent.futures.ThreadPoolExecutor(
-                    max_workers=min(self.max_workers["videos"], len(scripts))
-                ) as pool:
-                    fut_map = {}
-                    for i, s in enumerate(scripts):
-                        fut = pool.submit(
-                            vc.create_ugc_video,
-                            script=s["script"],
-                            influencer=s["influencer"],
-                            product_image=product_image or None,
-                            niche=niche,
-                            gender=s.get("gender", "male"),
-                            add_intro=s.get("add_intro", True),
-                            add_outro=s.get("add_outro", True),
-                            theme_override=theme if theme != "default" else None,
-                        )
-                        fut_map[fut] = i
-                    for fut in concurrent.futures.as_completed(fut_map):
-                        idx = fut_map[fut]
-                        try:
-                            path = fut.result()
-                            scripts[idx]["video_path"] = path
-                            videos.append(path)
-                        except Exception as e:
-                            log.warning("Video %d failed: %s", idx, e)
+                if use_editor:
+                    self._render_with_editor(scripts, product_image, face_image, niche, theme, watermark, videos)
+                else:
+                    self._render_with_composer(scripts, product_image, niche, theme, watermark, videos)
             except Exception as e:
                 log.warning("Video generation skipped: %s", e)
 
@@ -297,6 +297,7 @@ class UGCMassProduction:
             "count_target": count,
             "scripts_generated": len(scripts),
             "videos_generated": len(videos),
+            "affiliate_matched": affiliate_matched,
             "queued": posted,
             "elapsed_seconds": elapsed,
             "generated_at": datetime.now().isoformat(),
@@ -306,3 +307,60 @@ class UGCMassProduction:
             json.dump(manifest, f, indent=2)
 
         return manifest
+
+    @staticmethod
+    def _render_with_editor(scripts, product_image, face_image, niche, theme, watermark, videos):
+        from ugc_ai_overpower.gpu.video_editor import UGCVideoEditor
+        editor = UGCVideoEditor(theme=theme, watermark=watermark)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(scripts))) as pool:
+            fut_map = {}
+            for i, s in enumerate(scripts):
+                fut = pool.submit(
+                    editor.render,
+                    script=s["script"],
+                    product_image=product_image or None,
+                    face_image=face_image or None,
+                    gender=s.get("gender", "male"),
+                    niche=niche,
+                )
+                fut_map[fut] = i
+            for fut in concurrent.futures.as_completed(fut_map):
+                idx = fut_map[fut]
+                try:
+                    path = fut.result()
+                    if path:
+                        scripts[idx]["video_path"] = path
+                        videos.append(path)
+                except Exception as e:
+                    log.warning("Editor video %d failed: %s", idx, e)
+
+    @staticmethod
+    def _render_with_composer(scripts, product_image, niche, theme, watermark, videos):
+        from ugc_ai_overpower.gpu.video_composer import VideoComposer
+        vc = VideoComposer(watermark_text=watermark)
+        if theme:
+            vc.set_theme(theme)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(scripts))) as pool:
+            fut_map = {}
+            for i, s in enumerate(scripts):
+                fut = pool.submit(
+                    vc.create_ugc_video,
+                    script=s["script"],
+                    influencer=s["influencer"],
+                    product_image=product_image or None,
+                    niche=niche,
+                    gender=s.get("gender", "male"),
+                    add_intro=s.get("add_intro", True),
+                    add_outro=s.get("add_outro", True),
+                    theme_override=theme if theme != "default" else None,
+                )
+                fut_map[fut] = i
+            for fut in concurrent.futures.as_completed(fut_map):
+                idx = fut_map[fut]
+                try:
+                    path = fut.result()
+                    if path:
+                        scripts[idx]["video_path"] = path
+                        videos.append(path)
+                except Exception as e:
+                    log.warning("Composer video %d failed: %s", idx, e)

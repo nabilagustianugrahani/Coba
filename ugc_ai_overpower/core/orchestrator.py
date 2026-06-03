@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import threading
+from typing import Optional
 
 log = logging.getLogger(__name__)
 
@@ -421,6 +422,78 @@ class Orchestrator:
             return {"success": False, "error": f"Unsupported platform: {platform}"}
         return {"success": result.success, "profile": profile_name, "platform": platform,
                 "output": result.output, "error": result.error}
+
+    def render_video(self, script: str, product_image: str = None, face_image: str = None,
+                      gender: str = "male", niche: str = "lifestyle", theme: str = "default",
+                      watermark: str = "") -> Optional[str]:
+        """Render multi-scene UGC video using UGCVideoEditor.
+
+        Uses the new 5-scene editor by default (hook → problem → solution → testimonial → cta).
+        Falls back to basic VideoComposer if editor fails.
+        """
+        try:
+            from ugc_ai_overpower.gpu.video_editor import UGCVideoEditor
+            editor = UGCVideoEditor(theme=theme, watermark=watermark)
+            return editor.render(script=script, product_image=product_image,
+                                 face_image=face_image, gender=gender, niche=niche)
+        except Exception as e:
+            log.warning("VideoEditor failed, falling back to composer: %s", e)
+            from ugc_ai_overpower.gpu.video_composer import VideoComposer
+            vc = VideoComposer(watermark_text=watermark)
+            return vc.create_ugc_video(script=script, influencer="creator",
+                                       product_image=product_image, niche=niche, gender=gender)
+
+    def affiliate_search(self, query: str, limit: int = 10) -> list:
+        """Search affiliate products from e-commerce platforms."""
+        from ugc_ai_overpower.core.affiliator import Affiliator
+        return Affiliator().search_products(query, limit)
+
+    def affiliate_match(self, scripts: list, niche: str) -> list:
+        """Match scripts to affiliate products and inject links."""
+        from ugc_ai_overpower.core.affiliator import Affiliator
+        return Affiliator().run_pipeline(scripts, niche, self.ai)
+
+    def affiliate_catalog(self, query: str = "", limit: int = 20) -> list:
+        """Search local affiliate product catalog."""
+        from ugc_ai_overpower.core.affiliator import Affiliator
+        return Affiliator().search_catalog(query, limit)
+
+    def generate_avatar(self, face_image: str, script: str = None, audio_path: str = None,
+                         gender: str = "male") -> Optional[str]:
+        """Generate talking-head avatar video.
+
+        Args:
+            face_image: Path to face/portrait image.
+            script: Text script (if no audio_path).
+            audio_path: Pre-generated audio path (if no script).
+            gender: Voice gender for TTS.
+
+        Returns:
+            Path to avatar MP4, or None on failure.
+        """
+        if not audio_path and script:
+            audio_path = self.tts_voiceover(script, gender)
+        if not audio_path or not os.path.exists(audio_path):
+            log.error("No audio available for avatar")
+            return None
+        from ugc_ai_overpower.gpu.avatar_engine import AvatarEngine
+        engine = AvatarEngine()
+        return engine.generate_avatar(face_image, audio_path)
+
+    def modal_deploy(self) -> dict:
+        """Deploy SoulX-FlashHead to Modal GPU cloud."""
+        from ugc_ai_overpower.gpu.modal_pipeline import ModalPipeline
+        return ModalPipeline().deploy()
+
+    def modal_status(self) -> dict:
+        """Check Modal connection and quota."""
+        from ugc_ai_overpower.gpu.modal_pipeline import ModalPipeline
+        mp = ModalPipeline()
+        return {
+            "available": mp.is_available(),
+            "quota": mp.get_quota(),
+            "accounts": mp.list_accounts(),
+        }
 
     def alert(self, message: str, severity: str = "info", source: str = ""):
         """Send alert via configured channels."""

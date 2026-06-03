@@ -61,6 +61,16 @@ def main():
         logger.info("  list-affiliates        — Show affiliate platform configs")
         logger.info("  daily-schedule [product] — Schedule/set daily campaign schedule")
         logger.info("  start-daemon           — Start scheduler daemon with daily campaigns")
+        logger.info('  generate-avatar <face_img> <script> — Generate talking-head avatar')
+        logger.info('  render-video <script>   — Render multi-scene UGC video (5-scene editor)')
+        logger.info('  affiliate-search <q>    — Search affiliate products from Shopee/Tokopedia')
+        logger.info('  affiliate-catalog [q]   — Browse local affiliate product catalog')
+        logger.info("  swarm                  — Start multi-agent swarm")
+        logger.info('  swarm-campaign <product> — Dispatch campaign via swarm')
+        logger.info("  swarm-status           — Show swarm health & campaigns")
+        logger.info("  modal-status           — Check Modal GPU connection & quota")
+        logger.info("  modal-deploy           — Deploy SoulX-FlashHead to Modal")
+        logger.info("  list-modal-accounts    — Show all configured Modal accounts")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -303,6 +313,99 @@ def main():
 
     elif cmd == "api":
         _cmd_api()
+
+    # ── Swarm commands ─────────────────────────────────────────────
+    elif cmd == "swarm":
+        logger.info("🐝 Starting swarm agents...")
+        from ugc_ai_overpower.swarm.main import start_swarm
+        start_swarm(ai_router=ai)
+
+    elif cmd == "swarm-campaign":
+        if len(sys.argv) < 3:
+            logger.error("Usage: swarm-campaign <product> [niche] [count]")
+            sys.exit(1)
+        product = sys.argv[2]
+        niche = sys.argv[3] if len(sys.argv) > 3 else "general"
+        count = int(sys.argv[4]) if len(sys.argv) > 4 else 50
+        logger.info(f"🐝 Dispatching swarm campaign: {product} ({niche}, {count}videos)")
+        from ugc_ai_overpower.swarm.main import run_campaign
+        run_campaign(ai, product, niche, count)
+
+    elif cmd == "swarm-status":
+        from ugc_ai_overpower.swarm.message_bus import MessageBus
+        bus = MessageBus()
+        health = bus.health()
+        print(f"\n  Swarm Bus Health:")
+        print(f"    Pending   : {health['pending']}")
+        print(f"    Processing: {health['processing']}")
+        print(f"    Done      : {health['done']}")
+        print(f"    Failed    : {health['failed']}")
+        print(f"\n  Run 'python main.py swarm' to start agents.")
+
+    # ── Avatar / Modal commands ────────────────────────────────────
+    elif cmd == "generate-avatar":
+        if len(sys.argv) < 4:
+            logger.error("Usage: generate-avatar <face_image> <script>")
+            sys.exit(1)
+        face_image = sys.argv[2]
+        script = " ".join(sys.argv[3:])
+        logger.info(f"Generating avatar for: {os.path.basename(face_image)}")
+        path = orch.generate_avatar(face_image, script=script)
+        if path:
+            print(f"✅ Avatar video: {path}")
+        else:
+            print("❌ Avatar generation failed")
+
+    elif cmd == "render-video":
+        if len(sys.argv) < 3:
+            logger.error("Usage: render-video <script> [product_image] [face_image]")
+            sys.exit(1)
+        script = sys.argv[2]
+        product_image = sys.argv[3] if len(sys.argv) > 3 else None
+        face_image = sys.argv[4] if len(sys.argv) > 4 else None
+        logger.info("Rendering multi-scene UGC video...")
+        path = orch.render_video(script, product_image=product_image, face_image=face_image)
+        if path:
+            print(f"✅ Video: {path}")
+        else:
+            print("❌ Render failed")
+
+    elif cmd == "affiliate-search":
+        query = " ".join(sys.argv[2:]) or input("Search product: ")
+        products = orch.affiliate_search(query, limit=10)
+        print(f"\n  Top affiliate products for '{query}':")
+        print(f"  {'Platform':12s} {'Price':>10s} {'Komisi':>10s} {'Nama'}")
+        print(f"  {'-'*12} {'-'*10} {'-'*10} {'-'*40}")
+        for p in products:
+            print(f"  {p.platform:12s} Rp{p.price:>8,.0f} Rp{p.estimated_commission:>7,.0f} {p.name[:50]}")
+
+    elif cmd == "affiliate-catalog":
+        query = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else ""
+        products = orch.affiliate_catalog(query)
+        if not products:
+            print("  No products in catalog. Run 'affiliate-search' first.")
+        else:
+            print(f"\n  {'ID':>4} {'Platform':12s} {'Price':>10s} {'Komisi':>8s} {'Nama'}")
+            print(f"  {'-'*4} {'-'*12} {'-'*10} {'-'*8} {'-'*50}")
+            for p in products[:15]:
+                print(f"  {p.get('id',0):>4} {p.get('platform',''):12s} Rp{p.get('price',0):>8,.0f} Rp{p.get('commission',0):>6,.0f} {p.get('name','')[:50]}")
+
+    elif cmd == "modal-status":
+        status = orch.modal_status()
+        print(json.dumps(status, indent=2, default=str))
+
+    elif cmd == "modal-deploy":
+        logger.info("Deploying SoulX-FlashHead to Modal...")
+        result = orch.modal_deploy()
+        print(json.dumps(result, indent=2, default=str))
+
+    elif cmd == "list-modal-accounts":
+        from ugc_ai_overpower.gpu.modal_pipeline import ModalPipeline
+        accounts = ModalPipeline().list_accounts()
+        if not accounts:
+            print("  No Modal accounts configured.")
+        for acc in accounts:
+            print(f"  [{acc['index']}] {acc['status']}")
 
     # ── Notion commands ────────────────────────────────────────────
     elif cmd == "notion-init":
