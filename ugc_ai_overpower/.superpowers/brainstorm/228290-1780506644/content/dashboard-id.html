@@ -1,0 +1,87 @@
+<h2>🎯 Notion Dashboard — UGC Empire</h2>
+<p class="subtitle">7 database · tampilan nyambung · full kontrol dari Notion</p>
+
+<div class="section">
+  <h3>Arsitektur Database</h3>
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;padding:0.5rem;font-size:0.8rem">
+    <div style="background:#1a1a2e;padding:0.5rem 0.75rem;border-radius:8px;border:1px solid #333;text-align:center">
+      <div>📋 <strong>Campaigns</strong></div>
+      <div style="color:#888;font-size:0.65rem">Master campaign</div>
+    </div>
+    <div style="color:#666;display:flex;align-items:center">→</div>
+    <div style="background:#1a1a2e;padding:0.5rem 0.75rem;border-radius:8px;border:1px solid #333;text-align:center">
+      <div>📝 <strong>Content</strong></div>
+      <div style="color:#888;font-size:0.65rem">Script & video</div>
+    </div>
+    <div style="color:#666;display:flex;align-items:center">→</div>
+    <div style="background:#1a1a2e;padding:0.5rem 0.75rem;border-radius:8px;border:1px solid #333;text-align:center">
+      <div>📊 <strong>Analytics</strong></div>
+      <div style="color:#888;font-size:0.65rem">Engagement</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;padding:0 0.5rem 0.5rem;font-size:0.8rem">
+    <div style="background:#1a1a2e;padding:0.5rem 0.75rem;border-radius:8px;border:1px solid #333;text-align:center">
+      <div>🎬 <strong>Gallery</strong></div>
+      <div style="color:#888;font-size:0.65rem">Video + SEO</div>
+    </div>
+    <div style="background:#1a1a2e;padding:0.5rem 0.75rem;border-radius:8px;border:1px solid #333;text-align:center">
+      <div>📥 <strong>Inbox</strong></div>
+      <div style="color:#888;font-size:0.65rem">Komentar & DM</div>
+    </div>
+    <div style="background:#1a1a2e;padding:0.5rem 0.75rem;border-radius:8px;border:1px solid #333;text-align:center">
+      <div>🏷️ <strong>Brands</strong></div>
+      <div style="color:#888;font-size:0.65rem">Tone & voice</div>
+    </div>
+    <div style="background:#1a1a2e;padding:0.5rem 0.75rem;border-radius:8px;border:1px solid #333;text-align:center">
+      <div>✅ <strong>Approvals</strong></div>
+      <div style="color:#888;font-size:0.65rem">Review konten</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>👉 3 Pilihan Tampilan Dashboard</h3>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="linked" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>1 Halaman Semua</h3>
+      <p>Semua database di-link dalam 1 halaman Notion. Pake rollup + relation biar angka-angka otomatis terupdate. Paling simpel.</p>
+      <div class="pros-cons" style="margin-top:0.5rem;font-size:0.75rem">
+        <div class="pros"><ul><li>Mudah dibuat</li><li>Semua data visible</li><li>Minimal maintenance</li></ul></div>
+        <div class="cons"><ul><li>Bisa penuh kalo banyak data</li><li>Kurang interaktif</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="multi" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Multi Halaman + Template</h3>
+      <p>Tiap database punya halaman sendiri. Ada template button buat "Buat Campaign Baru", "Sync Data", dll. Drill-down dari Campaign → Content.</p>
+      <div class="pros-cons" style="margin-top:0.5rem;font-size:0.75rem">
+        <div class="pros"><ul><li>Rapi per kategori</li><li>Template button otomatis</li><li>Mudah di-share</li></ul></div>
+        <div class="cons"><ul><li>Setup lebih lama</li><li>Pindah halaman bolak-balik</li></ul></div>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="custom" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Dashboard + Tombol Aksi</h3>
+      <p>Pake formula Notion buat KPI (total views, approval rate, dsb). Ada Notion Button: "Approve Semua", "Sync Sekarang", "Jalanin Campaign". Paling powerfull.</p>
+      <div class="pros-cons" style="margin-top:0.5rem;font-size:0.75rem">
+        <div class="pros"><ul><li>KPI real-time</li><li>Tombol aksi dari Notion</li><li>User experience paling mantap</li></ul></div>
+        <div class="cons"><ul><li>Setup paling kompleks</li><li>Butuh formula Notion</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1rem">Mana yang lo suka? Klik atau bilang aja A/B/C di terminal.</p>
+
+<div class="section">
+  <h3>⚠️ URL Notion Dashboard</h3>
+  <p style="font-size:0.85rem;color:#ccc">Kalo URL di atas ga bisa diakses (0.0.0.0), lo tinggal bilang "ga bisa akses" — gue bakal bikin design doc aja tanpa browser.</p>
+</div>

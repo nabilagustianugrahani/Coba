@@ -91,6 +91,9 @@ webhooks:
     - content.failed
     - error.critical
 
+notion:
+  button_secret: "${NOTION_BUTTON_SECRET:-change-me}"
+
 notifications:
   enabled: false
   telegram_bot_token: "${TELEGRAM_BOT_TOKEN:-}"

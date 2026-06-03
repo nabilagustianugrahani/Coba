@@ -61,6 +61,111 @@ SCHEMAS = {
             "Updated At": {"date": {}},
         },
     },
+    "Gallery": {
+        "title": "Video Title",
+        "properties": {
+            "Title": {"title": {}},
+            "Slug": {"rich_text": {}},
+            "Description": {"rich_text": {}},
+            "Niche": {"select": {"options": [
+                {"name": "skincare", "color": "pink"},
+                {"name": "fashion", "color": "purple"},
+                {"name": "food", "color": "orange"},
+                {"name": "tech", "color": "blue"},
+                {"name": "general", "color": "gray"},
+            ]}},
+            "Platform": {"select": {"options": [
+                {"name": "tiktok", "color": "purple"},
+                {"name": "instagram", "color": "pink"},
+                {"name": "youtube", "color": "red"},
+            ]}},
+            "Product": {"rich_text": {}},
+            "Tags": {"multi_select": {}},
+            "Views": {"number": {}},
+            "Likes": {"number": {}},
+            "SEO Page": {"url": {}},
+            "Created At": {"date": {}},
+        },
+    },
+    "Inbox": {
+        "title": "Message",
+        "properties": {
+            "Content": {"title": {}},
+            "Platform": {"select": {"options": [
+                {"name": "tiktok"}, {"name": "instagram"}, {"name": "youtube"},
+                {"name": "telegram"}, {"name": "whatsapp"}, {"name": "discord"},
+            ]}},
+            "Sender": {"rich_text": {}},
+            "Account": {"rich_text": {}},
+            "Type": {"select": {"options": [
+                {"name": "comment"}, {"name": "dm"}, {"name": "mention"}, {"name": "reply"},
+            ]}},
+            "Sentiment": {"select": {"options": [
+                {"name": "positive", "color": "green"},
+                {"name": "negative", "color": "red"},
+                {"name": "neutral", "color": "gray"},
+                {"name": "urgent", "color": "red"},
+            ]}},
+            "AI Reply": {"rich_text": {}},
+            "Replied": {"checkbox": {}},
+            "Is Read": {"checkbox": {}},
+            "Created At": {"date": {}},
+        },
+    },
+    "Brands": {
+        "title": "Brand Name",
+        "properties": {
+            "Name": {"title": {}},
+            "Tone": {"select": {"options": [
+                {"name": "professional", "color": "blue"},
+                {"name": "casual", "color": "green"},
+                {"name": "humorous", "color": "yellow"},
+                {"name": "aspirational", "color": "purple"},
+                {"name": "urgent", "color": "red"},
+                {"name": "luxury", "color": "orange"},
+                {"name": "educational", "color": "gray"},
+            ]}},
+            "Voice": {"select": {"options": [
+                {"name": "formal"}, {"name": "friendly"}, {"name": "authoritative"},
+                {"name": "playful"}, {"name": "empathetic"}, {"name": "bold"},
+            ]}},
+            "Language": {"select": {"options": [
+                {"name": "en"}, {"name": "id"}, {"name": "mix"},
+            ]}},
+            "Target Audience": {"rich_text": {}},
+            "Emoji Style": {"select": {"options": [
+                {"name": "none"}, {"name": "minimal"}, {"name": "moderate"}, {"name": "heavy"},
+            ]}},
+            "Default CTA": {"rich_text": {}},
+            "Active": {"checkbox": {}},
+            "Created At": {"date": {}},
+        },
+    },
+    "Approvals": {
+        "title": "Content Preview",
+        "properties": {
+            "Preview": {"title": {}},
+            "Type": {"select": {"options": [
+                {"name": "script"}, {"name": "caption"}, {"name": "video"},
+                {"name": "image"}, {"name": "hashtag_set"},
+            ]}},
+            "Platform": {"select": {"options": [
+                {"name": "tiktok"}, {"name": "instagram"}, {"name": "youtube"},
+            ]}},
+            "Product": {"rich_text": {}},
+            "Status": {"select": {"options": [
+                {"name": "pending_review", "color": "yellow"},
+                {"name": "approved", "color": "green"},
+                {"name": "rejected", "color": "red"},
+                {"name": "auto_approved", "color": "blue"},
+            ]}},
+            "Reviewer": {"rich_text": {}},
+            "Review Note": {"rich_text": {}},
+            "Urgent": {"checkbox": {}},
+            "Created At": {"date": {}},
+            "Reviewed At": {"date": {}},
+        },
+    },
     "Analytics": {
         "title": "Post URL",
         "properties": {
@@ -95,6 +200,10 @@ class NotionDashboard:
         self.campaign_db = campaign_db or os.getenv("NOTION_CAMPAIGN_DB", "")
         self.content_db = content_db or os.getenv("NOTION_CONTENT_DB", "")
         self.analytics_db = analytics_db or os.getenv("NOTION_ANALYTICS_DB", "")
+        self.gallery_db = os.getenv("NOTION_GALLERY_DB", "")
+        self.inbox_db = os.getenv("NOTION_INBOX_DB", "")
+        self.brands_db = os.getenv("NOTION_BRANDS_DB", "")
+        self.approvals_db = os.getenv("NOTION_APPROVALS_DB", "")
         self._session = requests.Session()
         self._session.headers.update({
             "Authorization": f"Bearer {self.token}",
@@ -172,8 +281,19 @@ class NotionDashboard:
             print("[Notion] Set NOTION_PARENT_PAGE to a page ID that the integration can write to.")
             parent = None
 
+        _SCHEMA_ATTR_MAP = {
+            "Campaigns": "campaign_db",
+            "Content": "content_db",
+            "Analytics": "analytics_db",
+            "Gallery": "gallery_db",
+            "Inbox": "inbox_db",
+            "Brands": "brands_db",
+            "Approvals": "approvals_db",
+        }
+
         for name, schema in SCHEMAS.items():
-            db_id = getattr(self, f"{name.lower()}_db", "")
+            attr = _SCHEMA_ATTR_MAP.get(name, f"{name.lower()}_db")
+            db_id = getattr(self, attr, "")
             if db_id:
                 print(f"[Notion] {name} DB already configured: {db_id}")
                 created[name] = db_id
@@ -193,10 +313,11 @@ class NotionDashboard:
             db_id = result.get("id", "")
 
             if db_id:
-                setattr(self, f"{name.lower()}_db", db_id)
+                setattr(self, attr, db_id)
                 created[name] = db_id
                 # Also set env var so future runs find it
-                os.environ[f"NOTION_{name.upper()}_DB"] = db_id
+                env_key = attr.upper()
+                os.environ[f"NOTION_{env_key}"] = db_id
                 print(f"[Notion] Created {name} database: {db_id}")
             else:
                 print(f"[Notion] Failed to create {name} database: {result.get('message', 'unknown')}")
@@ -480,6 +601,164 @@ class NotionDashboard:
     def _extract_rich(props: dict, key: str) -> str:
         items = props.get(key, {}).get("rich_text", [])
         return "".join(t.get("plain_text", "") for t in items) if items else ""
+
+    # ── Gallery ────────────────────────────────────────────────────────
+    def sync_gallery(self, videos: list) -> list:
+        if not self.gallery_db:
+            print("[Notion] Gallery DB not configured")
+            return []
+        synced = []
+        for v in videos:
+            tags = []
+            raw_tags = v.get("tags", "")
+            if raw_tags:
+                tags = [{"name": t.strip()} for t in raw_tags.split(",") if t.strip()]
+            payload = {
+                "parent": {"database_id": self.gallery_db},
+                "properties": {
+                    "Title": {"title": self._format_title(v.get("title", "Untitled"))},
+                    "Slug": {"rich_text": self._format_rich(v.get("slug", ""))},
+                    "Description": {"rich_text": self._format_rich(v.get("description", "")[:200])},
+                    "Niche": {"select": {"name": v.get("niche", "general")}},
+                    "Platform": {"select": {"name": v.get("platform", "tiktok")}},
+                    "Product": {"rich_text": self._format_rich(v.get("product", ""))},
+                    "Tags": {"multi_select": tags} if tags else {"multi_select": []},
+                    "Views": {"number": v.get("views", 0)},
+                    "Likes": {"number": v.get("likes", 0)},
+                    "SEO Page": {"url": f"https://ugc-empire.ai/gallery/{v.get('slug','')}"},
+                    "Created At": {"date": self._date_obj(v.get("created_at", self._iso_now()))},
+                },
+            }
+            result = self._request("POST", "pages", payload)
+            pid = result.get("id")
+            if pid:
+                synced.append(pid)
+        print(f"[Notion] Synced {len(synced)} videos to Gallery")
+        return synced
+
+    # ── Inbox ──────────────────────────────────────────────────────────
+    def sync_inbox(self, messages: list) -> list:
+        if not self.inbox_db:
+            print("[Notion] Inbox DB not configured")
+            return []
+        synced = []
+        for m in messages:
+            if m.get("reply_sent"):
+                continue
+            payload = {
+                "parent": {"database_id": self.inbox_db},
+                "properties": {
+                    "Content": {"title": self._format_title(m.get("content", "")[:100])},
+                    "Platform": {"select": {"name": m.get("platform", "tiktok")}},
+                    "Sender": {"rich_text": self._format_rich(m.get("sender_username", ""))},
+                    "Account": {"rich_text": self._format_rich(m.get("account_id", ""))},
+                    "Type": {"select": {"name": m.get("message_type", "comment")}},
+                    "Sentiment": {"select": {"name": m.get("sentiment", "neutral")}},
+                    "AI Reply": {"rich_text": self._format_rich(m.get("ai_suggested_reply", "")[:200])},
+                    "Replied": {"checkbox": bool(m.get("reply_sent", False))},
+                    "Is Read": {"checkbox": bool(m.get("is_read", False))},
+                    "Created At": {"date": self._date_obj(m.get("created_at", self._iso_now()))},
+                },
+            }
+            result = self._request("POST", "pages", payload)
+            pid = result.get("id")
+            if pid:
+                synced.append(pid)
+        print(f"[Notion] Synced {len(synced)} inbox messages")
+        return synced
+
+    # ── Brands ─────────────────────────────────────────────────────────
+    def sync_brands(self, brands: list) -> list:
+        if not self.brands_db:
+            print("[Notion] Brands DB not configured")
+            return []
+        synced = []
+        for b in brands:
+            payload = {
+                "parent": {"database_id": self.brands_db},
+                "properties": {
+                    "Name": {"title": self._format_title(b.get("name", ""))},
+                    "Tone": {"select": {"name": b.get("tone", "casual")}},
+                    "Voice": {"select": {"name": b.get("voice", "friendly")}},
+                    "Language": {"select": {"name": b.get("language", "en")}},
+                    "Target Audience": {"rich_text": self._format_rich(b.get("target_audience", ""))},
+                    "Emoji Style": {"select": {"name": b.get("emoji_style", "moderate")}},
+                    "Default CTA": {"rich_text": self._format_rich(b.get("default_cta", ""))},
+                    "Active": {"checkbox": bool(b.get("is_active", False))},
+                    "Created At": {"date": self._date_obj(b.get("created_at", self._iso_now()))},
+                },
+            }
+            result = self._request("POST", "pages", payload)
+            pid = result.get("id")
+            if pid:
+                synced.append(pid)
+        print(f"[Notion] Synced {len(synced)} brand profiles")
+        return synced
+
+    # ── Approvals ──────────────────────────────────────────────────────
+    def sync_approvals(self, approvals: list) -> list:
+        if not self.approvals_db:
+            print("[Notion] Approvals DB not configured")
+            return []
+        synced = []
+        for a in approvals:
+            payload = {
+                "parent": {"database_id": self.approvals_db},
+                "properties": {
+                    "Preview": {"title": self._format_title(a.get("content_data", "")[:100])},
+                    "Type": {"select": {"name": a.get("content_type", "script")}},
+                    "Platform": {"select": {"name": a.get("platform", "tiktok")}},
+                    "Product": {"rich_text": self._format_rich(a.get("product", ""))},
+                    "Status": {"select": {"name": a.get("status", "pending_review")}},
+                    "Reviewer": {"rich_text": self._format_rich(a.get("reviewer", ""))},
+                    "Review Note": {"rich_text": self._format_rich((a.get("review_note") or "")[:200])},
+                    "Urgent": {"checkbox": bool(a.get("is_urgent", False))},
+                    "Created At": {"date": self._date_obj(a.get("created_at", self._iso_now()))},
+                    "Reviewed At": {"date": self._date_obj(a.get("reviewed_at")) if a.get("reviewed_at") else None},
+                },
+            }
+            result = self._request("POST", "pages", payload)
+            pid = result.get("id")
+            if pid:
+                synced.append(pid)
+        print(f"[Notion] Synced {len(synced)} approval items")
+        return synced
+
+    # ── Full Dashboard Sync ────────────────────────────────────────────
+    def sync_all(self, gallery=None, inbox=None, brand_profile=None, approval_workflow=None) -> dict:
+        """Sync all local data to Notion databases in one call."""
+        results = {}
+        if gallery:
+            try:
+                videos = gallery.list_videos(limit=50)
+                if videos:
+                    results["gallery"] = self.sync_gallery(videos)
+            except Exception as e:
+                print(f"[Notion] Gallery sync error: {e}")
+        if inbox:
+            try:
+                msgs = inbox.list_messages(limit=50)
+                if msgs:
+                    results["inbox"] = self.sync_inbox(msgs)
+            except Exception as e:
+                print(f"[Notion] Inbox sync error: {e}")
+        if brand_profile:
+            try:
+                brands = brand_profile.list_all()
+                if brands:
+                    results["brands"] = self.sync_brands(brands)
+            except Exception as e:
+                print(f"[Notion] Brands sync error: {e}")
+        if approval_workflow:
+            try:
+                pending = approval_workflow.list_pending(limit=50)
+                history = approval_workflow.list_history(limit=50)
+                all_items = pending + [{"content_data": h.get("note",""), "content_type": "review", "status": h.get("action",""), "reviewer": h.get("reviewer",""), "review_note": h.get("note",""), "created_at": h.get("created_at","")} for h in history]
+                if all_items:
+                    results["approvals"] = self.sync_approvals(all_items)
+            except Exception as e:
+                print(f"[Notion] Approvals sync error: {e}")
+        return results
 
     # ── Orchestrator Sync ──────────────────────────────────────────────
     def sync_orchestrator_result(self, result: dict, product: str) -> dict:

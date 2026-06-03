@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 import sys
 import json
@@ -65,9 +66,14 @@ def main():
         logger.info('  render-video <script>   — Render multi-scene UGC video (5-scene editor)')
         logger.info('  affiliate-search <q>    — Search affiliate products from Shopee/Tokopedia')
         logger.info('  affiliate-catalog [q]   — Browse local affiliate product catalog')
+        logger.info("  notion-dbs              — Create all Notion databases (7 databases)")
+        logger.info("  notion-sync-all          — Sync ALL data to Notion (gallery, inbox, brands, approvals)")
         logger.info("  swarm                  — Start multi-agent swarm")
         logger.info('  swarm-campaign <product> — Dispatch campaign via swarm')
         logger.info("  swarm-status           — Show swarm health & campaigns")
+        logger.info("  pipeline <product>     — DAG pipeline: 6 hunters → critic → 3 narrators → judge")
+        logger.info("  telegram               — Start Telegram Commander (control from phone)")
+        logger.info("  trends [niche]         — AI-powered trend analysis for niche")
         logger.info("  modal-status           — Check Modal GPU connection & quota")
         logger.info("  modal-deploy           — Deploy SoulX-FlashHead to Modal")
         logger.info("  list-modal-accounts    — Show all configured Modal accounts")
@@ -106,6 +112,56 @@ def main():
         )
         logger.info(json.dumps(result, indent=2, default=str))
         logger.info(f"✅ Overkill done: {result['generated']} generated, {result.get('posted', 0)} posted in {result.get('elapsed_seconds', 0)}s")
+
+    elif cmd == "pipeline":
+        product = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else input("Product: ")
+        niche = input("Niche [general]: ") or "general"
+        logger.info(f"🚀 Running DAG pipeline for {product} ({niche})...")
+        from ugc_ai_overpower.core.pipeline_engine import UGCPipelineFactory
+        factory = UGCPipelineFactory(ai_router=ai)
+        result = factory.run_campaign(product, niche)
+        winner = result.get("context", {}).get("judge", {}).get("winner_script", {})
+        print(json.dumps(result, indent=2, default=str))
+        if winner:
+            print(f"\n🎯 Winning hook: {winner.get('hook', 'N/A')}")
+        print(f"✅ Pipeline done in {result.get('duration_seconds', 0)}s")
+
+    elif cmd == "telegram":
+        logger.info("Starting Telegram Commander...")
+        from ugc_ai_overpower.browser.telegram_commander import TelegramCommander
+        from ugc_ai_overpower.core.gallery import Gallery
+        from ugc_ai_overpower.browser.social_inbox import SocialInbox
+        from ugc_ai_overpower.core.brand_profile import BrandProfile
+        from ugc_ai_overpower.core.approval_workflow import ApprovalWorkflow
+        from ugc_ai_overpower.core.pipeline_engine import UGCPipelineFactory
+        tc = TelegramCommander(
+            gallery=Gallery(),
+            inbox=SocialInbox(ai_router=ai),
+            brand_profile=BrandProfile(),
+            approval_workflow=ApprovalWorkflow(),
+            pipeline_factory=UGCPipelineFactory(ai_router=ai),
+        )
+        tc.start()
+        logger.info("Telegram Commander running. Press Ctrl+C to stop.")
+        try:
+            import time
+            while True:
+                time.sleep(10)
+        except KeyboardInterrupt:
+            tc.stop()
+
+    elif cmd == "trends":
+        niche = sys.argv[2] if len(sys.argv) > 2 else "general"
+        logger.info(f"Scanning trends for '{niche}'...")
+        from ugc_ai_overpower.browser.trend_scout import TrendScout
+        ts = TrendScout(ai_router=ai)
+        hooks = ts.analyze_with_ai(niche=niche)
+        print(f"\n  📈 Trending Hooks for '{niche}':")
+        for i, h in enumerate(hooks, 1):
+            print(f"  {i}. {h['hook'][:60]}")
+            print(f"     Format: {h['format']} | Score: {h['score']}/10")
+            print(f"     Why: {h.get('reasoning','')[:80]}")
+            print()
 
     elif cmd == "mass-produce":
         product = sys.argv[2] if len(sys.argv) > 2 else input("Product: ")
@@ -428,6 +484,12 @@ def main():
             sys.exit(1)
         _cmd_notion_sync(orch, product)
 
+    elif cmd == "notion-sync-all":
+        _cmd_notion_sync_all()
+
+    elif cmd == "notion-dbs":
+        _cmd_notion_create_all_dbs()
+
     else:
         logger.warning(f"Unknown command: {cmd}")
 
@@ -568,8 +630,8 @@ def _cmd_cookie_list() -> None:
 def _cmd_api() -> None:
     logger.info("Starting FastAPI server...")
     import uvicorn
-    from ugc_ai_overpower.api.routes import app
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    from ugc_ai_overpower.web.dashboard import app
+    uvicorn.run(app, host="0.0.0.0", port=8111, log_level="info")
 
 
 # ======================================================================
@@ -608,6 +670,10 @@ def _cmd_notion_status():
     print(f"  Campaign DB      : {'✅' if nd.campaign_db else '❌'} {nd.campaign_db or ''}")
     print(f"  Content DB       : {'✅' if nd.content_db else '❌'} {nd.content_db or ''}")
     print(f"  Analytics DB     : {'✅' if nd.analytics_db else '❌'} {nd.analytics_db or ''}")
+    print(f"  Gallery DB       : {'✅' if nd.gallery_db else '❌'} {nd.gallery_db or ''}")
+    print(f"  Inbox DB         : {'✅' if nd.inbox_db else '❌'} {nd.inbox_db or ''}")
+    print(f"  Brands DB        : {'✅' if nd.brands_db else '❌'} {nd.brands_db or ''}")
+    print(f"  Approvals DB     : {'✅' if nd.approvals_db else '❌'} {nd.approvals_db or ''}")
     print(f"  Parent Page      : {os.getenv('NOTION_PARENT_PAGE', '(not set)')}")
 
 
@@ -644,6 +710,48 @@ def _cmd_notion_sync(orch, product: str):
     result = orch.run_campaign(product)
     print(f"  ✅ Synced! Campaign ID: {result.get('notion_synced', '?')}")
     print(f"     Total content: {result['total']} pieces")
+
+
+def _cmd_notion_sync_all():
+    nd = _get_notion()
+    if not nd:
+        return
+    from ugc_ai_overpower.core.gallery import Gallery
+    from ugc_ai_overpower.browser.social_inbox import SocialInbox
+    from ugc_ai_overpower.core.brand_profile import BrandProfile
+    from ugc_ai_overpower.core.approval_workflow import ApprovalWorkflow
+    from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
+    ai = AIRouter(
+        base_url=os.getenv("ROUTER_URL", "http://localhost:20128"),
+        api_key=os.getenv("ROUTER_KEY", ""),
+    )
+    logger.info("Syncing ALL data to Notion...")
+    results = nd.sync_all(
+        gallery=Gallery(),
+        inbox=SocialInbox(ai_router=ai),
+        brand_profile=BrandProfile(),
+        approval_workflow=ApprovalWorkflow(),
+    )
+    for key, items in results.items():
+        print(f"  ✅ {key}: {len(items)} items synced")
+    print("  ✅ All synced!")
+
+
+def _cmd_notion_create_all_dbs():
+    nd = _get_notion()
+    if not nd:
+        return
+    logger.info("Creating all Notion databases...")
+    created = nd.auto_create_databases()
+    if created:
+        for name, db_id in created.items():
+            print(f"  ✅ {name}: {db_id}")
+        print("\n  Add these to your .env:")
+        for name, db_id in created.items():
+            env_key = f"NOTION_{name.upper()}_DB"
+            print(f"  {env_key}={db_id}")
+    else:
+        print("  ❌ No databases created. Check NOTION_PARENT_PAGE env var.")
 
 
 if __name__ == "__main__":

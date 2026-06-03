@@ -28,8 +28,50 @@ except ImportError:
 
 from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
 from ugc_ai_overpower.core.config import skynet_config
+from ugc_ai_overpower.core.pipeline_engine import UGCPipelineFactory
+from ugc_ai_overpower.core.gallery import Gallery
+from ugc_ai_overpower.browser.social_inbox import SocialInbox
+from ugc_ai_overpower.core.brand_profile import BrandProfile
+from ugc_ai_overpower.core.approval_workflow import ApprovalWorkflow
+from ugc_ai_overpower.browser.trend_scout import TrendScout
 
 SWARM_SERVER_NAME = "Skynet-Swarm"
+
+_gallery_store = None
+_inbox_store = None
+_brand_store = None
+_approval_store = None
+_trend_store = None
+
+def _get_gallery():
+    global _gallery_store
+    if _gallery_store is None:
+        _gallery_store = Gallery()
+    return _gallery_store
+
+def _get_inbox(ai_router=None):
+    global _inbox_store
+    if _inbox_store is None:
+        _inbox_store = SocialInbox(ai_router=ai_router)
+    return _inbox_store
+
+def _get_brand():
+    global _brand_store
+    if _brand_store is None:
+        _brand_store = BrandProfile()
+    return _brand_store
+
+def _get_approval():
+    global _approval_store
+    if _approval_store is None:
+        _approval_store = ApprovalWorkflow()
+    return _approval_store
+
+def _get_trend(ai_router=None):
+    global _trend_store
+    if _trend_store is None:
+        _trend_store = TrendScout(ai_router=ai_router)
+    return _trend_store
 
 
 class SwarmMCPServer:
@@ -271,6 +313,141 @@ class SwarmMCPServer:
                 },
                 "zombie_script": zombie,
             }, indent=2, default=str)
+
+        # ═══════════════════════════════════════════════════════════
+        # DAG Pipeline
+        # ═══════════════════════════════════════════════════════════
+
+        @mcp.tool(description="Run DAG pipeline campaign with parallel reasoners")
+        def dag_campaign(product: str, niche: str = "general") -> str:
+            """6 parallel hunters → critic → 3 narrators → judge. Returns best script."""
+            factory = UGCPipelineFactory(ai_router=ai)
+            result = factory.run_campaign(product, niche)
+            winner = result.get("context", {}).get("judge", {}).get("winner_script", {})
+            return json.dumps({
+                "product": product,
+                "niche": niche,
+                "duration_sec": result.get("duration_seconds"),
+                "nodes_completed": result.get("completed"),
+                "nodes_failed": result.get("failed"),
+                "winner_script": winner,
+            }, indent=2, default=str)
+
+        # ═══════════════════════════════════════════════════════════
+        # Gallery
+        # ═══════════════════════════════════════════════════════════
+
+        @mcp.tool(description="Add video to UGC gallery with SEO landing page")
+        def gallery_add(title: str, video_path: str, niche: str = "general",
+                        platform: str = "tiktok", tags: str = "",
+                        description: str = "") -> str:
+            g = _get_gallery()
+            vid = g.add_video(title=title, video_path=video_path, niche=niche,
+                              platform=platform, tags=tags, description=description)
+            v = g.get_video(vid)
+            return json.dumps({"id": vid, "slug": v["slug"] if v else "", "status": "created"})
+
+        @mcp.tool(description="List UGC gallery videos with stats")
+        def gallery_list(niche: str = "", limit: int = 20) -> str:
+            g = _get_gallery()
+            videos = g.list_videos(niche=niche, limit=limit)
+            stats = g.get_stats()
+            return json.dumps({"videos": videos, "stats": stats}, indent=2, default=str)
+
+        # ═══════════════════════════════════════════════════════════
+        # Social Inbox
+        # ═══════════════════════════════════════════════════════════
+
+        @mcp.tool(description="List latest unread inbox messages")
+        def inbox_list(platform: str = "", limit: int = 10) -> str:
+            ib = _get_inbox(ai_router=ai)
+            msgs = ib.list_messages(platform=platform, status="unread", limit=limit)
+            stats = ib.get_stats()
+            return json.dumps({"messages": msgs, "stats": stats}, indent=2, default=str)
+
+        @mcp.tool(description="Reply to an inbox message")
+        def inbox_reply(message_id: int, reply_text: str) -> str:
+            ib = _get_inbox()
+            ok = ib.send_reply(message_id, reply_text)
+            ib.mark_read(message_id)
+            return json.dumps({"status": "ok" if ok else "error", "message_id": message_id})
+
+        @mcp.tool(description="Run auto-reply on all unreplied messages")
+        def inbox_auto_reply(limit: int = 20) -> str:
+            ib = _get_inbox()
+            result = ib.bulk_auto_reply(limit=limit)
+            return json.dumps(result)
+
+        # ═══════════════════════════════════════════════════════════
+        # Brand Profiles
+        # ═══════════════════════════════════════════════════════════
+
+        @mcp.tool(description="List all brand profiles")
+        def brand_list() -> str:
+            bp = _get_brand()
+            brands = bp.list_all()
+            return json.dumps({"brands": brands}, indent=2, default=str)
+
+        @mcp.tool(description="Create a new brand profile")
+        def brand_create(name: str, tone: str = "casual", voice: str = "friendly",
+                         language: str = "en") -> str:
+            bp = _get_brand()
+            bid = bp.create({"name": name, "tone": tone, "voice": voice, "language": language})
+            return json.dumps({"id": bid, "status": "created"})
+
+        @mcp.tool(description="Activate a brand profile by ID")
+        def brand_activate(brand_id: int) -> str:
+            bp = _get_brand()
+            ok = bp.set_active(brand_id)
+            return json.dumps({"status": "ok" if ok else "error"})
+
+        # ═══════════════════════════════════════════════════════════
+        # Approval Workflow
+        # ═══════════════════════════════════════════════════════════
+
+        @mcp.tool(description="List pending content approvals")
+        def approval_list(limit: int = 20) -> str:
+            aw = _get_approval()
+            items = aw.list_pending(limit=limit)
+            stats = aw.get_stats()
+            return json.dumps({"items": items, "stats": stats}, indent=2, default=str)
+
+        @mcp.tool(description="Approve pending content")
+        def approval_approve(approval_id: int, note: str = "") -> str:
+            aw = _get_approval()
+            ok = aw.approve(approval_id, reviewer="mcp", note=note)
+            return json.dumps({"status": "ok" if ok else "error"})
+
+        @mcp.tool(description="Reject pending content")
+        def approval_reject(approval_id: int, note: str = "") -> str:
+            aw = _get_approval()
+            ok = aw.reject(approval_id, reviewer="mcp", note=note)
+            return json.dumps({"status": "ok" if ok else "error"})
+
+        # ═══════════════════════════════════════════════════════════
+        # Trend Scout
+        # ═══════════════════════════════════════════════════════════
+
+        @mcp.tool(description="Get trending hooks for a niche with AI analysis")
+        def trend_hooks(niche: str = "general", platform: str = "tiktok", limit: int = 10) -> str:
+            ts = _get_trend(ai_router=ai)
+            hooks = ts.get_trending(niche=niche, platform=platform, limit=limit)
+            if not hooks:
+                hooks = ts.analyze_with_ai(niche=niche, platform=platform)
+            stats = ts.get_stats()
+            return json.dumps({"hooks": hooks, "stats": stats}, indent=2, default=str)
+
+        @mcp.tool(description="Get winning content patterns by niche")
+        def trend_patterns(niche: str = "", pattern_type: str = "") -> str:
+            ts = _get_trend()
+            patterns = ts.get_winning_patterns(niche=niche, pattern_type=pattern_type)
+            return json.dumps({"patterns": patterns}, indent=2, default=str)
+
+        @mcp.tool(description="Analyze trends with AI for a niche")
+        def trend_analyze(niche: str = "general", platform: str = "tiktok") -> str:
+            ts = _get_trend(ai_router=ai)
+            hooks = ts.analyze_with_ai(niche=niche, platform=platform)
+            return json.dumps({"niche": niche, "platform": platform, "hooks": hooks}, indent=2, default=str)
 
     def run(self, transport: str = "stdio"):
         """Start the MCP server.

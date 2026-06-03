@@ -207,8 +207,14 @@ td{padding:.75rem .5rem;border-bottom:1px solid #1e1e2e;font-size:.875rem}
 <div class="navbar"><div class="logo">Skynet</div>
 <div class="nav-links">
 <a href="/">Dashboard</a>
-<a href="/queue" class="active">Queue</a>
+<a href="/queue">Queue</a>
 <a href="/campaigns">Campaigns</a>
+<a href="/contents">Content</a>
+<a href="/analytics">Analytics</a>
+<a href="/gallery-page">Gallery</a>
+<a href="/inbox">Inbox</a>
+<a href="/brands">Brands</a>
+<a href="/approvals">Approvals</a>
 <a href="#" onclick="logout()" style="color:#ff6b6b">Logout</a>
 </div></div>
 <div class="container">
@@ -415,6 +421,528 @@ async def retry_all_failed(_=Depends(auth_required)):
 @app.get("/queue", response_class=HTMLResponse)
 async def queue_page(request: Request):
     return HTMLResponse(HTML_QUEUE)
+
+# ═══════════════════════════════════════════════════════════════
+# UGC Gallery — SEO pages + Gallery API
+# ═══════════════════════════════════════════════════════════════
+
+HTML_GALLERY = '''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UGC Gallery — Skynet</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh}
+.navbar{background:#12121a;border-bottom:1px solid #1e1e2e;padding:1rem 2rem;display:flex;align-items:center;gap:1rem}
+.logo{font-size:1.25rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{margin-left:auto;display:flex;gap:1rem}
+.nav-links a{color:#888;text-decoration:none;padding:.5rem 1rem;border-radius:8px;transition:all .2s;font-size:.875rem}
+.nav-links a:hover,.nav-links a.active{background:#1e1e2e;color:#fff}
+.container{max-width:1200px;margin:0 auto;padding:2rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem}
+.stat-card{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:1.5rem}
+.stat-value{font-size:2rem;font-weight:700;color:#fff}
+.stat-label{font-size:.875rem;color:#888;margin-top:.25rem}
+.section{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:1.5rem;margin-bottom:1rem}
+.section h3{color:#fff;margin-bottom:1rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+.card{background:#0a0a0f;border:1px solid #1e1e2e;border-radius:12px;overflow:hidden;transition:border-color .2s}
+.card:hover{border-color:#7b2ff7}
+.card .thumb{aspect-ratio:9/16;background:#1a1a2e;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.card .thumb img{width:100%;height:100%;object-fit:cover}
+.card .body{padding:.75rem}
+.card .title{font-size:.813rem;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .meta{font-size:.688rem;color:#666;margin-top:.25rem}
+.loading{text-align:center;padding:3rem;color:#666}
+.footer{text-align:center;padding:2rem;color:#444;font-size:.75rem}
+.toast{position:fixed;bottom:2rem;right:2rem;padding:.75rem 1.5rem;border-radius:8px;color:#fff;font-size:.875rem;z-index:999;animation:fadeIn .3s}
+.toast-success{background:#166534}
+.toast-error{background:#7f1d1d}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.sort-bar{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.sort-bar select,.sort-bar input{background:#0a0a0f;border:1px solid #1e1e2e;border-radius:8px;color:#e0e0e0;padding:.5rem .75rem;font-size:.813rem}
+.sort-bar select:focus,.sort-bar input:focus{border-color:#7b2ff7;outline:none}
+</style></head><body>
+<div class="navbar"><div class="logo">Skynet UGC Gallery</div>
+<div class="nav-links">
+<a href="/">Dashboard</a><a href="/gallery-page" class="active">Gallery</a><a href="/inbox">Inbox</a><a href="/brands">Brands</a><a href="/approvals">Approvals</a><a href="#" onclick="logout()" style="color:#ff6b6b">Logout</a>
+</div></div>
+<div class="container">
+<div class="stats" id="galleryStats"></div>
+<div class="section">
+<h3>Video Gallery <button class="refresh-btn" onclick="loadGallery()">Refresh</button></h3>
+<div class="sort-bar">
+<select id="filterNiche" onchange="loadGallery()"><option value="">All Niches</option><option value="skincare">Skincare</option><option value="fashion">Fashion</option><option value="food">Food</option><option value="tech">Tech</option><option value="general">General</option></select>
+<select id="filterProduct" onchange="loadGallery()"><option value="">All Products</option></select>
+</div>
+<div class="grid" id="galleryGrid"><div class="loading">Loading...</div></div>
+</div>
+<div class="footer"><a href="/gallery-page" target="_blank">Public Gallery</a> &middot; <a href="/gallery-page/sitemap.xml">Sitemap</a> &middot; <a href="/gallery-page/feed.xml">RSS</a></div>
+</div>
+<script>
+const TOKEN=()=>localStorage.getItem('token');
+async function api(path,opts){try{const r=await fetch(path,{headers:{'Authorization':'Bearer '+TOKEN(),...(opts?.headers||{})},...(opts||{})});if(r.status===401){localStorage.removeItem('token');window.location.href='/login';return null}return await r.json()}catch(e){return null}}
+function toast(msg,type){const d=document.createElement('div');d.className='toast toast-'+type;d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),4000)}
+function logout(){localStorage.removeItem('token');window.location.href='/login'}
+async function loadGallery(){const d=await api('/api/v1/gallery/list?niche='+(document.getElementById('filterNiche').value||'')+'&product='+(document.getElementById('filterProduct').value||''));if(!d)return;const st=d.stats||{};document.getElementById('galleryStats').innerHTML='<div class="stat-card"><div class="stat-value">'+st.total+'</div><div class="stat-label">Total Videos</div></div><div class="stat-card"><div class="stat-value">'+st.total_views+'</div><div class="stat-label">Views</div></div><div class="stat-card"><div class="stat-value">'+st.total_likes+'</div><div class="stat-label">Likes</div></div><div class="stat-card"><div class="stat-value">'+(st.niches?st.niches.length:0)+'</div><div class="stat-label">Niches</div></div>';const g=document.getElementById('galleryGrid');if(d.videos&&d.videos.length){g.innerHTML=d.videos.map(v=>'<div class="card"><div class="thumb">'+(v.thumbnail_path?'<img src="'+v.thumbnail_path+'" loading="lazy">':'<div style="color:#444;font-size:1.25rem">UGC</div>')+'</div><div class="body"><div class="title">'+(v.title||'Untitled')+'</div><div class="meta">'+v.niche+' &middot; '+v.platform+' &middot; '+v.views+' views</div></div></div>').join('')}else{g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:3rem;color:#666">No videos yet</div>'}}
+if(!TOKEN()){window.location.href='/login'}else{loadGallery();setInterval(loadGallery,30000)}
+</script></body></html>'''
+
+HTML_INBOX = '''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Social Inbox — Skynet</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh}
+.navbar{background:#12121a;border-bottom:1px solid #1e1e2e;padding:1rem 2rem;display:flex;align-items:center;gap:1rem}
+.logo{font-size:1.25rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{margin-left:auto;display:flex;gap:1rem}
+.nav-links a{color:#888;text-decoration:none;padding:.5rem 1rem;border-radius:8px;transition:all .2s;font-size:.875rem}
+.nav-links a:hover,.nav-links a.active{background:#1e1e2e;color:#fff}
+.container{max-width:1200px;margin:0 auto;padding:2rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.5rem}
+.stat-card{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:1.25rem}
+.stat-value{font-size:1.75rem;font-weight:700;color:#fff}
+.stat-label{font-size:.75rem;color:#888;margin-top:.25rem}
+.section{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:1.5rem;margin-bottom:1rem}
+.section h3{color:#fff;margin-bottom:1rem}
+.msg{display:flex;gap:1rem;padding:1rem;border-bottom:1px solid #1e1e2e;transition:background .2s;cursor:pointer}
+.msg:last-child{border-bottom:none}
+.msg:hover{background:#0f0f1a}
+.msg.unread{border-left:3px solid #7b2ff7}
+.msg.urgent{border-left:3px solid #ff6b6b}
+.msg-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#7b2ff7);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.875rem;color:#fff;flex-shrink:0}
+.msg-body{flex:1;min-width:0}
+.msg-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem}
+.msg-sender{font-weight:600;font-size:.875rem;color:#fff}
+.msg-time{font-size:.688rem;color:#666}
+.msg-platform{font-size:.688rem;color:#7b2ff7;margin-left:.5rem}
+.msg-content{font-size:.813rem;color:#ccc;line-height:1.4;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.msg-footer{display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap}
+.badge{display:inline-block;padding:.125rem .375rem;border-radius:4px;font-size:.625rem;font-weight:600}
+.badge-positive{background:#0d1a0d;color:#4ade80}
+.badge-negative{background:#1a0d0d;color:#ff6b6b}
+.badge-neutral{background:#1a1a0d;color:#facc15}
+.badge-urgent{background:#1a0d0d;color:#ff4444;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.ai-reply{background:#0d1a2a;border:1px solid #1a2a3a;border-radius:8px;padding:.75rem;margin-top:.5rem;font-size:.813rem;color:#93c5fd;display:none}
+.ai-reply.show{display:block}
+.reply-box{display:none;margin-top:.5rem;gap:.5rem}
+.reply-box.show{display:flex}
+.reply-box textarea{flex:1;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:8px;color:#e0e0e0;padding:.5rem;font-size:.813rem;resize:none;min-height:60px;font-family:inherit}
+.reply-box textarea:focus{border-color:#7b2ff7;outline:none}
+.reply-box button{padding:.5rem 1rem;border-radius:8px;border:none;font-weight:600;font-size:.75rem;cursor:pointer}
+.btn-send{background:#166534;color:#4ade80}
+.btn-ai{background:#1e3a5f;color:#60a5fa}
+.btn-cancel{background:#1e1e2e;color:#888}
+.btn{display:inline-block;padding:.25rem .75rem;border-radius:6px;border:none;font-size:.75rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-action{background:#1e1e2e;color:#e0e0e0;padding:.5rem 1rem}
+.btn-action:hover{background:#2a2a3e}
+.filter-bar{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.filter-bar select{background:#0a0a0f;border:1px solid #1e1e2e;border-radius:8px;color:#e0e0e0;padding:.5rem .75rem;font-size:.813rem}
+.filter-bar select:focus{border-color:#7b2ff7;outline:none}
+.loading{text-align:center;padding:3rem;color:#666}
+.footer{text-align:center;padding:2rem;color:#444;font-size:.75rem}
+.toast{position:fixed;bottom:2rem;right:2rem;padding:.75rem 1.5rem;border-radius:8px;color:#fff;font-size:.875rem;z-index:999;animation:fadeIn .3s}
+.toast-success{background:#166534}
+.toast-error{background:#7f1d1d}
+.toast-info{background:#1e3a5f}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+</style></head><body>
+<div class="navbar"><div class="logo">Skynet Inbox</div>
+<div class="nav-links">
+<a href="/">Dashboard</a><a href="/gallery-page">Gallery</a><a href="/inbox" class="active">Inbox</a><a href="/brands">Brands</a><a href="/approvals">Approvals</a><a href="#" onclick="logout()" style="color:#ff6b6b">Logout</a>
+</div></div>
+<div class="container">
+<div class="stats" id="inboxStats"></div>
+<div class="section">
+<h3>Unified Social Inbox
+<button class="btn btn-action" onclick="loadInbox()">Refresh</button>
+<button class="btn btn-action" onclick="bulkAutoReply()">Auto-Reply</button>
+</h3>
+<div class="filter-bar">
+<select id="filterPlatform" onchange="loadInbox()"><option value="">All Platforms</option><option value="tiktok">TikTok</option><option value="instagram">Instagram</option><option value="youtube">YouTube</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option></select>
+<select id="filterStatus" onchange="loadInbox()"><option value="all">All</option><option value="unread">Unread</option><option value="urgent">Urgent</option><option value="unreplied">Unreplied</option></select>
+</div>
+<div id="inboxMessages"><div class="loading">Loading...</div></div>
+</div>
+<div class="footer">Skynet UGC Empire v2.0.0</div></div>
+<script>
+const TOKEN=()=>localStorage.getItem('token');
+async function api(path,opts){try{const r=await fetch(path,{headers:{'Authorization':'Bearer '+TOKEN(),...(opts?.headers||{})},...(opts||{})});if(r.status===401){localStorage.removeItem('token');window.location.href='/login';return null}return await r.json()}catch(e){return null}}
+function toast(msg,type){const d=document.createElement('div');d.className='toast toast-'+type;d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),4000)}
+function logout(){localStorage.removeItem('token');window.location.href='/login'}
+let expandedMsg=null;
+function toggleReply(id){const el=document.getElementById('reply-'+id);const ai=document.getElementById('ai-'+id);if(expandedMsg&&expandedMsg!==id){const oldEl=document.getElementById('reply-'+expandedMsg);const oldAi=document.getElementById('ai-'+expandedMsg);if(oldEl)oldEl.classList.remove('show');if(oldAi)oldAi.classList.remove('show')}if(el)el.classList.toggle('show');if(ai)ai.classList.toggle('show');expandedMsg=el&&el.classList.contains('show')?id:null}
+async function sendReply(id){const txt=document.getElementById('replyText-'+id).value;if(!txt.trim())return;const r=await api('/api/v1/inbox/reply/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reply_text:txt})});if(r&&r.status==='ok'){toast('Reply sent!','success');loadInbox()}else{toast('Failed','error')}}
+async function useAiReply(id){const r=await api('/api/v1/inbox/approve-ai/'+id,{method:'POST'});if(r&&r.reply){document.getElementById('replyText-'+id).value=r.reply;toast('AI reply loaded','info')}else{toast('No AI reply available','error')}}
+async function loadInbox(){const plat=document.getElementById('filterPlatform').value;const status=document.getElementById('filterStatus').value;const d=await api('/api/v1/inbox/list?platform='+plat+'&status='+status);if(!d)return;const st=d.stats||{};document.getElementById('inboxStats').innerHTML='<div class="stat-card"><div class="stat-value">'+st.total+'</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">'+st.unread+'</div><div class="stat-label">Unread</div></div><div class="stat-card"><div class="stat-value">'+st.urgent+'</div><div class="stat-label">Urgent</div></div><div class="stat-card"><div class="stat-value">'+st.unreplied+'</div><div class="stat-label">Unreplied</div></div>';const c=document.getElementById('inboxMessages');if(d.messages&&d.messages.length){c.innerHTML=d.messages.map(m=>{const s=m.sentiment||'neutral';const u=m.is_read?'':'unread';const ur=m.is_urgent?'urgent':'';const avatar=m.sender_username?m.sender_username[0].toUpperCase():'?';return '<div class="msg '+u+' '+ur+'" onclick="toggleReply('+m.id+')"><div class="msg-avatar">'+avatar+'</div><div class="msg-body"><div class="msg-header"><span><span class="msg-sender">'+m.sender_username+'</span><span class="msg-platform">'+m.platform+'</span><span class="badge badge-'+s+'">'+s+'</span></span><span class="msg-time">'+m.created_at.substr(11,5)+'</span></div><div class="msg-content">'+m.content+'</div><div class="msg-footer"><span style="font-size:.688rem;color:#666">'+m.message_type+'</span></div><div class="ai-reply" id="ai-'+m.id+'">AI suggestion: '+m.ai_suggested_reply+'</div><div class="reply-box" id="reply-'+m.id+'"><textarea id="replyText-'+m.id+'" placeholder="Type reply..."></textarea><div style="display:flex;flex-direction:column;gap:.25rem"><button class="btn-send" onclick="event.stopPropagation();sendReply('+m.id+')">Send</button><button class="btn-ai" onclick="event.stopPropagation();useAiReply('+m.id+')">AI</button></div></div></div></div>'}).join('')}else{c.innerHTML='<div class="loading">No messages</div>'}}
+async function bulkAutoReply(){const r=await api('/api/v1/inbox/auto-reply',{method:'POST'});if(r&&r.status==='ok'){toast(r.replied+' replied, '+r.skipped+' skipped','success');loadInbox()}else{toast('Failed','error')}}
+if(!TOKEN()){window.location.href='/login'}else{loadInbox();setInterval(loadInbox,15000)}
+</script></body></html>'''
+
+HTML_BRANDS = '''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brand Profiles — Skynet</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh}
+.navbar{background:#12121a;border-bottom:1px solid #1e1e2e;padding:1rem 2rem;display:flex;align-items:center;gap:1rem}
+.logo{font-size:1.25rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{margin-left:auto;display:flex;gap:1rem}
+.nav-links a{color:#888;text-decoration:none;padding:.5rem 1rem;border-radius:8px;transition:all .2s;font-size:.875rem}
+.nav-links a:hover,.nav-links a.active{background:#1e1e2e;color:#fff}
+.container{max-width:1000px;margin:0 auto;padding:2rem}
+.section{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:1.5rem;margin-bottom:1rem}
+.section h3{color:#fff;margin-bottom:1rem}
+.brand-card{background:#0a0a0f;border:1px solid #1e1e2e;border-radius:12px;padding:1.25rem;margin-bottom:1rem;position:relative}
+.brand-card.active{border-color:#7b2ff7}
+.brand-name{font-size:1.125rem;font-weight:700;color:#fff;margin-bottom:.5rem}
+.brand-active{position:absolute;top:1rem;right:1rem;background:#166534;color:#4ade80;padding:.125rem .5rem;border-radius:4px;font-size:.625rem;font-weight:600}
+.brand-detail{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:.813rem;color:#ccc}
+.brand-detail .label{color:#888}
+.colors{display:flex;gap:.375rem;margin:.5rem 0}
+.color-swatch{width:24px;height:24px;border-radius:4px;border:1px solid #1e1e2e}
+.btn{display:inline-block;padding:.375rem .75rem;border-radius:6px;border:none;font-size:.75rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-activate{background:#166534;color:#4ade80}
+.btn-edit{background:#1e3a5f;color:#60a5fa}
+.btn-delete{background:#7f1d1d;color:#fca5a5}
+.btn-action{background:#1e1e2e;color:#e0e0e0;padding:.5rem 1rem;margin-left:.5rem}
+.btn-add{background:#7b2ff7;color:#fff;padding:.5rem 1rem;border:none;border-radius:8px;font-weight:600;cursor:pointer}
+.loading{text-align:center;padding:3rem;color:#666}
+.footer{text-align:center;padding:2rem;color:#444;font-size:.75rem}
+.toast{position:fixed;bottom:2rem;right:2rem;padding:.75rem 1.5rem;border-radius:8px;color:#fff;font-size:.875rem;z-index:999;animation:fadeIn .3s}
+.toast-success{background:#166534}
+.toast-error{background:#7f1d1d}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
+.modal.show{display:flex}
+.modal-content{background:#12121a;border:1px solid #1e1e2e;border-radius:16px;padding:2rem;width:500px;max-width:90vw;max-height:80vh;overflow-y:auto}
+.modal-content h3{color:#fff;margin-bottom:1rem}
+.form-group{margin-bottom:1rem}
+.form-group label{display:block;color:#888;font-size:.813rem;margin-bottom:.25rem}
+.form-group input,.form-group select{width:100%;padding:.625rem .75rem;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:8px;color:#e0e0e0;font-size:.813rem}
+.form-group input:focus,.form-group select:focus{border-color:#7b2ff7;outline:none}
+</style></head><body>
+<div class="navbar"><div class="logo">Skynet Brands</div>
+<div class="nav-links">
+<a href="/">Dashboard</a><a href="/gallery-page">Gallery</a><a href="/inbox">Inbox</a><a href="/brands" class="active">Brands</a><a href="/approvals">Approvals</a><a href="#" onclick="logout()" style="color:#ff6b6b">Logout</a>
+</div></div>
+<div class="container">
+<div class="section">
+<h3>Brand Profiles <button class="btn btn-action" onclick="loadBrands()">Refresh</button><button class="btn btn-action" onclick="showAddModal()">Add Brand</button></h3>
+<div id="brandList"><div class="loading">Loading...</div></div>
+</div>
+<div class="footer">Skynet UGC Empire v2.0.0</div></div>
+<div class="modal" id="addModal"><div class="modal-content"><h3 id="modalTitle">Add Brand Profile</h3>
+<div class="form-group"><label>Name</label><input id="fName" placeholder="My Brand"></div>
+<div class="form-group"><label>Tone</label><select id="fTone"><option value="casual">Casual</option><option value="professional">Professional</option><option value="humorous">Humorous</option><option value="aspirational">Aspirational</option><option value="urgent">Urgent</option><option value="luxury">Luxury</option><option value="educational">Educational</option></select></div>
+<div class="form-group"><label>Voice</label><select id="fVoice"><option value="friendly">Friendly</option><option value="formal">Formal</option><option value="authoritative">Authoritative</option><option value="playful">Playful</option><option value="empathetic">Empathetic</option></select></div>
+<div class="form-group"><label>Language</label><select id="fLang"><option value="en">English</option><option value="id">Indonesian</option><option value="mix">Mix</option></select></div>
+<div class="form-group"><label>Emoji Style</label><select id="fEmoji"><option value="moderate">Moderate</option><option value="none">None</option><option value="minimal">Minimal</option><option value="heavy">Heavy</option></select></div>
+<div class="form-group"><label>Target Audience</label><input id="fAudience" placeholder="e.g. Gen Z women 18-25"></div>
+<div class="form-group"><label>Default CTA</label><input id="fCta" placeholder="Link in bio!"></div>
+<div class="form-group"><label>Hashtag Bank</label><input id="fHashtags" placeholder="#ugc #review #musttry"></div>
+<div style="display:flex;gap:.5rem;margin-top:1rem"><button class="btn-add" onclick="saveBrand()">Save</button><button class="btn" style="background:#1e1e2e;color:#888" onclick="closeModal()">Cancel</button></div>
+</div></div>
+<script>
+const TOKEN=()=>localStorage.getItem('token');
+async function api(path,opts){try{const r=await fetch(path,{headers:{'Authorization':'Bearer '+TOKEN(),...(opts?.headers||{})},...(opts||{})});if(r.status===401){localStorage.removeItem('token');window.location.href='/login';return null}return await r.json()}catch(e){return null}}
+function toast(msg,type){const d=document.createElement('div');d.className='toast toast-'+type;d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),4000)}
+function logout(){localStorage.removeItem('token');window.location.href='/login'}
+function closeModal(){document.getElementById('addModal').classList.remove('show')}
+function showAddModal(){document.getElementById('modalTitle').textContent='Add Brand Profile';document.getElementById('fName').value='';document.getElementById('fAudience').value='';document.getElementById('fCta').value='';document.getElementById('fHashtags').value='';document.getElementById('addModal').classList.add('show')}
+async function saveBrand(){const data={name:document.getElementById('fName').value,tone:document.getElementById('fTone').value,voice:document.getElementById('fVoice').value,language:document.getElementById('fLang').value,emoji_style:document.getElementById('fEmoji').value,target_audience:document.getElementById('fAudience').value,default_cta:document.getElementById('fCta').value,hashtag_bank:document.getElementById('fHashtags').value};if(!data.name)return toast('Name required','error');const r=await api('/api/v1/brands',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(r&&r.id){toast('Brand created!','success');closeModal();loadBrands()}else{toast('Failed','error')}}
+async function setActive(id){const r=await api('/api/v1/brands/'+id+'/activate',{method:'POST'});if(r&&r.status==='ok'){toast('Brand activated','success');loadBrands()}else{toast('Failed','error')}}
+async function deleteBrand(id){if(!confirm('Delete this brand?'))return;const r=await api('/api/v1/brands/'+id,{method:'DELETE'});if(r&&r.status==='ok'){toast('Brand deleted','success');loadBrands()}else{toast('Failed','error')}}
+async function loadBrands(){const d=await api('/api/v1/brands');if(!d)return;const c=document.getElementById('brandList');if(d.brands&&d.brands.length){c.innerHTML=d.brands.map(b=>{const colors=Array.isArray(b.color_palette)?b.color_palette:['#7b2ff7','#00d4ff','#ffffff'];return '<div class="brand-card'+(b.is_active?' active':'')+'">'+(b.is_active?'<div class="brand-active">ACTIVE</div>':'')+'<div class="brand-name">'+b.name+'</div><div class="colors">'+colors.map(c=>'<div class="color-swatch" style="background:'+c+'"></div>').join('')+'</div><div class="brand-detail"><div><span class="label">Tone:</span> '+b.tone+'</div><div><span class="label">Voice:</span> '+b.voice+'</div><div><span class="label">Language:</span> '+b.language+'</div><div><span class="label">Emoji:</span> '+b.emoji_style+'</div><div><span class="label">Audience:</span> '+(b.target_audience||'-')+'</div><div><span class="label">CTA:</span> '+(b.default_cta||'-')+'</div></div><div style="margin-top:.75rem;display:flex;gap:.5rem">'+(!b.is_active?'<button class="btn btn-activate" onclick="setActive('+b.id+')">Activate</button>':'')+'<button class="btn btn-delete" onclick="deleteBrand('+b.id+')">Delete</button></div></div>'}).join('')}else{c.innerHTML='<div class="loading">No brand profiles. Create one!</div>'}}
+if(!TOKEN()){window.location.href='/login'}else{loadBrands()}
+</script></body></html>'''
+
+HTML_APPROVALS = '''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Approvals — Skynet</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a0f;color:#e0e0e0;min-height:100vh}
+.navbar{background:#12121a;border-bottom:1px solid #1e1e2e;padding:1rem 2rem;display:flex;align-items:center;gap:1rem}
+.logo{font-size:1.25rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{margin-left:auto;display:flex;gap:1rem}
+.nav-links a{color:#888;text-decoration:none;padding:.5rem 1rem;border-radius:8px;transition:all .2s;font-size:.875rem}
+.nav-links a:hover,.nav-links a.active{background:#1e1e2e;color:#fff}
+.container{max-width:1000px;margin:0 auto;padding:2rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem}
+.stat-card{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:1.25rem}
+.stat-value{font-size:1.75rem;font-weight:700;color:#fff}
+.stat-label{font-size:.75rem;color:#888;margin-top:.25rem}
+.section{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:1.5rem;margin-bottom:1rem}
+.section h3{color:#fff;margin-bottom:1rem}
+.item{background:#0a0a0f;border:1px solid #1e1e2e;border-radius:8px;padding:1rem;margin-bottom:.75rem}
+.item-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
+.item-type{font-size:.688rem;color:#7b2ff7;font-weight:600;text-transform:uppercase}
+.item-product{font-size:.75rem;color:#666}
+.item-content{font-size:.813rem;color:#ccc;margin-bottom:.75rem;padding:.5rem;background:#0d0d14;border-radius:6px;max-height:100px;overflow-y:auto;white-space:pre-wrap}
+.item-actions{display:flex;gap:.5rem}
+.btn{display:inline-block;padding:.375rem .75rem;border-radius:6px;border:none;font-size:.75rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-approve{background:#166534;color:#4ade80}
+.btn-reject{background:#7f1d1d;color:#fca5a5}
+.btn-action{background:#1e1e2e;color:#e0e0e0;padding:.5rem 1rem;margin-left:.5rem}
+.loading{text-align:center;padding:3rem;color:#666}
+.footer{text-align:center;padding:2rem;color:#444;font-size:.75rem}
+.toast{position:fixed;bottom:2rem;right:2rem;padding:.75rem 1.5rem;border-radius:8px;color:#fff;font-size:.875rem;z-index:999;animation:fadeIn .3s}
+.toast-success{background:#166534}
+.toast-error{background:#7f1d1d}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+</style></head><body>
+<div class="navbar"><div class="logo">Skynet Approvals</div>
+<div class="nav-links">
+<a href="/">Dashboard</a><a href="/gallery-page">Gallery</a><a href="/inbox">Inbox</a><a href="/brands">Brands</a><a href="/approvals" class="active">Approvals</a><a href="#" onclick="logout()" style="color:#ff6b6b">Logout</a>
+</div></div>
+<div class="container">
+<div class="stats" id="approvalStats"></div>
+<div class="section">
+<h3>Pending Reviews <button class="btn btn-action" onclick="loadApprovals()">Refresh</button></h3>
+<div id="approvalList"><div class="loading">Loading...</div></div>
+</div>
+<div class="footer">Skynet UGC Empire v2.0.0</div></div>
+<script>
+const TOKEN=()=>localStorage.getItem('token');
+async function api(path,opts){try{const r=await fetch(path,{headers:{'Authorization':'Bearer '+TOKEN(),...(opts?.headers||{})},...(opts||{})});if(r.status===401){localStorage.removeItem('token');window.location.href='/login';return null}return await r.json()}catch(e){return null}}
+function toast(msg,type){const d=document.createElement('div');d.className='toast toast-'+type;d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),4000)}
+function logout(){localStorage.removeItem('token');window.location.href='/login'}
+async function approve(id){const note=prompt('Approval note (optional):')||'';const r=await api('/api/v1/approvals/'+id+'/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewer:'admin',note})});if(r&&r.status==='ok'){toast('Approved!','success');loadApprovals()}else{toast('Failed','error')}}
+async function reject(id){const note=prompt('Rejection reason:');if(note===null)return;const r=await api('/api/v1/approvals/'+id+'/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewer:'admin',note})});if(r&&r.status==='ok'){toast('Rejected','success');loadApprovals()}else{toast('Failed','error')}}
+async function loadApprovals(){const d=await api('/api/v1/approvals/list');if(!d)return;const st=d.stats||{};document.getElementById('approvalStats').innerHTML='<div class="stat-card"><div class="stat-value">'+st.pending_review+'</div><div class="stat-label">Pending</div></div><div class="stat-card"><div class="stat-value">'+st.approved+'</div><div class="stat-label">Approved</div></div><div class="stat-card"><div class="stat-value">'+st.rejected+'</div><div class="stat-label">Rejected</div></div><div class="stat-card"><div class="stat-value">'+st.auto_approved+'</div><div class="stat-label">Auto</div></div>';const c=document.getElementById('approvalList');if(d.items&&d.items.length){c.innerHTML=d.items.map(i=>'<div class="item"><div class="item-header"><span><span class="item-type">'+i.content_type+'</span> &middot; <span class="item-product">'+(i.product||'')+'</span></span><span style="font-size:.688rem;color:#666">#'+i.content_id+'</span></div><div class="item-content">'+i.content_data+'</div><div class="item-actions"><button class="btn btn-approve" onclick="approve('+i.id+')">Approve</button><button class="btn btn-reject" onclick="reject('+i.id+')">Reject</button></div></div>').join('')}else{c.innerHTML='<div class="loading">No pending reviews</div>'}}
+if(!TOKEN()){window.location.href='/login'}else{loadApprovals();setInterval(loadApprovals,15000)}
+</script></body></html>'''
+
+_gallery_store = None
+_inbox_store = None
+_brand_store = None
+_approval_store = None
+
+def _get_gallery():
+    global _gallery_store
+    if _gallery_store is None:
+        from ugc_ai_overpower.core.gallery import Gallery
+        _gallery_store = Gallery()
+    return _gallery_store
+
+def _get_inbox():
+    global _inbox_store
+    if _inbox_store is None:
+        from ugc_ai_overpower.browser.social_inbox import SocialInbox
+        from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
+        _inbox_store = SocialInbox(ai_router=AIRouter(
+            base_url=os.getenv("ROUTER_URL", "http://localhost:20128"),
+            api_key=os.getenv("ROUTER_KEY", ""),
+        ))
+    return _inbox_store
+
+def _get_brand():
+    global _brand_store
+    if _brand_store is None:
+        from ugc_ai_overpower.core.brand_profile import BrandProfile
+        _brand_store = BrandProfile()
+    return _brand_store
+
+def _get_approval():
+    global _approval_store
+    if _approval_store is None:
+        from ugc_ai_overpower.core.approval_workflow import ApprovalWorkflow
+        _approval_store = ApprovalWorkflow()
+    return _approval_store
+
+@app.get("/gallery-page", response_class=HTMLResponse)
+async def gallery_page(request: Request):
+    return HTMLResponse(HTML_GALLERY)
+
+@app.get("/gallery-page/{path:path}")
+async def gallery_static(path: str):
+    from fastapi.responses import FileResponse
+    gallery = _get_gallery()
+    file_path = gallery.output_dir / path
+    if file_path.exists() and file_path.is_file():
+        return FileResponse(str(file_path))
+    return HTMLResponse("Not found", status_code=404)
+
+@app.get("/inbox", response_class=HTMLResponse)
+async def inbox_page(request: Request):
+    return HTMLResponse(HTML_INBOX)
+
+@app.get("/brands", response_class=HTMLResponse)
+async def brands_page(request: Request):
+    return HTMLResponse(HTML_BRANDS)
+
+@app.get("/approvals", response_class=HTMLResponse)
+async def approvals_page(request: Request):
+    return HTMLResponse(HTML_APPROVALS)
+
+@app.post("/api/v1/gallery/view/{video_id}")
+async def gallery_record_view(video_id: int):
+    _get_gallery().record_view(video_id)
+    return {"status": "ok"}
+
+@app.get("/api/v1/gallery/list")
+async def gallery_list(niche: str = "", product: str = "", limit: int = 50, offset: int = 0):
+    g = _get_gallery()
+    videos = g.list_videos(niche=niche, product=product, limit=limit, offset=offset)
+    stats = g.get_stats()
+    return {"videos": videos, "stats": stats}
+
+@app.post("/api/v1/gallery/add")
+async def gallery_add(request: Request, _=Depends(auth_required)):
+    body = await request.json()
+    vid = _get_gallery().add_video(
+        title=body.get("title", "Untitled"),
+        video_path=body.get("video_path", ""),
+        thumbnail_path=body.get("thumbnail_path", ""),
+        duration_sec=body.get("duration_sec", 0),
+        platform=body.get("platform", "tiktok"),
+        niche=body.get("niche", "general"),
+        product=body.get("product", ""),
+        tags=body.get("tags", ""),
+        description=body.get("description", ""),
+    )
+    return {"id": vid, "status": "created", "slug": _get_gallery().get_video(vid)["slug"] if vid else ""}
+
+@app.get("/api/v1/inbox/list")
+async def inbox_list(platform: str = "", status: str = "all", limit: int = 50):
+    ib = _get_inbox()
+    messages = ib.list_messages(platform=platform, status=status, limit=limit)
+    stats = ib.get_stats()
+    return {"messages": messages, "stats": stats}
+
+@app.post("/api/v1/inbox/reply/{message_id}")
+async def inbox_reply(message_id: int, request: Request, _=Depends(auth_required)):
+    body = await request.json()
+    ok = _get_inbox().send_reply(message_id, body.get("reply_text", ""))
+    _get_inbox().mark_read(message_id)
+    return {"status": "ok" if ok else "error"}
+
+@app.post("/api/v1/inbox/approve-ai/{message_id}")
+async def inbox_approve_ai(message_id: int, _=Depends(auth_required)):
+    reply = _get_inbox().approve_ai_reply(message_id)
+    return {"status": "ok" if reply else "error", "reply": reply or ""}
+
+@app.post("/api/v1/inbox/auto-reply")
+async def inbox_auto_reply(_=Depends(auth_required)):
+    result = _get_inbox().bulk_auto_reply(limit=20)
+    return {"status": "ok", **result}
+
+@app.get("/api/v1/brands")
+async def brand_list():
+    brands = _get_brand().list_all()
+    return {"brands": brands}
+
+@app.post("/api/v1/brands")
+async def brand_create(request: Request, _=Depends(auth_required)):
+    body = await request.json()
+    bid = _get_brand().create(body)
+    return {"id": bid, "status": "created"}
+
+@app.post("/api/v1/brands/{brand_id}/activate")
+async def brand_activate(brand_id: int, _=Depends(auth_required)):
+    ok = _get_brand().set_active(brand_id)
+    return {"status": "ok" if ok else "error"}
+
+@app.delete("/api/v1/brands/{brand_id}")
+async def brand_delete(brand_id: int, _=Depends(auth_required)):
+    ok = _get_brand().delete(brand_id)
+    return {"status": "ok" if ok else "error"}
+
+@app.get("/api/v1/approvals/list")
+async def approval_list():
+    aw = _get_approval()
+    items = aw.list_pending()
+    stats = aw.get_stats()
+    return {"items": items, "stats": stats}
+
+@app.post("/api/v1/approvals/{approval_id}/approve")
+async def approval_approve(approval_id: int, request: Request, _=Depends(auth_required)):
+    body = await request.json()
+    ok = _get_approval().approve(approval_id, reviewer=body.get("reviewer", "admin"), note=body.get("note", ""))
+    return {"status": "ok" if ok else "error"}
+
+@app.post("/api/v1/approvals/{approval_id}/reject")
+async def approval_reject(approval_id: int, request: Request, _=Depends(auth_required)):
+    body = await request.json()
+    ok = _get_approval().reject(approval_id, reviewer=body.get("reviewer", "admin"), note=body.get("note", ""))
+    return {"status": "ok" if ok else "error"}
+
+# ═══════════════════════════════════════════════════════════
+# Notion Button Webhooks — dipanggil dari Notion Button
+# ═══════════════════════════════════════════════════════════
+
+_NOTION_SECRET = os.getenv("NOTION_BUTTON_SECRET", "")
+
+async def _verify_notion(request: Request):
+    if _NOTION_SECRET:
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {_NOTION_SECRET}":
+            raise HTTPException(401, "Invalid Notion secret")
+    return True
+
+@app.post("/api/v1/notion/sync")
+async def notion_sync_all(request: Request):
+    await _verify_notion(request)
+    from ugc_ai_overpower.core.notion_sync import NotionDashboard
+    from ugc_ai_overpower.core.gallery import Gallery
+    from ugc_ai_overpower.browser.social_inbox import SocialInbox
+    from ugc_ai_overpower.core.brand_profile import BrandProfile
+    from ugc_ai_overpower.core.approval_workflow import ApprovalWorkflow
+    nd = NotionDashboard()
+    if not nd.ready:
+        return {"status": "error", "message": "Notion token not configured"}
+    results = nd.sync_all(
+        gallery=Gallery(),
+        inbox=SocialInbox(ai_router=_get_ai()),
+        brand_profile=BrandProfile(),
+        approval_workflow=ApprovalWorkflow(),
+    )
+    return {"status": "ok", "results": {k: len(v) for k, v in results.items()}}
+
+@app.post("/api/v1/notion/campaign")
+async def notion_run_campaign(request: Request):
+    await _verify_notion(request)
+    body = await request.json()
+    product = body.get("product", "")
+    niche = body.get("niche", "general")
+    if not product:
+        return {"status": "error", "message": "product required"}
+    from ugc_ai_overpower.core.pipeline_engine import UGCPipelineFactory
+    factory = UGCPipelineFactory(ai_router=_get_ai())
+    result = factory.run_campaign(product, niche)
+    return {"status": "ok", "duration_sec": result.get("duration_seconds"), "completed": result.get("completed")}
+
+@app.post("/api/v1/notion/approve-all")
+async def notion_approve_all(request: Request):
+    await _verify_notion(request)
+    aw = _get_approval()
+    pending = aw.list_pending(limit=50)
+    count = 0
+    for p in pending:
+        if aw.approve(p["id"], reviewer="notion-button", note="Bulk approve from Notion"):
+            count += 1
+    return {"status": "ok", "approved": count}
+
+@app.post("/api/v1/notion/trends")
+async def notion_trends(request: Request):
+    await _verify_notion(request)
+    body = await request.json()
+    niche = body.get("niche", "general")
+    from ugc_ai_overpower.browser.trend_scout import TrendScout
+    ts = TrendScout(ai_router=_get_ai())
+    hooks = ts.analyze_with_ai(niche=niche)
+    return {"status": "ok", "niche": niche, "hooks_count": len(hooks)}
+
+def _get_ai():
+    from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
+    from ugc_ai_overpower.core.config import skynet_config
+    return AIRouter(
+        base_url=os.getenv("ROUTER_URL", "http://localhost:20128"),
+        api_key=os.getenv("ROUTER_KEY", ""),
+    )
 
 def serve():
     host = os.getenv("HOST", "0.0.0.0")
