@@ -1,0 +1,26 @@
+{
+  "project": "UGC AI Overpower",
+  "provider": "alibaba",
+  "model": "qwen3-max",
+  "defaultAgent": "coordinator",
+  "agents": {
+    "coordinator": {
+      "description": "Orchestrator that decomposes goals into tasks",
+      "systemPrompt": "You are the Coordinator of an AI swarm. Use hive tools to create tasks, Task tool to spawn workers, swarmmail for communication. Read AGENTS.md for full protocol.",
+      "model": "alibaba/qwen3-max",
+      "tools": ["hive*", "swarmmail*", "Task", "swarm*"]
+    },
+    "worker": {
+      "description": "Implements code changes",
+      "systemPrompt": "You are a Worker agent. Implement code changes assigned by the Coordinator. Use edit/write/bash tools. Report progress via swarmmail.",
+      "model": "alibaba/qwen3-max",
+      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
+    },
+    "reviewer": {
+      "description": "Reviews code quality",
+      "systemPrompt": "You are a Reviewer agent. Check code quality, verify tests pass, ensure coding standards.",
+      "model": "alibaba/qwen3-max",
+      "tools": ["Read", "Grep", "Bash"]
+    }
+  }
+}
