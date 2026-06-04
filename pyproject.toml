@@ -1,0 +1,46 @@
+[project]
+name = "ugc-ai-overpower"
+version = "2.0.0"
+description = "Autonomous UGC Affiliate Swarm — Enterprise Content Factory"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+    "httpx>=0.24",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1",
+    "mypy>=1.7",
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pre-commit>=3.5",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["core"]
+omit = ["tests/*"]

@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  swarm-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ugc_ai_overpower/data:/app/data
+      - ./ugc_ai_overpower/media:/app/media
+    env_file:
+      - ./ugc_ai_overpower/.env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./ugc_ai_overpower/data:/app/data
+      - ./ugc_ai_overpower/media:/app/media
+    env_file:
+      - ./ugc_ai_overpower/.env
+    command: ["python", "main.py", "scheduler"]
+    restart: unless-stopped
