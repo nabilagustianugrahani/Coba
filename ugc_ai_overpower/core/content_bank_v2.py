@@ -232,6 +232,17 @@ class ContentBankV2:
             finally:
                 conn.close()
 
+    def get_all_products(self, limit: int = 100, offset: int = 0) -> list:
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT id, name, platform, price, commission AS commission_rate, affiliate_link, category, image_url, created_at FROM products_v2 ORDER BY id DESC LIMIT ? OFFSET ?",
+                (limit, offset)
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
     def search_products(self, query: str, limit: int = 20) -> list:
         conn = self._connect()
         try:

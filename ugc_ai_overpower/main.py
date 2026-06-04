@@ -68,6 +68,8 @@ def main():
         logger.info('  affiliate-catalog [q]   — Browse local affiliate product catalog')
         logger.info("  notion-dbs              — Create all Notion databases (7 databases)")
         logger.info("  notion-sync-all          — Sync ALL data to Notion (gallery, inbox, brands, approvals)")
+        logger.info("  notion-sync-products     — Sync affiliate products to Notion")
+        logger.info("  list-products            — List affiliate products from catalog")
         logger.info("  swarm                  — Start multi-agent swarm")
         logger.info('  swarm-campaign <product> — Dispatch campaign via swarm')
         logger.info("  swarm-status           — Show swarm health & campaigns")
@@ -490,6 +492,12 @@ def main():
     elif cmd == "notion-dbs":
         _cmd_notion_create_all_dbs()
 
+    elif cmd == "notion-sync-products":
+        _cmd_notion_sync_products()
+
+    elif cmd == "list-products":
+        _cmd_list_products()
+
     else:
         logger.warning(f"Unknown command: {cmd}")
 
@@ -752,6 +760,36 @@ def _cmd_notion_create_all_dbs():
             print(f"  {env_key}={db_id}")
     else:
         print("  ❌ No databases created. Check NOTION_PARENT_PAGE env var.")
+
+
+def _cmd_notion_sync_products():
+    nd = _get_notion()
+    if not nd:
+        return
+    from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+    bank = ContentBankV2()
+    products = bank.get_all_products(limit=500)
+    if not products:
+        print("  No products found in catalog.")
+        return
+    logger.info(f"Syncing {len(products)} affiliate products to Notion...")
+    synced = nd.sync_products(products)
+    print(f"  ✅ {len(synced)} products synced to Notion")
+
+
+def _cmd_list_products():
+    from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+    bank = ContentBankV2()
+    products = bank.get_all_products(limit=100)
+    if not products:
+        print("  No products in catalog.")
+        return
+    print(f"\n  {'Name':45s} {'Platform':12s} {'Price':>10s} {'Comm%':>7s} {'Affiliate Link'}")
+    print(f"  {'-'*45} {'-'*12} {'-'*10} {'-'*7} {'-'*50}")
+    for p in products:
+        aff = (p.get('affiliate_link') or '')[:50]
+        name = (p.get('name') or '')[:45]
+        print(f"  {name:45s} {p.get('platform',''):12s} Rp{p.get('price',0):>8,.0f} {p.get('commission_rate',0):>6.1f}% {aff}")
 
 
 if __name__ == "__main__":

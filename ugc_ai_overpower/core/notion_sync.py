@@ -21,8 +21,9 @@ SCHEMAS = {
                 {"name": "Failed", "color": "red"},
             ]}},
             "Target Platforms": {"multi_select": {"options": [
-                {"name": "tiktok"}, {"name": "instagram"}, {"name": "youtube"},
-                {"name": "shopee"}, {"name": "tokopedia"}, {"name": "lazada"},
+                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
+                {"name": "youtube", "color": "red"}, {"name": "shopee", "color": "orange"},
+                {"name": "tokopedia", "color": "green"}, {"name": "lazada", "color": "blue"},
             ]}},
             "Psychology Triggers": {"rich_text": {}},
             "Total Content": {"number": {}},
@@ -40,18 +41,15 @@ SCHEMAS = {
             "Hook": {"title": {}},
             "Campaign": {"relation": {}},
             "Platform": {"select": {"options": [
-                {"name": "tiktok", "color": "purple"},
-                {"name": "instagram", "color": "pink"},
-                {"name": "youtube", "color": "red"},
-                {"name": "shopee", "color": "orange"},
-                {"name": "tokopedia", "color": "green"},
-                {"name": "lazada", "color": "blue"},
+                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
+                {"name": "youtube", "color": "red"}, {"name": "shopee", "color": "orange"},
+                {"name": "tokopedia", "color": "green"}, {"name": "lazada", "color": "blue"},
             ]}},
             "Status": {"select": {"options": [
                 {"name": "pending", "color": "gray"},
                 {"name": "scripted", "color": "yellow"},
                 {"name": "video_generated", "color": "orange"},
-                {"name": "posted", "color": "blue"},
+                {"name": "posted", "color": "green"},
                 {"name": "failed", "color": "red"},
             ]}},
             "Script": {"rich_text": {}},
@@ -59,6 +57,7 @@ SCHEMAS = {
             "File Path": {"rich_text": {}},
             "Created At": {"date": {}},
             "Updated At": {"date": {}},
+            "Affiliate Product": {"relation": {"database_id": "", "type": "single_property", "single_property": {}}},
         },
     },
     "Gallery": {
@@ -68,15 +67,12 @@ SCHEMAS = {
             "Slug": {"rich_text": {}},
             "Description": {"rich_text": {}},
             "Niche": {"select": {"options": [
-                {"name": "skincare", "color": "pink"},
-                {"name": "fashion", "color": "purple"},
-                {"name": "food", "color": "orange"},
-                {"name": "tech", "color": "blue"},
-                {"name": "general", "color": "gray"},
+                {"name": "skincare", "color": "pink"}, {"name": "fashion", "color": "purple"},
+                {"name": "food", "color": "orange"}, {"name": "tech", "color": "blue"},
+                {"name": "lifestyle", "color": "green"}, {"name": "general", "color": "gray"},
             ]}},
             "Platform": {"select": {"options": [
-                {"name": "tiktok", "color": "purple"},
-                {"name": "instagram", "color": "pink"},
+                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
                 {"name": "youtube", "color": "red"},
             ]}},
             "Product": {"rich_text": {}},
@@ -92,19 +88,19 @@ SCHEMAS = {
         "properties": {
             "Content": {"title": {}},
             "Platform": {"select": {"options": [
-                {"name": "tiktok"}, {"name": "instagram"}, {"name": "youtube"},
-                {"name": "telegram"}, {"name": "whatsapp"}, {"name": "discord"},
+                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
+                {"name": "youtube", "color": "red"}, {"name": "telegram", "color": "blue"},
+                {"name": "whatsapp", "color": "green"}, {"name": "discord", "color": "gray"},
             ]}},
             "Sender": {"rich_text": {}},
             "Account": {"rich_text": {}},
             "Type": {"select": {"options": [
-                {"name": "comment"}, {"name": "dm"}, {"name": "mention"}, {"name": "reply"},
+                {"name": "comment", "color": "green"}, {"name": "dm", "color": "purple"},
+                {"name": "mention", "color": "blue"}, {"name": "reply", "color": "gray"},
             ]}},
             "Sentiment": {"select": {"options": [
-                {"name": "positive", "color": "green"},
-                {"name": "negative", "color": "red"},
-                {"name": "neutral", "color": "gray"},
-                {"name": "urgent", "color": "red"},
+                {"name": "positive", "color": "green"}, {"name": "negative", "color": "red"},
+                {"name": "neutral", "color": "gray"}, {"name": "urgent", "color": "orange"},
             ]}},
             "AI Reply": {"rich_text": {}},
             "Replied": {"checkbox": {}},
@@ -117,24 +113,25 @@ SCHEMAS = {
         "properties": {
             "Name": {"title": {}},
             "Tone": {"select": {"options": [
-                {"name": "professional", "color": "blue"},
-                {"name": "casual", "color": "green"},
-                {"name": "humorous", "color": "yellow"},
-                {"name": "aspirational", "color": "purple"},
-                {"name": "urgent", "color": "red"},
-                {"name": "luxury", "color": "orange"},
-                {"name": "educational", "color": "gray"},
+                {"name": "professional", "color": "blue"}, {"name": "casual", "color": "green"},
+                {"name": "humorous", "color": "yellow"}, {"name": "aspirational", "color": "purple"},
+                {"name": "urgent", "color": "red"}, {"name": "luxury", "color": "orange"},
+                {"name": "educational", "color": "gray"}, {"name": "playful", "color": "pink"},
             ]}},
             "Voice": {"select": {"options": [
-                {"name": "formal"}, {"name": "friendly"}, {"name": "authoritative"},
-                {"name": "playful"}, {"name": "empathetic"}, {"name": "bold"},
+                {"name": "formal", "color": "blue"}, {"name": "friendly", "color": "green"},
+                {"name": "authoritative", "color": "red"}, {"name": "playful", "color": "pink"},
+                {"name": "empathetic", "color": "purple"}, {"name": "bold", "color": "orange"},
             ]}},
             "Language": {"select": {"options": [
-                {"name": "en"}, {"name": "id"}, {"name": "mix"},
+                {"name": "en", "color": "blue"}, {"name": "id", "color": "red"},
+                {"name": "mix", "color": "purple"},
             ]}},
+            "Color Palette": {"rich_text": {}},
             "Target Audience": {"rich_text": {}},
             "Emoji Style": {"select": {"options": [
-                {"name": "none"}, {"name": "minimal"}, {"name": "moderate"}, {"name": "heavy"},
+                {"name": "none", "color": "gray"}, {"name": "minimal", "color": "blue"},
+                {"name": "moderate", "color": "green"}, {"name": "heavy", "color": "pink"},
             ]}},
             "Default CTA": {"rich_text": {}},
             "Active": {"checkbox": {}},
@@ -146,11 +143,13 @@ SCHEMAS = {
         "properties": {
             "Preview": {"title": {}},
             "Type": {"select": {"options": [
-                {"name": "script"}, {"name": "caption"}, {"name": "video"},
-                {"name": "image"}, {"name": "hashtag_set"},
+                {"name": "script", "color": "blue"}, {"name": "caption", "color": "green"},
+                {"name": "video", "color": "purple"}, {"name": "image", "color": "orange"},
+                {"name": "hashtag_set", "color": "gray"},
             ]}},
             "Platform": {"select": {"options": [
-                {"name": "tiktok"}, {"name": "instagram"}, {"name": "youtube"},
+                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
+                {"name": "youtube", "color": "red"},
             ]}},
             "Product": {"rich_text": {}},
             "Status": {"select": {"options": [
@@ -178,11 +177,53 @@ SCHEMAS = {
             "Comments": {"number": {}},
             "Shares": {"number": {}},
             "Clicks": {"number": {}},
-            "Engagement Rate": {"number": {}},
+            "📊 Engagement Rate": {"formula": {"expression": "if(prop(\"Views\") > 0, format(round((prop(\"Likes\") + prop(\"Comments\") + prop(\"Shares\")) / prop(\"Views\") * 10000) / 100) + \"%\", \"0%\")"}},
+            "📈 Click Rate": {"formula": {"expression": "if(prop(\"Views\") > 0, format(round(prop(\"Clicks\") / prop(\"Views\") * 10000) / 100) + \"%\", \"0%\")"}},
+            "Commission": {"number": {"format": "dollar"}},
+            "Commission Rate": {"number": {"format": "percent"}},
+            "Estimated Earnings": {"formula": {"expression": "prop(\"Clicks\") * prop(\"Commission Rate\")"}},
+            "Conversion Rate": {"formula": {"expression": "if(prop(\"Clicks\") > 0, prop(\"Conversions\") / prop(\"Clicks\"), 0)"}},
             "Platform": {"select": {"options": [
-                {"name": "tiktok"}, {"name": "instagram"}, {"name": "youtube"},
-                {"name": "shopee"}, {"name": "tokopedia"}, {"name": "lazada"},
+                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
+                {"name": "youtube", "color": "red"}, {"name": "shopee", "color": "orange"},
+                {"name": "tokopedia", "color": "green"}, {"name": "lazada", "color": "blue"},
             ]}},
+        },
+    },
+    "Affiliate Products": {
+        "title": "Product Name",
+        "properties": {
+            "Name": {"title": {}},
+            "Platform": {"select": {"options": [
+                {"name": "shopee", "color": "orange"},
+                {"name": "tokopedia", "color": "green"},
+                {"name": "lazada", "color": "blue"},
+                {"name": "tiktok", "color": "purple"},
+                {"name": "sociolla", "color": "pink"},
+                {"name": "blibli", "color": "red"},
+            ]}},
+            "Price": {"number": {"format": "dollar"}},
+            "Commission Rate": {"number": {"format": "percent"}},
+            "Commission Amount": {"formula": {"expression": "prop(\"Price\") * prop(\"Commission Rate\")"}},
+            "Affiliate Link": {"url": {}},
+            "Product URL": {"url": {}},
+            "Image URL": {"url": {}},
+            "Rating": {"number": {"format": "number"}},
+            "Sold": {"number": {"format": "number"}},
+            "Category": {"select": {"options": [
+                {"name": "skincare", "color": "pink"},
+                {"name": "makeup", "color": "purple"},
+                {"name": "bodycare", "color": "yellow"},
+                {"name": "haircare", "color": "green"},
+                {"name": "fragrance", "color": "blue"},
+                {"name": "supplements", "color": "orange"},
+            ]}},
+            "Status": {"select": {"options": [
+                {"name": "active", "color": "green"},
+                {"name": "inactive", "color": "gray"},
+            ]}},
+            "Notes": {"rich_text": {}},
+            "Created": {"date": {}},
         },
     },
 }
@@ -204,6 +245,7 @@ class NotionDashboard:
         self.inbox_db = os.getenv("NOTION_INBOX_DB", "")
         self.brands_db = os.getenv("NOTION_BRANDS_DB", "")
         self.approvals_db = os.getenv("NOTION_APPROVALS_DB", "")
+        self.products_db = os.getenv("NOTION_PRODUCTS_DB", "")
         self._session = requests.Session()
         self._session.headers.update({
             "Authorization": f"Bearer {self.token}",
@@ -289,9 +331,22 @@ class NotionDashboard:
             "Inbox": "inbox_db",
             "Brands": "brands_db",
             "Approvals": "approvals_db",
+            "Affiliate Products": "products_db",
         }
 
-        for name, schema in SCHEMAS.items():
+        # Dependency order: databases without relations FIRST
+        DB_ORDER = ["Campaigns", "Gallery", "Inbox", "Brands", "Approvals", "Affiliate Products", "Content", "Analytics"]
+        # Map relation property names to their target database keys
+        RELATION_MAP = {
+            "Content": {"Campaign": "Campaigns", "Affiliate Product": "Affiliate Products"},
+            "Analytics": {"Content": "Content", "Campaign": "Campaigns"},
+        }
+
+        for name in DB_ORDER:
+            schema = SCHEMAS.get(name)
+            if not schema:
+                continue
+
             attr = _SCHEMA_ATTR_MAP.get(name, f"{name.lower()}_db")
             db_id = getattr(self, attr, "")
             if db_id:
@@ -303,10 +358,44 @@ class NotionDashboard:
                 print(f"[Notion] Cannot create {name} database — no parent page configured")
                 continue
 
+            # Inject data_source_id for relation fields
+            properties = {}
+            for prop_name, prop_def in schema["properties"].items():
+                if "relation" in prop_def:
+                    target = RELATION_MAP.get(name, {}).get(prop_name)
+                    target_id = created.get(target) if target else None
+                    if target_id:
+                        properties[prop_name] = {
+                            "relation": {
+                                "database_id": target_id,
+                                "type": "single_property",
+                                "single_property": {}
+                            }
+                        }
+                    else:
+                        # Fallback: check if target was already created in a prior run
+                        target_attr = _SCHEMA_ATTR_MAP.get(target, f"{target.lower()}_db")
+                        existing_id = getattr(self, target_attr, "")
+                        if existing_id:
+                            properties[prop_name] = {
+                                "relation": {
+                                    "database_id": existing_id,
+                                    "type": "single_property",
+                                    "single_property": {}
+                                }
+                            }
+                        else:
+                            print(f"[Notion] Skipping relation {prop_name} for {name} — target {target} not yet created")
+                            # Notion still rejects; will be retried next run
+                            # Pass minimal valid relation so API doesn't reject
+                            properties[prop_name] = {"relation": {"type": "single_property", "single_property": {}}}
+                else:
+                    properties[prop_name] = prop_def
+
             payload = {
                 "parent": parent,
                 "title": self._format_title(f"UGC — {name}"),
-                "properties": schema["properties"],
+                "properties": properties,
             }
 
             result = self._request("POST", "databases", payload)
@@ -321,6 +410,24 @@ class NotionDashboard:
                 print(f"[Notion] Created {name} database: {db_id}")
             else:
                 print(f"[Notion] Failed to create {name} database: {result.get('message', 'unknown')}")
+
+        # Post-creation: ensure Affiliate Product relation in Content DB is linked
+        products_db_id = created.get("Affiliate Products") or self.products_db
+        content_db_id = created.get("Content") or self.content_db
+        if products_db_id and content_db_id:
+            patch_payload = {
+                "properties": {
+                    "Affiliate Product": {
+                        "relation": {
+                            "database_id": products_db_id,
+                            "type": "single_property",
+                            "single_property": {},
+                        }
+                    }
+                }
+            }
+            self._request("PATCH", f"databases/{content_db_id}", patch_payload)
+            print(f"[Notion] Updated Content DB Affiliate Product relation -> {products_db_id}")
 
         return created
 
@@ -722,6 +829,40 @@ class NotionDashboard:
             if pid:
                 synced.append(pid)
         print(f"[Notion] Synced {len(synced)} approval items")
+        return synced
+
+    # ── Affiliate Products ─────────────────────────────────────────────
+    def sync_products(self, products: list) -> list:
+        if not self.products_db:
+            print("[Notion] Products DB not configured")
+            return []
+        synced = []
+        for p in products:
+            properties = {
+                "Name": {"title": self._format_title(p.get("name", ""))},
+                "Platform": {"select": {"name": p.get("platform", "shopee")}},
+                "Price": self._num(p.get("price")),
+                "Commission Rate": self._num(p.get("commission_rate")),
+                "Affiliate Link": {"url": p.get("affiliate_link") or None},
+                "Product URL": {"url": p.get("product_url") or None},
+                "Image URL": {"url": p.get("image_url") or None},
+                "Rating": self._num(p.get("rating")),
+                "Sold": self._num(p.get("sold")),
+                "Category": {"select": {"name": p.get("category", "skincare")}},
+                "Status": {"select": {"name": p.get("status", "active")}},
+                "Notes": {"rich_text": self._format_rich(p.get("notes", ""))},
+                "Created": {"date": self._date_obj(p.get("created_at", self._iso_now()))},
+            }
+            properties = {k: v for k, v in properties.items() if v is not None}
+            payload = {
+                "parent": {"database_id": self.products_db},
+                "properties": properties,
+            }
+            result = self._request("POST", "pages", payload)
+            pid = result.get("id")
+            if pid:
+                synced.append(pid)
+        print(f"[Notion] Synced {len(synced)} affiliate products")
         return synced
 
     # ── Full Dashboard Sync ────────────────────────────────────────────
