@@ -439,7 +439,7 @@ class ContentBankV2:
     # ── Analytics & Performance ──────────────────────────────────
     def update_performance(self, content_id: int, views: int = 0, likes: int = 0,
                            comments: int = 0, shares: int = 0, clicks: int = 0,
-                           engagement_score: float = None):
+                           engagement_score: Optional[float] = None):
         with self._lock:
             conn = self._connect()
             try:

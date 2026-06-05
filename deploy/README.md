@@ -10,6 +10,9 @@ Production deployment artifacts for the **UGC AI Overpower** auto-pipeline daemo
 | `logrotate.conf` | Daily rotation of `/home/aer/ugc/logs/*.log` (keep 7) |
 | `monitor.sh` | Health-check script (PID file + Notion alert) |
 | `install.sh` | One-shot installer (systemd + logrotate + cron) |
+| `codespace_cron_restart.sh` | Codespace fail-safe: restarts daemon if down |
+| `healthcheck_cron.sh` | Periodic health check via health_monitor.py |
+| `failover_monitor.sh` | Codespace pool failover (primary → backup) |
 
 ## Architecture
 
@@ -75,6 +78,16 @@ tail -f /home/aer/ugc/logs/monitor.log
 cd /home/aer/ugc
 python3 -m ugc_ai_overpower.main auto-pipeline status
 python3 -m ugc_ai_overpower.main auto-pipeline run-once
+
+# Codespace operations
+# - codespace_cron_restart.sh is run every 5min via background loop in codespace
+# - healthcheck_cron.sh runs every 10min, posts to Notion Inbox on failure
+# - failover_monitor.sh checks primary codespace, switches to backup on 3 failures
+
+# Manual checks (in codespace)
+/tmp/ugc-restart                    # restart daemon
+/tmp/healthcheck_cron.sh            # health check
+bash /workspaces/Coba/deploy/failover_monitor.sh
 ```
 
 ## Monitor behaviour

@@ -43,5 +43,21 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.coverage.run]
-source = ["core"]
-omit = ["tests/*"]
+source = ["ugc_ai_overpower"]
+omit = [
+    "tests/*",
+    "**/__init__.py",
+    "seed_*",
+    "main.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass",
+]
+show_missing = true
+skip_empty = true
+precision = 1

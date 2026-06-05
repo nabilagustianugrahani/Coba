@@ -86,6 +86,8 @@ def main():
         logger.info("  modal-deploy           — Deploy SoulX-FlashHead to Modal")
         logger.info("  list-modal-accounts    — Show all configured Modal accounts")
         logger.info("  analytics-collect      — Collect engagement from bank, push to Notion")
+        logger.info("  scrape-engagement      — Scrape/simulate engagement metrics for content items")
+        logger.info("  health-check           — Run daemon health check, alert Notion Inbox on failure")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -474,6 +476,34 @@ def main():
 
     elif cmd == "analytics-collect":
         _cmd_analytics_collect()
+
+    elif cmd == "scrape-engagement":
+        from ugc_ai_overpower.core.engagement_scraper import EngagementScraper
+        scraper = EngagementScraper()
+        mode = sys.argv[2] if len(sys.argv) > 2 else "simulate"
+        if mode == "simulate":
+            result = scraper.simulate_all(posted_only=True)
+            print(f"\n  Engagement simulation complete: {result['simulated']} items updated")
+            for item in result["items"][:5]:
+                print(f"    #{item['id']:>4}  views={item['views']:>6}  likes={item['likes']:>4}  comments={item['comments']:>3}  shares={item['shares']:>3}  score={item['engagement_score']:.2f}%")
+        elif mode == "scrape":
+            logger.info("Real platform scraping — limited by anti-bot. Use simulate for now.")
+            result = scraper.simulate_all(posted_only=True)
+            print(f"  Simulated: {result['simulated']} items (real scrape needs API keys)")
+        else:
+            logger.error(f"Unknown scrape-engagement mode: {mode}")
+            logger.error("Usage: scrape-engagement [simulate|scrape]")
+
+    elif cmd == "health-check":
+        from ugc_ai_overpower.core.health_monitor import HealthMonitor
+        monitor = HealthMonitor()
+        result = monitor.run_health_check(alert=True)
+        if result["healthy"]:
+            print("  ✅ Pipeline healthy")
+            sys.exit(0)
+        else:
+            print(f"  ❌ Pipeline unhealthy: {result}")
+            sys.exit(1)
 
     # ── Notion commands ────────────────────────────────────────────
     elif cmd == "notion-init":

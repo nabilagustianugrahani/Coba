@@ -1,14 +1,49 @@
 {
   "pool": [
-    {"name": "pool-1-zen", "model": "opencode/deepseek-v4-flash-free", "region": "us-west-2", "machine": "basic-linux-32gb"},
-    {"name": "pool-2-zen", "model": "opencode/deepseek-v4-flash-free", "region": "us-east-1", "machine": "basic-linux-32gb"},
-    {"name": "pool-3-zen", "model": "opencode/deepseek-v4-flash-free", "region": "eu-west-1", "machine": "basic-linux-32gb"},
-    {"name": "pool-4-zen", "model": "opencode/glm-4.6-free", "region": "us-west-2", "machine": "basic-linux-32gb"},
-    {"name": "pool-5-zen", "model": "opencode/kimi-k2-free", "region": "us-east-1", "machine": "basic-linux-32gb"}
+    {
+      "name": "primary",
+      "codespace": "symmetrical-palm-tree-5gpr979vgv6jhvqr",
+      "repo": "nabilagustianugrahani/Coba",
+      "branch": "feat/add-sshd",
+      "role": "primary",
+      "model": "opencode/deepseek-v4-flash-free",
+      "machine": "basic-linux-32gb",
+      "max_concurrent": 3
+    },
+    {
+      "name": "failover-1",
+      "codespace": "super-duper-space-guacamole-6975pxpv9p7rfx664",
+      "repo": "nabilagustianugrahani/Coba",
+      "branch": "main",
+      "role": "failover",
+      "model": "opencode/big-pickle-free",
+      "machine": "basic-linux-32gb",
+      "max_concurrent": 2
+    },
+    {
+      "name": "failover-2",
+      "codespace": "expert-space-bassoon-xr56r9v5pg4fppjg",
+      "repo": "nabilagustianugrahani/Coba",
+      "branch": "main",
+      "role": "failover",
+      "model": "opencode/mimo-v2.5-free",
+      "machine": "basic-linux-32gb",
+      "max_concurrent": 2
+    }
   ],
   "scheduler": {
-    "strategy": "round_robin",
-    "health_check_interval_seconds": 60,
-    "max_concurrent_per_pool": 3
+    "strategy": "primary_with_failover",
+    "primary_health_check_seconds": 60,
+    "failover_threshold_failures": 3,
+    "failover_cooldown_seconds": 300
+  },
+  "failover": {
+    "enabled": true,
+    "auto_start_on_shutdown": true,
+    "startup_timeout_seconds": 180,
+    "fallback_pool": [
+      "opencode/nemotron-3-ultra-free",
+      "opencode/minimax-m3-free"
+    ]
   }
 }

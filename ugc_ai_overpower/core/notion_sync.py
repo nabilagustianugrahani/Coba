@@ -3,7 +3,7 @@ import json
 import time
 import datetime
 import requests
-from typing import Optional, Any
+from typing import Optional, Any, Dict, cast
 
 NOTION_VERSION = "2022-06-28"
 NOTION_API = "https://api.notion.com/v1"
@@ -329,7 +329,7 @@ class NotionDashboard:
 
     # ── Auto-create databases ────────────────────────────────────────
     def auto_create_databases(self) -> dict:
-        created = {}
+        created: Dict[str, str] = {}
         if not self.token:
             print("[Notion] No token configured. Set NOTION_TOKEN env var.")
             return created
@@ -379,8 +379,8 @@ class NotionDashboard:
                 continue
 
             # Inject data_source_id for relation fields
-            properties = {}
-            for prop_name, prop_def in schema["properties"].items():
+            properties: Dict[str, Any] = {}
+            for prop_name, prop_def in cast(Dict[str, Any], schema["properties"]).items():
                 if "relation" in prop_def:
                     target = RELATION_MAP.get(name, {}).get(prop_name)
                     target_id = created.get(target) if target else None
@@ -394,7 +394,7 @@ class NotionDashboard:
                         }
                     else:
                         # Fallback: check if target was already created in a prior run
-                        target_attr = _SCHEMA_ATTR_MAP.get(target, f"{target.lower()}_db")
+                        target_attr = _SCHEMA_ATTR_MAP.get(str(target), f"{str(target).lower()}_db")
                         existing_id = getattr(self, target_attr, "")
                         if existing_id:
                             properties[prop_name] = {
@@ -435,7 +435,7 @@ class NotionDashboard:
         products_db_id = created.get("Affiliate Products") or self.products_db
         content_db_id = created.get("Content") or self.content_db
         if products_db_id and content_db_id:
-            patch_payload = {
+            patch_payload: Dict[str, Any] = {
                 "properties": {
                     "Affiliate Product": {
                         "relation": {
@@ -582,7 +582,7 @@ class NotionDashboard:
         return cid
 
     def update_content(self, content_id: str, status: Optional[str] = None, post_url: Optional[str] = None, file_path: Optional[str] = None) -> bool:
-        props = {}
+        props: Dict[str, Any] = {}
         if status:
             props["Status"] = {"select": {"name": status}}
         if post_url:

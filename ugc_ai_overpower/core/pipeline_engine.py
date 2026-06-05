@@ -70,7 +70,7 @@ class DAGPipeline:
         self._context: Dict[str, Any] = {}
         self._run_id = str(uuid.uuid4())[:8]
 
-    def add_node(self, name: str, fn: Callable, deps: List[str] = None,
+    def add_node(self, name: str, fn: Callable, deps: Optional[List[str]] = None,
                  priority: int = 0) -> "DAGPipeline":
         self._nodes[name] = PipelineNode(
             name=name, fn=fn, deps=deps or [], priority=priority,
@@ -96,7 +96,7 @@ class DAGPipeline:
         ready.sort(key=lambda n: self._nodes[n].priority, reverse=True)
         return ready
 
-    def run(self, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    def run(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         self._context = context or {}
         self._context["pipeline_run_id"] = self._run_id
         if self.ai:
@@ -110,7 +110,7 @@ class DAGPipeline:
         completed = 0
         failed = 0
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {}
+            futures: Dict[Any, str] = {}
 
             while len(futures) > 0 or completed + failed < len(self._nodes):
                 ready = self.get_ready_nodes()
@@ -121,11 +121,11 @@ class DAGPipeline:
                     future = executor.submit(self._run_node, name)
                     futures[future] = name
 
-                done_futures = []
+                done_futures: List[Any] = []
                 for future in as_completed(futures):
                     name = futures[future]
                     try:
-                        result = future.result()
+                        result: Any = future.result()
                         if result is not None:
                             self._context[name] = result
                         self._nodes[name].status = NodeStatus.COMPLETED

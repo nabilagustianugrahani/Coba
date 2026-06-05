@@ -22,7 +22,8 @@
       }
     }
   },
-  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && pip install --upgrade pip && pip install -r ugc_ai_overpower/requirements.txt",
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && pip install --upgrade pip && pip install -r ugc_ai_overpower/requirements.txt && cp deploy/codespace_cron_restart.sh /usr/local/bin/ugc-restart && chmod +x /usr/local/bin/ugc-restart && (crontab -l 2>/dev/null; echo '*/5 * * * * /usr/local/bin/ugc-restart >> /tmp/ugc-restart.log 2>&1') | crontab -",
+  "postStartCommand": "/usr/local/bin/ugc-restart",
   "workspaceFolder": "/workspaces/ugc_ai_overpower",
   "workspaceMount": "source=${localWorkspaceFolder}/ugc_ai_overpower,target=/workspaces/ugc_ai_overpower,type=bind"
 }

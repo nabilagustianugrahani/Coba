@@ -66,11 +66,33 @@ class CodespacePool:
             if not members:
                 raise RuntimeError("Codespace pool is empty")
             strategy = self.config["scheduler"].get("strategy", "round_robin")
+            if strategy == "primary_with_failover":
+                primary = next((m for m in members if m.get("role") == "primary"), members[0])
+                if self._is_healthy(primary):
+                    return dict(primary)
+                logger.warning("Primary unhealthy — trying failover")
+                for fail in (m for m in members if m.get("role") == "failover"):
+                    if self._is_healthy(fail):
+                        logger.info("Failover active: %s", fail["name"])
+                        return dict(fail)
+                logger.error("All failover codespaces unhealthy — using primary anyway")
+                return dict(primary)
             if strategy != "round_robin":
                 logger.warning("Unsupported scheduler strategy '%s' - falling back to round_robin", strategy)
             member = members[self._cursor % len(members)]
             self._cursor = (self._cursor + 1) % len(members)
             return dict(member)
+
+    def _is_healthy(self, member: dict[str, Any]) -> bool:
+        cs_name = member.get("codespace")
+        if not cs_name:
+            return False
+        cached = self._health_cache.get(cs_name)
+        if cached and (time.time() - cached.get("checked_at", 0)) < 60:
+            return cached["health"].get("available", False)
+        health = self._check_codespace_health(cs_name)
+        self._health_cache[cs_name] = {"checked_at": time.time(), "health": health}
+        return health.get("available", False)
 
     def _gh_available(self) -> bool:
         return shutil.which("gh") is not None
