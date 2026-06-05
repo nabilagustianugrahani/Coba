@@ -133,6 +133,23 @@ def run_pipeline_for_all_products():
             run_result["notion_status"] = "fail"
             log.error(f"Notion sync failed (non-fatal): {ne}", exc_info=True)
 
+        # Auto-heal cycle: detect & fix any issues from this run
+        try:
+            from ugc_ai_overpower.core.autoheal import AutoHealOrchestrator
+            orch = AutoHealOrchestrator()
+            orch.reload()
+            heal_result = orch.run_heal_cycle(auto_apply=True)
+            run_result["autoheal"] = {
+                "rules_triggered": heal_result.get("rules_triggered", 0),
+                "actions_executed": heal_result.get("actions_executed", 0),
+                "incidents": len(heal_result.get("incidents", [])),
+            }
+            if heal_result.get("incidents"):
+                log.warning(f"Auto-heal triggered {len(heal_result['incidents'])} incident(s)")
+        except Exception as ae:
+            run_result["autoheal"] = {"error": str(ae)}
+            log.error(f"Auto-heal cycle failed (non-fatal): {ae}", exc_info=True)
+
         log.info(
             f"Run summary: timestamp={run_timestamp} "
             f"products={products_processed} scripts={scripts_generated} "

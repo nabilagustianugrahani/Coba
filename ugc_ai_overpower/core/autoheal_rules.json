@@ -1,0 +1,58 @@
+{
+  "rules": [
+    {
+      "name": "restart_dead_daemon",
+      "condition": "daemon_down",
+      "priority": 10,
+      "cooldown_seconds": 300,
+      "actions": [
+        {
+          "type": "restart",
+          "target": "daemon",
+          "description": "Restart auto-pipeline daemon via /tmp/ugc-restart"
+        }
+      ]
+    },
+    {
+      "name": "fix_recent_log_errors",
+      "condition": "log_error",
+      "priority": 20,
+      "cooldown_seconds": 600,
+      "actions": [
+        {
+          "type": "alert",
+          "target": "",
+          "params": {
+            "title": "Auto-heal: log errors detected",
+            "body": "Recent ERROR/Traceback in auto-pipeline.log. Investigating root cause.",
+            "severity": "warning"
+          },
+          "description": "Notify about log errors"
+        }
+      ]
+    },
+    {
+      "name": "switch_failover_when_daemon_unrecoverable",
+      "condition": "daemon_down",
+      "priority": 5,
+      "cooldown_seconds": 900,
+      "actions": [
+        {
+          "type": "switch_failover",
+          "target": "",
+          "description": "Switch to backup codespace"
+        },
+        {
+          "type": "alert",
+          "target": "",
+          "params": {
+            "title": "Auto-heal: failover triggered",
+            "body": "Primary codespace unresponsive after restart attempts. Switched to backup.",
+            "severity": "critical"
+          },
+          "description": "Notify about failover"
+        }
+      ]
+    }
+  ]
+}

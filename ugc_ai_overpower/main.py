@@ -88,6 +88,7 @@ def main():
         logger.info("  analytics-collect      — Collect engagement from bank, push to Notion")
         logger.info("  scrape-engagement      — Scrape/simulate engagement metrics for content items")
         logger.info("  health-check           — Run daemon health check, alert Notion Inbox on failure")
+        logger.info("  autoheal               — Run auto-heal cycle (run|dry-run|stats|incidents)")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -504,6 +505,25 @@ def main():
         else:
             print(f"  ❌ Pipeline unhealthy: {result}")
             sys.exit(1)
+
+    elif cmd == "autoheal":
+        from ugc_ai_overpower.core.autoheal import AutoHealOrchestrator
+        orch = AutoHealOrchestrator()
+        orch.reload()
+        sub = sys.argv[2] if len(sys.argv) > 2 else "run"
+        if sub == "run":
+            result = orch.run_heal_cycle(auto_apply=True)
+            print(json.dumps(result, indent=2, default=str))
+        elif sub == "dry-run":
+            result = orch.run_heal_cycle(auto_apply=False)
+            print(json.dumps(result, indent=2, default=str))
+        elif sub == "stats":
+            print(json.dumps(orch.get_stats(), indent=2))
+        elif sub == "incidents":
+            for inc in orch.recent_incidents(limit=20):
+                print(json.dumps(inc, default=str))
+        else:
+            logger.error("Usage: autoheal [run|dry-run|stats|incidents]")
 
     # ── Notion commands ────────────────────────────────────────────
     elif cmd == "notion-init":
