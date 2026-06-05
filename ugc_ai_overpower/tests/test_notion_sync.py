@@ -109,6 +109,7 @@ class TestNotionDashboard:
         
         assert result == {"object": "page", "id": "test"}
         mock_session.request.assert_called_once_with(
+            "GET",
             "https://api.notion.com/v1/test/endpoint",
             json=None
         )
@@ -226,7 +227,7 @@ class TestNotionDashboard:
         result = dashboard.auto_create_databases()
         
         assert result == {}
-        mock_session_class.assert_not_called()
+        mock_session_class.return_value.request.assert_not_called()
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
@@ -242,7 +243,8 @@ class TestNotionDashboard:
         
         # Mock database creation response
         mock_response = Mock()
-        mock_response.get.return_value = "test-db-id"
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "test-db-id"}
         mock_session.request.return_value = mock_response
         
         dashboard = NotionDashboard(token="test_token")
@@ -269,9 +271,10 @@ class TestNotionDashboard:
         
     def test_add_campaign_no_db(self):
         """Test add_campaign without campaign database configured."""
-        dashboard = NotionDashboard(token="test_token")
-        with patch('builtins.print') as mock_print:
-            result = dashboard.add_campaign("Test Product")
+        with patch.dict(os.environ, {}, clear=True):
+            dashboard = NotionDashboard(token="test_token")
+            with patch('builtins.print') as mock_print:
+                result = dashboard.add_campaign("Test Product")
             
         assert result is None
         mock_print.assert_called_with("[Notion] Campaign DB not configured")
@@ -289,7 +292,8 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = "campaign-page-id"
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "campaign-page-id"}
         mock_session.request.return_value = mock_response
         
         dashboard = NotionDashboard(token="test_token")
@@ -317,7 +321,8 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = {"object": "page"}
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"object": "page"}
         mock_session.request.return_value = mock_response
         
         dashboard = NotionDashboard(token="test_token")
@@ -332,8 +337,8 @@ class TestNotionDashboard:
         
     def test_add_content_no_db(self):
         """Test add_content without content database configured."""
-        dashboard = NotionDashboard(token="test_token")
-        with patch('builtins.print') as mock_print:
+        with patch.dict(os.environ, {}, clear=True), patch('builtins.print') as mock_print:
+            dashboard = NotionDashboard(token="test_token")
             result = dashboard.add_content("campaign-id", "Test Hook")
             
         assert result is None
@@ -352,7 +357,8 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = "content-page-id"
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "content-page-id"}
         mock_session.request.return_value = mock_response
         
         dashboard = NotionDashboard(token="test_token")
@@ -386,7 +392,8 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = {"object": "page"}
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"object": "page"}
         mock_session.request.return_value = mock_response
         
         dashboard = NotionDashboard(token="test_token")
@@ -425,7 +432,8 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = "analytics-page-id"
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "analytics-page-id"}
         mock_session.request.return_value = mock_response
         
         dashboard = NotionDashboard(token="test_token")
@@ -462,16 +470,17 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = {
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
             "results": [
                 {
                     "id": "campaign-1",
                     "properties": {
-                        "Name": {"title": [{"text": {"content": "Test Campaign"}}]},
-                        "Product": {"rich_text": [{"text": {"content": "Test Product"}}]},
+                        "Name": {"title": [{"type": "text", "text": {"content": "Test Campaign"}, "plain_text": "Test Campaign"}]},
+                        "Product": {"rich_text": [{"type": "text", "text": {"content": "Test Product"}, "plain_text": "Test Product"}]},
                         "Status": {"select": {"name": "Active"}},
                         "Target Platforms": {"multi_select": [{"name": "tiktok"}]},
-                        "Psychology Triggers": {"rich_text": [{"text": {"content": "curiosity"}}]},
+                        "Psychology Triggers": {"rich_text": [{"type": "text", "text": {"content": "curiosity"}, "plain_text": "curiosity"}]},
                         "Total Content": {"number": 10},
                         "Content Generated": {"number": 5},
                         "Videos Generated": {"number": 3},
@@ -524,12 +533,13 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = {
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
             "results": [
                 {
                     "id": "content-1",
                     "properties": {
-                        "Hook": {"title": [{"text": {"content": "Test Hook 1"}}]},
+                        "Hook": {"title": [{"plain_text": "Test Hook 1"}]},
                         "Platform": {"select": {"name": "tiktok"}},
                         "Status": {"select": {"name": "scripted"}},
                         "Post URL": {"url": "https://example.com/post1"}
@@ -538,7 +548,7 @@ class TestNotionDashboard:
                 {
                     "id": "content-2",
                     "properties": {
-                        "Hook": {"title": [{"text": {"content": "Test Hook 2"}}]},
+                        "Hook": {"title": [{"plain_text": "Test Hook 2"}]},
                         "Platform": {"select": {"name": "instagram"}},
                         "Status": {"select": {"name": "posted"}},
                         "Post URL": {"url": "https://example.com/post2"}
@@ -584,9 +594,15 @@ class TestNotionDashboard:
         mock_session = Mock()
         mock_session_class.return_value = mock_session
         
-        mock_response = Mock()
-        mock_response.get.return_value = "gallery-page-id"
-        mock_session.request.return_value = mock_response
+        query_response = Mock()
+        query_response.status_code = 200
+        query_response.json.return_value = {"results": []}
+        
+        create_response = Mock()
+        create_response.status_code = 200
+        create_response.json.return_value = {"id": "gallery-page-id"}
+        
+        mock_session.request.side_effect = [query_response, create_response]
         
         videos = [
             {
@@ -608,7 +624,7 @@ class TestNotionDashboard:
         
         assert len(result) == 1
         assert result[0] == "gallery-page-id"
-        mock_session.request.assert_called_once()
+        assert mock_session.request.call_count == 2
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
@@ -635,9 +651,15 @@ class TestNotionDashboard:
         mock_session = Mock()
         mock_session_class.return_value = mock_session
         
-        mock_response = Mock()
-        mock_response.get.return_value = "inbox-page-id"
-        mock_session.request.return_value = mock_response
+        query_response = Mock()
+        query_response.status_code = 200
+        query_response.json.return_value = {"results": []}
+        
+        create_response = Mock()
+        create_response.status_code = 200
+        create_response.json.return_value = {"id": "inbox-page-id"}
+        
+        mock_session.request.side_effect = [query_response, create_response]
         
         messages = [
             {
@@ -659,7 +681,7 @@ class TestNotionDashboard:
         
         assert len(result) == 1
         assert result[0] == "inbox-page-id"
-        mock_session.request.assert_called_once()
+        assert mock_session.request.call_count == 2
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
@@ -687,7 +709,8 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = "brands-page-id"
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "brands-page-id"}
         mock_session.request.return_value = mock_response
         
         brands = [
@@ -737,7 +760,8 @@ class TestNotionDashboard:
         mock_session_class.return_value = mock_session
         
         mock_response = Mock()
-        mock_response.get.return_value = "approvals-page-id"
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"id": "approvals-page-id"}
         mock_session.request.return_value = mock_response
         
         approvals = [
@@ -787,9 +811,15 @@ class TestNotionDashboard:
         mock_session = Mock()
         mock_session_class.return_value = mock_session
         
-        mock_response = Mock()
-        mock_response.get.return_value = "products-page-id"
-        mock_session.request.return_value = mock_response
+        query_response = Mock()
+        query_response.status_code = 200
+        query_response.json.return_value = {"results": []}
+        
+        create_response = Mock()
+        create_response.status_code = 200
+        create_response.json.return_value = {"id": "products-page-id"}
+        
+        mock_session.request.side_effect = [query_response, create_response]
         
         products = [
             {
@@ -814,7 +844,7 @@ class TestNotionDashboard:
         
         assert len(result) == 1
         assert result[0] == "products-page-id"
-        mock_session.request.assert_called_once()
+        assert mock_session.request.call_count == 2
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
@@ -842,15 +872,25 @@ class TestNotionDashboard:
         mock_session = Mock()
         mock_session_class.return_value = mock_session
         
-        mock_response = Mock()
-        mock_response.get.return_value = "report-page-id"
-        mock_session.request.return_value = mock_response
+        campaigns_response = Mock()
+        campaigns_response.status_code = 200
+        campaigns_response.json.return_value = {"results": []}
+        
+        analytics_response = Mock()
+        analytics_response.status_code = 200
+        analytics_response.json.return_value = {"results": []}
+        
+        create_response = Mock()
+        create_response.status_code = 200
+        create_response.json.return_value = {"id": "report-page-id"}
+        
+        mock_session.request.side_effect = [campaigns_response, analytics_response, create_response]
         
         dashboard = NotionDashboard(token="test_token")
         result = dashboard.create_daily_report("2023-01-01")
         
         assert result == "report-page-id"
-        mock_session.request.assert_called_once()
+        assert mock_session.request.call_count == 3
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
@@ -879,6 +919,11 @@ class TestNotionDashboard:
         mock_session = Mock()
         mock_session_class.return_value = mock_session
         
+        campaigns_response = Mock()
+        campaigns_response.status_code = 200
+        campaigns_response.json.return_value = {"results": []}
+        mock_session.request.return_value = campaigns_response
+        
         # Mock add_campaign to return None (failed)
         dashboard = NotionDashboard(token="test_token")
         with patch.object(dashboard, 'add_campaign', return_value=None):
@@ -900,9 +945,10 @@ class TestNotionDashboard:
         mock_session = Mock()
         mock_session_class.return_value = mock_session
         
-        mock_response = Mock()
-        mock_response.get.return_value = "page-id"
-        mock_session.request.return_value = mock_response
+        update_response = Mock()
+        update_response.status_code = 200
+        update_response.json.return_value = {"object": "page"}
+        mock_session.request.return_value = update_response
         
         dashboard = NotionDashboard(token="test_token")
         
