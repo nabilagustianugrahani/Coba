@@ -259,6 +259,13 @@ class ContentBankV2:
         with self._lock:
             conn = self._connect()
             try:
+                product_id = kw.get("product_id")
+                if product_id is not None:
+                    exists = conn.execute(
+                        "SELECT 1 FROM products_v2 WHERE id=?", (product_id,)
+                    ).fetchone()
+                    if not exists:
+                        product_id = None
                 version_group = kw.get("version_group") or hashlib.md5(
                     (hook + script[:50]).encode()
                 ).hexdigest()[:16]
@@ -270,7 +277,7 @@ class ContentBankV2:
                        tags, metadata, a_b_group, is_recycle, source_content_id)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (version_group, kw.get("version", 1), kw.get("parent_version_id"),
-                     kw.get("influencer_id"), kw.get("product_id"), kw.get("series_id"),
+                     kw.get("influencer_id"), product_id, kw.get("series_id"),
                      kw.get("episode_number"), kw.get("platform", "tiktok"),
                      hook, script, script_hash,
                      json.dumps(kw.get("hashtags", [])), kw.get("status", "draft"),
@@ -290,19 +297,22 @@ class ContentBankV2:
             orig = conn.execute("SELECT * FROM content_v2 WHERE id=?", (content_id,)).fetchone()
             if not orig:
                 raise ValueError(f"Content {content_id} not found")
+            new_kw = dict(kw)
+            new_kw.pop("hook", None)
+            new_kw.pop("script", None)
+            new_kw.setdefault("version_group", orig["version_group"])
+            new_kw.setdefault("version", orig["version"] + 1)
+            new_kw.setdefault("parent_version_id", content_id)
+            new_kw.setdefault("influencer_id", orig["influencer_id"])
+            new_kw.setdefault("product_id", orig["product_id"])
+            new_kw.setdefault("series_id", orig["series_id"])
+            new_kw.setdefault("platform", orig["platform"])
+            new_kw.setdefault("hashtags", json.loads(orig["hashtags"]))
+            new_kw.setdefault("tags", json.loads(orig["tags"]))
             return self.add_content(
                 hook=kw.get("hook", orig["hook"]),
                 script=new_script,
-                version_group=orig["version_group"],
-                version=orig["version"] + 1,
-                parent_version_id=content_id,
-                influencer_id=orig["influencer_id"],
-                product_id=orig["product_id"],
-                series_id=orig["series_id"],
-                platform=orig["platform"],
-                hashtags=json.loads(orig["hashtags"]),
-                tags=json.loads(orig["tags"]),
-                **kw
+                **new_kw
             )
         finally:
             conn.close()
@@ -338,9 +348,38 @@ class ContentBankV2:
         with self._lock:
             conn = self._connect()
             try:
+                name_lower = name.lower()
                 cur = conn.execute(
                     "INSERT OR IGNORE INTO tags (name, color, category) VALUES (?, ?, ?)",
-                    (name.lower(), color, category)
+                    (name_lower, color, category)
+                )
+                conn.commit()
+                if cur.lastrowid:
+                    return cur.lastrowid
+                row = conn.execute(
+                    "SELECT id FROM tags WHERE name=?", (name_lower,)
+                ).fetchone()
+                return row["id"] if row else 0
+            finally:
+                conn.close()
+
+    # ── Influencers ──────────────────────────────────────────────
+    def add_influencer(self, name: str, **kw) -> int:
+        with self._lock:
+            conn = self._connect()
+            try:
+                cur = conn.execute(
+                    """INSERT INTO influencers_v2 (name, niche, gender, age, personality,
+                       voice_style, visual_style, backstory, avatar_url, followers,
+                       engagement_rate, platforms, tags, metadata, performance_score)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (name, kw.get("niche", ""), kw.get("gender", ""), kw.get("age"),
+                     kw.get("personality", ""), kw.get("voice_style", ""),
+                     kw.get("visual_style", ""), kw.get("backstory", ""),
+                     kw.get("avatar_url", ""), kw.get("followers", 0),
+                     kw.get("engagement_rate", 0),
+                     json.dumps(kw.get("platforms", [])), json.dumps(kw.get("tags", [])),
+                     json.dumps(kw.get("metadata", {})), kw.get("performance_score", 0))
                 )
                 conn.commit()
                 return cur.lastrowid
@@ -370,7 +409,7 @@ class ContentBankV2:
                      kw.get("platform", "tiktok"), kw.get("total_episodes", 10),
                      kw.get("episode_interval_hours", 24),
                      json.dumps(kw.get("tags", [])),
-                     json.dumps(kw.get("template", {})),
+                     json.dumps(kw.get("template_json", {})),
                      kw.get("schedule_cron"))
                 )
                 conn.commit()
@@ -399,12 +438,18 @@ class ContentBankV2:
 
     # ── Analytics & Performance ──────────────────────────────────
     def update_performance(self, content_id: int, views: int = 0, likes: int = 0,
-                           comments: int = 0, shares: int = 0, clicks: int = 0):
+                           comments: int = 0, shares: int = 0, clicks: int = 0,
+                           engagement_score: float = None):
         with self._lock:
             conn = self._connect()
             try:
-                total_eng = likes + comments + shares + clicks
-                score = round(total_eng / max(views, 1) * 100, 2)
+                if engagement_score is not None:
+                    score = engagement_score
+                elif views == 0:
+                    score = 0
+                else:
+                    total_eng = likes + comments + shares + clicks
+                    score = round(total_eng / views * 100, 2)
                 conn.execute(
                     """UPDATE content_v2 SET views=?, likes=?, comments=?, shares=?, clicks=?,
                        engagement_score=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
@@ -423,7 +468,7 @@ class ContentBankV2:
                 where += " AND platform=?"
                 params.append(platform)
             if days:
-                where += " AND posted_at >= datetime('now', ?)"
+                where += " AND (posted_at IS NULL OR posted_at >= datetime('now', ?))"
                 params.append(f"-{days} days")
             rows = conn.execute(
                 f"SELECT * FROM content_v2 {where} ORDER BY engagement_score DESC LIMIT ?",

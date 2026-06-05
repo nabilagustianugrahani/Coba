@@ -1,0 +1,17 @@
+[Unit]
+Description=UGC Auto-Pipeline Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=aer
+WorkingDirectory=/home/aer/ugc
+Environment="PYTHONPATH=/home/aer/ugc"
+ExecStart=/usr/bin/python3 -m ugc_ai_overpower.main auto-pipeline start
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/aer/ugc/logs/auto-pipeline.log
+StandardError=append:/home/aer/ugc/logs/auto-pipeline-err.log
+
+[Install]
+WantedBy=multi-user.target

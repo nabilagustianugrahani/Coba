@@ -74,11 +74,18 @@ def main():
         logger.info('  swarm-campaign <product> — Dispatch campaign via swarm')
         logger.info("  swarm-status           — Show swarm health & campaigns")
         logger.info("  pipeline <product>     — DAG pipeline: 6 hunters → critic → 3 narrators → judge")
+        logger.info("  notion-list campaigns|content  — List Notion campaigns or content")
+        logger.info("  notion-find <query>         — Search across Notion databases")
+        logger.info("  notion-analytics [product]   — View or update analytics")
+        logger.info("  run-pipeline           — Full pipeline: all products → content → Notion sync")
+        logger.info("  codespace-pool status|dispatch|list — Multi-codespace parallel execution")
+        logger.info("  auto-pipeline          — Auto-pipeline daemon management")
         logger.info("  telegram               — Start Telegram Commander (control from phone)")
         logger.info("  trends [niche]         — AI-powered trend analysis for niche")
         logger.info("  modal-status           — Check Modal GPU connection & quota")
         logger.info("  modal-deploy           — Deploy SoulX-FlashHead to Modal")
         logger.info("  list-modal-accounts    — Show all configured Modal accounts")
+        logger.info("  analytics-collect      — Collect engagement from bank, push to Notion")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -465,6 +472,9 @@ def main():
         for acc in accounts:
             print(f"  [{acc['index']}] {acc['status']}")
 
+    elif cmd == "analytics-collect":
+        _cmd_analytics_collect()
+
     # ── Notion commands ────────────────────────────────────────────
     elif cmd == "notion-init":
         _cmd_notion_init()
@@ -495,8 +505,95 @@ def main():
     elif cmd == "notion-sync-products":
         _cmd_notion_sync_products()
 
+    elif cmd == "notion-list":
+        nd = _get_notion()
+        if not nd:
+            return
+        if len(sys.argv) < 3:
+            logger.error("Usage: notion-list campaigns | content <campaign_id>")
+            sys.exit(1)
+        sub = sys.argv[2]
+        if sub == "campaigns":
+            campaigns = nd.get_all_campaigns()
+            print(f"\n  {'Name':30s} {'Status':12s} {'Content':>8} {'Posts':>6} {'Product'}")
+            print(f"  {'-'*30} {'-'*12} {'-'*8} {'-'*6} {'-'*30}")
+            for c in campaigns:
+                print(f"  {c['name'][:30]:30s} {c['status']:12s} {c['content_generated']:>8} {c['posts_published']:>6} {c['product'][:30]}")
+            print(f"  Total: {len(campaigns)} campaigns")
+        elif sub == "content":
+            if len(sys.argv) < 4:
+                logger.error("Usage: notion-list content <campaign_id>")
+                sys.exit(1)
+            items = nd.get_content_for_campaign(sys.argv[3])
+            print(f"\n  {'Hook':50s} {'Platform':12s} {'Status':12s}")
+            print(f"  {'-'*50} {'-'*12} {'-'*12}")
+            for i in items:
+                print(f"  {i['hook'][:50]:50s} {i['platform']:12s} {i['status']:12s}")
+            print(f"  Total: {len(items)} items")
+        else:
+            logger.error(f"Unknown notion-list subcommand: {sub}")
+
+    elif cmd == "notion-find":
+        nd = _get_notion()
+        if not nd:
+            return
+        query = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else input("Search: ")
+        print(f"\n  Searching for '{query}' across all databases...")
+        dbs = [
+            ("Campaigns", nd.campaign_db),
+            ("Content", nd.content_db),
+            ("Products", nd.products_db),
+        ]
+        found = 0
+        for name, db_id in dbs:
+            if db_id:
+                results = nd.find_in_database(db_id, query)
+                if results:
+                    print(f"\n  📁 {name}:")
+                    for r in results:
+                        print(f"     - {r['name'][:80]} ({r['id'][:12]}...)")
+                        found += 1
+        if not found:
+            print("  No results found.")
+
+    elif cmd == "notion-analytics":
+        nd = _get_notion()
+        if not nd:
+            return
+        product = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else None
+        if product:
+            logger.info(f"Updating analytics for {product}...")
+            from ugc_ai_overpower.core.orchestrator import Orchestrator
+            orch = Orchestrator(None, None)
+            result = orch.update_analytics(product)
+            print(json.dumps(result, indent=2, default=str))
+        else:
+            _cmd_analytics()
+
+    elif cmd == "run-pipeline":
+        from ugc_ai_overpower.core.pipeline_engine import PipelineEngine
+        engine = PipelineEngine(ai_router=ai)
+        logger.info("Running full pipeline (products -> content -> notion)...")
+        result = engine.run_full_pipeline()
+        print(json.dumps(result, indent=2, default=str))
+        print(f"Pipeline complete: {result['products_processed']} products processed")
+
+    elif cmd == "auto-pipeline":
+        if len(sys.argv) < 3:
+            logger.error("Usage: auto-pipeline <start|stop|status|run-once>")
+            sys.exit(1)
+        # Import and run the auto-pipeline daemon
+        from ugc_ai_overpower.core.auto_pipeline import main as auto_pipeline_main
+        # Replace sys.argv with the auto-pipeline arguments
+        sys.argv = [sys.argv[0]] + sys.argv[2:]  # Remove 'main.py' and 'auto-pipeline'
+        auto_pipeline_main()
+
     elif cmd == "list-products":
         _cmd_list_products()
+
+    elif cmd == "codespace-pool":
+        sub = sys.argv[2] if len(sys.argv) > 2 else "status"
+        _cmd_codespace_pool(sub, sys.argv[3:])
 
     else:
         logger.warning(f"Unknown command: {cmd}")
@@ -560,16 +657,61 @@ def _cmd_post(bank: ContentBank, orch: Orchestrator, content_id: int, platform: 
 
 
 def _cmd_scheduler() -> None:
-    logger.info("Starting content scheduler daemon...")
-    # TODO: Implement scheduler daemon
-    # For now, we just print a message and exit.
-    logger.info("Scheduler daemon started (placeholder).")
+    logger.info("Starting auto-pipeline daemon...")
+    from ugc_ai_overpower.core.auto_pipeline import start_scheduler, initialize_components
+    if initialize_components():
+        start_scheduler(interval_hours=6)
+        logger.info("Auto-pipeline daemon started (runs every 6h)")
+    else:
+        logger.error("Failed to initialize pipeline components")
 
 
 def _cmd_analytics() -> None:
     logger.info("Showing analytics dashboard...")
-    # TODO: Implement analytics dashboard
-    logger.info("Analytics dashboard (placeholder).")
+    from ugc_ai_overpower.core.notion_sync import NotionDashboard
+    nd = NotionDashboard()
+    if not nd.ready:
+        logger.error("Notion not configured")
+        return
+    print(f"\n  Notion Dashboard Analytics")
+    print(f"  {'-'*40}")
+    campaigns = nd.get_all_campaigns()
+    total_content = sum(c.get("content_generated", 0) for c in campaigns)
+    total_posts = sum(c.get("posts_published", 0) for c in campaigns)
+    print(f"  Total campaigns  : {len(campaigns)}")
+    print(f"  Total content    : {total_content}")
+    print(f"  Total posts      : {total_posts}")
+    print(f"  Active campaigns : {sum(1 for c in campaigns if c.get('status') == 'Active')}")
+    print()
+
+
+def _cmd_analytics_collect() -> None:
+    """Run the analytics collector: aggregate bank engagement, push to Notion."""
+    from ugc_ai_overpower.core.analytics_collector import AnalyticsCollector
+
+    collector = AnalyticsCollector()
+    daily = collector.daily_aggregate()
+    print()
+    print("  📊 Engagement Analytics Summary")
+    print("  " + "-" * 40)
+    print(f"  Content pieces : {daily.get('content_count', 0)}")
+    print(f"  Views           : {int(daily.get('views', 0)):,}")
+    print(f"  Likes           : {int(daily.get('likes', 0)):,}")
+    print(f"  Comments        : {int(daily.get('comments', 0)):,}")
+    print(f"  Shares          : {int(daily.get('shares', 0)):,}")
+    print(f"  Clicks          : {int(daily.get('clicks', 0)):,}")
+    print(f"  Engagement rate : {daily.get('engagement_rate', 0)}%")
+    print(f"  Avg score       : {daily.get('avg_engagement_score') or 0}")
+    print()
+    print("  Pushing to Notion...")
+    push_result = collector.push_to_notion()
+    print(f"  Status          : {push_result.get('status')}")
+    print(f"  Synced records  : {push_result.get('synced', 0)}")
+    if push_result.get("campaigns_matched") is not None:
+        print(f"  Campaigns hit   : {push_result.get('campaigns_matched')}")
+    if push_result.get("message"):
+        print(f"  Message         : {push_result.get('message')}")
+    print()
 
 
 def _cmd_generate_video(script: str, product_image: str = None) -> None:
@@ -673,15 +815,30 @@ def _cmd_notion_init():
 
 
 def _cmd_notion_status():
+    from ugc_ai_overpower.core.notion_sync import NotionDashboard
     nd = NotionDashboard()
     print(f"  Token configured : {'✅' if nd.token else '❌'}")
-    print(f"  Campaign DB      : {'✅' if nd.campaign_db else '❌'} {nd.campaign_db or ''}")
-    print(f"  Content DB       : {'✅' if nd.content_db else '❌'} {nd.content_db or ''}")
-    print(f"  Analytics DB     : {'✅' if nd.analytics_db else '❌'} {nd.analytics_db or ''}")
-    print(f"  Gallery DB       : {'✅' if nd.gallery_db else '❌'} {nd.gallery_db or ''}")
-    print(f"  Inbox DB         : {'✅' if nd.inbox_db else '❌'} {nd.inbox_db or ''}")
-    print(f"  Brands DB        : {'✅' if nd.brands_db else '❌'} {nd.brands_db or ''}")
-    print(f"  Approvals DB     : {'✅' if nd.approvals_db else '❌'} {nd.approvals_db or ''}")
+    db_fields = [
+        ("Campaign DB", nd.campaign_db),
+        ("Content DB", nd.content_db),
+        ("Analytics DB", nd.analytics_db),
+        ("Gallery DB", nd.gallery_db),
+        ("Inbox DB", nd.inbox_db),
+        ("Brands DB", nd.brands_db),
+        ("Approvals DB", nd.approvals_db),
+        ("Products DB", nd.products_db),
+    ]
+    for name, db_id in db_fields:
+        if db_id:
+            info = nd.get_database_info(db_id)
+            title = info.get("title", [{}])
+            title_text = ""
+            if title and isinstance(title, list):
+                for t in title:
+                    title_text += t.get("plain_text", "")
+            print(f"  {name:15s} : ✅ {title_text[:40]} ({db_id[:10]}...)")
+        else:
+            print(f"  {name:15s} : ❌ (not configured)")
     print(f"  Parent Page      : {os.getenv('NOTION_PARENT_PAGE', '(not set)')}")
 
 
@@ -790,6 +947,53 @@ def _cmd_list_products():
         aff = (p.get('affiliate_link') or '')[:50]
         name = (p.get('name') or '')[:45]
         print(f"  {name:45s} {p.get('platform',''):12s} Rp{p.get('price',0):>8,.0f} {p.get('commission_rate',0):>6.1f}% {aff}")
+
+
+def _cmd_codespace_pool(sub: str, args: list) -> None:
+    """codespace-pool CLI handler: status | dispatch | list."""
+    try:
+        from ugc_ai_overpower.core.codespace_pool import CodespacePool
+    except Exception as exc:
+        logger.error(f"Failed to import CodespacePool: {exc}")
+        sys.exit(1)
+    try:
+        pool = CodespacePool()
+    except FileNotFoundError as exc:
+        logger.error(str(exc))
+        logger.error("Hint: create .opencode/codespace_pool.json at repo root")
+        sys.exit(1)
+    except ValueError as exc:
+        logger.error(f"Invalid pool config: {exc}")
+        sys.exit(1)
+
+    if sub == "list":
+        for m in pool.pool:
+            print(f"  {m['name']:18s} model={m.get('model',''):40s} region={m.get('region','-'):10s} machine={m.get('machine','-')}")
+        print(f"  Total: {len(pool.pool)} codespaces")
+    elif sub == "status":
+        rows = pool.pool_status()
+        print(f"\n  {'Status':8s} {'Name':18s} {'State':12s} {'Model':40s} {'Error'}")
+        print(f"  {'-'*8} {'-'*18} {'-'*12} {'-'*40} {'-'*30}")
+        healthy = 0
+        for s in rows:
+            flag = "OK" if s["healthy"] else "DOWN"
+            err = (s.get("error") or "")[:30]
+            print(f"  {flag:8s} {s['name']:18s} {s['state']:12s} {s['model']:40s} {err}")
+            if s["healthy"]:
+                healthy += 1
+        print(f"  Healthy: {healthy}/{len(rows)}")
+    elif sub == "dispatch":
+        if not args:
+            logger.error("Usage: codespace-pool dispatch <task description>")
+            sys.exit(1)
+        task = " ".join(args)
+        result = pool.dispatch_task(task)
+        print(json.dumps(result, indent=2, default=str))
+        sys.exit(result.get("returncode", 1) or 0)
+    else:
+        logger.error(f"Unknown codespace-pool subcommand: {sub}")
+        logger.error("Usage: codespace-pool status | dispatch <task> | list")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

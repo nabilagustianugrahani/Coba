@@ -25,6 +25,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from ugc_ai_overpower.core.notion_sync import NotionDashboard
+from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+
 log = logging.getLogger(__name__)
 
 
@@ -51,7 +54,7 @@ class PipelineNode:
     @property
     def duration(self) -> float:
         if self.started_at and self.finished_at:
-            return self.finished_at - self.started_at
+            return round(self.finished_at - self.started_at, 6)
         return 0.0
 
 
@@ -96,6 +99,10 @@ class DAGPipeline:
     def run(self, context: Dict[str, Any] = None) -> Dict[str, Any]:
         self._context = context or {}
         self._context["pipeline_run_id"] = self._run_id
+        if self.ai:
+            self._context["ai"] = self.ai.chat_structured(
+                f"Pipeline '{self.name}' auxiliary inference for downstream nodes."
+            )
         total_start = time.time()
         log.info("[DAG] Pipeline '%s' started (workers=%d, nodes=%d)",
                  self.name, self.max_workers, len(self._nodes))
@@ -166,6 +173,84 @@ class DAGPipeline:
         except Exception as e:
             log.error("[DAG]   '%s' error: %s", name, e)
             raise
+
+
+class PipelineEngine:
+    """High-level engine: products → content generation → Notion sync."""
+
+    def __init__(self, ai_router=None):
+        self.ai = ai_router
+        self.factory = UGCPipelineFactory(ai_router=ai_router)
+
+    def run_full_pipeline(self) -> dict:
+        notion = NotionDashboard()
+        bank = ContentBankV2()
+
+        products = bank.get_all_products(limit=100)
+        if not products:
+            log.warning("No products found in content bank")
+            return {"status": "skipped", "reason": "no_products", "products_processed": 0}
+
+        results = []
+        for product in products:
+            product_name = product.get("name", "unknown")
+            log.info("Processing product: %s", product_name)
+
+            scripts_result = self._generate_scripts(product_name)
+            sync_result = notion.sync_orchestrator_result(scripts_result, product_name)
+
+            results.append({
+                "product": product_name,
+                "scripts_generated": len(scripts_result.get("scripts", [])),
+                "notion_synced": sync_result.get("synced", False),
+            })
+
+        return {
+            "status": "completed",
+            "products_processed": len(results),
+            "details": results,
+        }
+
+    def _generate_scripts(self, product_name: str) -> dict:
+        if self.ai:
+            try:
+                prompt = (
+                    f"Generate 2-3 UGC video scripts for product '{product_name}'. "
+                    f"For each, provide a hook, full script, caption, hashtags, and CTA. "
+                    f"Return JSON: {{\"all_scripts\":[{{\"hook\":\"...\",\"script\":\"...\","
+                    f"\"caption\":\"...\",\"hashtags\":[...],\"cta\":\"...\"}}]}}"
+                )
+                response = self.ai.chat_structured(prompt)
+                scripts = response.get("all_scripts", [])
+                if not scripts:
+                    return self._generate_template_scripts(product_name)
+                return {
+                    "scripts": scripts,
+                    "platforms": ["tiktok", "instagram"],
+                    "psychology_triggers": "curiosity, social_proof, loss_aversion",
+                }
+            except Exception as e:
+                log.warning("AI router unavailable, generating template scripts: %s", e)
+        return self._generate_template_scripts(product_name)
+
+    @staticmethod
+    def _generate_template_scripts(product_name: str) -> dict:
+        templates = [
+            {"hook": f"I tried {product_name} for 30 days... here's what happened",
+             "script": f"I used {product_name} every day for a month. The results were shocking.",
+             "platform": "tiktok"},
+            {"hook": f"Stop buying {product_name} until you watch this",
+             "script": f"Before you spend money on {product_name}, watch this. I found something better.",
+             "platform": "tiktok"},
+            {"hook": f"The {product_name} secret they don't want you to know",
+             "script": f"Everyone is buying {product_name}, but nobody is talking about this one thing.",
+             "platform": "instagram"},
+        ]
+        return {
+            "scripts": templates,
+            "platforms": ["tiktok", "instagram"],
+            "psychology_triggers": "curiosity, loss_aversion, social_proof",
+        }
 
 
 class UGCPipelineFactory:
@@ -288,7 +373,7 @@ class UGCPipelineFactory:
             if v in ctx and ctx[v]:
                 scripts.append({"variant": v, "script": ctx[v]})
         if not scripts:
-            return {"winner": None, "all_scripts": []}
+            return {"winner": None, "winner_variant": None, "winner_script": None, "all_scripts": []}
         if self.ai:
             prompt = (
                 f"As a UGC content judge, select the BEST script from these variants:\n"
@@ -307,14 +392,24 @@ class UGCPipelineFactory:
             if s["variant"] == winner_name:
                 winner_data = s["script"]
                 break
-        if not winner_data:
+        if winner_data is None:
+            winner_name = scripts[0]["variant"]
             winner_data = scripts[0]["script"]
+
+        all_script_texts = []
+        for s in scripts:
+            output = s["script"]
+            if isinstance(output, dict):
+                all_script_texts.append(output.get("script", ""))
+            else:
+                all_script_texts.append(output)
 
         return {
             "verdict": verdict,
+            "winner": winner_name,
             "winner_variant": winner_name,
             "winner_script": winner_data,
-            "all_scripts": [s["script"] for s in scripts],
+            "all_scripts": all_script_texts,
         }
 
     def create_full_pipeline(self, product: str, niche: str = "general") -> DAGPipeline:

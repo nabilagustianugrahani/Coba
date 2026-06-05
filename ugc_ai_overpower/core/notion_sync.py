@@ -282,6 +282,26 @@ class NotionDashboard:
 
         raise RuntimeError(f"[Notion] Request failed after 5 retries: {method} {endpoint}")
 
+    def _query_database(self, db_id: str, filter_obj: dict) -> list:
+        payload = {"filter": {"property": next(iter(filter_obj)), **next(iter(filter_obj.values()))}}
+        results = []
+        has_more = True
+        start_cursor = None
+        while has_more:
+            if start_cursor:
+                payload["start_cursor"] = start_cursor
+            resp = self._request("POST", f"databases/{db_id}/query", payload)
+            results.extend(resp.get("results", []))
+            has_more = resp.get("has_more", False)
+            start_cursor = resp.get("next_cursor")
+        return results
+
+    def _update_page(self, page_id: str, properties: dict) -> dict:
+        return self._request("PATCH", f"pages/{page_id}", {"properties": properties})
+
+    def get_database_info(self, db_id: str) -> dict:
+        return self._request("GET", f"databases/{db_id}")
+
     # ── Helpers ───────────────────────────────────────────────────────
     @staticmethod
     def _iso_now() -> str:
@@ -494,6 +514,40 @@ class NotionDashboard:
         result = self._request("PATCH", f"pages/{campaign_id}", {"properties": props})
         return "object" in result and result.get("object") == "page"
 
+    def cleanup_duplicate_campaigns(self) -> dict:
+        """Archive duplicate campaigns grouped by product, keeping the first."""
+        if not self.campaign_db:
+            print("[Notion] Campaign DB not configured")
+            return {}
+
+        campaigns = self.get_all_campaigns()
+        from collections import defaultdict
+        groups: dict = defaultdict(list)
+        for c in campaigns:
+            key = (c.get("product") or "").strip()
+            if not key:
+                continue
+            groups[key].append(c)
+
+        deleted: dict = {}
+        for product, items in groups.items():
+            if len(items) <= 1:
+                continue
+            ids_removed = []
+            for dup in items[1:]:
+                page_id = dup["id"]
+                result = self._request("PATCH", f"pages/{page_id}", {"archived": True})
+                if result.get("object") == "page" and result.get("archived"):
+                    ids_removed.append(page_id)
+                    print(f"[Notion] Archived duplicate campaign '{product}' -> {page_id}")
+                else:
+                    code = result.get("code", "unknown")
+                    message = result.get("message", str(result))
+                    print(f"[Notion] Archive failed for {page_id}: code={code} message={message}")
+            if ids_removed:
+                deleted[product] = ids_removed
+        return deleted
+
     # ── Content ───────────────────────────────────────────────────────
     def add_content(
         self,
@@ -560,9 +614,6 @@ class NotionDashboard:
             print("[Notion] Analytics DB not configured")
             return None
 
-        total_engagement = likes + comments + shares + clicks
-        engagement_rate = round(total_engagement / max(views, 1) * 100, 2)
-
         payload = {
             "parent": {"database_id": self.analytics_db},
             "properties": {
@@ -577,7 +628,6 @@ class NotionDashboard:
                 "Comments": {"number": comments},
                 "Shares": {"number": shares},
                 "Clicks": {"number": clicks},
-                "Engagement Rate": {"number": engagement_rate},
                 "Platform": {"select": {"name": platform}},
             },
         }
@@ -586,6 +636,10 @@ class NotionDashboard:
         aid = result.get("id")
         if aid:
             print(f"[Notion] Analytics recorded: {views}v/{likes}l/{comments}c/{shares}s")
+        else:
+            code = result.get("code", "unknown")
+            message = result.get("message", str(result))
+            print(f"[Notion] Analytics write failed: code={code} message={message}")
         return aid
 
     # ── Daily Reports ─────────────────────────────────────────────────
@@ -624,11 +678,6 @@ class NotionDashboard:
         except Exception as e:
             print(f"[Notion] Could not query analytics for daily report: {e}")
 
-        total_engagement = total_likes + total_comments + total_shares + total_clicks
-        engagement_rate = round(total_engagement / max(total_views, 1) * 100, 2)
-
-        # Create report as a page in the Campaigns DB (or we could make a separate Reports DB)
-        # For simplicity, add it to analytics DB with special marker
         report_title = f"📊 Daily Report — {date_str}"
         payload = {
             "parent": {"database_id": self.analytics_db},
@@ -640,7 +689,6 @@ class NotionDashboard:
                 "Comments": {"number": total_comments},
                 "Shares": {"number": total_shares},
                 "Clicks": {"number": total_clicks},
-                "Engagement Rate": {"number": engagement_rate},
                 "Platform": {"select": {"name": "report"}},
             },
         }
@@ -649,6 +697,10 @@ class NotionDashboard:
         rid = result.get("id")
         if rid:
             print(f"[Notion] Daily report created: {report_title}")
+        else:
+            code = result.get("code", "unknown")
+            message = result.get("message", str(result))
+            print(f"[Notion] Daily report write failed: code={code} message={message}")
         return rid
 
     # ── Queries ────────────────────────────────────────────────────────
@@ -699,6 +751,16 @@ class NotionDashboard:
             })
         return items
 
+    def find_in_database(self, db_id: str, query_text: str) -> list:
+        result = self._request("POST", f"databases/{db_id}/query", {})
+        items = []
+        for row in result.get("results", []):
+            p = row.get("properties", {})
+            name = self._extract_title(p, "Name") or self._extract_title(p, "Title") or self._extract_title(p, "Hook") or ""
+            if query_text.lower() in name.lower():
+                items.append({"id": row["id"], "name": name[:80]})
+        return items
+
     @staticmethod
     def _extract_title(props: dict, key: str) -> str:
         items = props.get(key, {}).get("title", [])
@@ -716,30 +778,34 @@ class NotionDashboard:
             return []
         synced = []
         for v in videos:
+            title = v.get("title", "Untitled")
             tags = []
             raw_tags = v.get("tags", "")
             if raw_tags:
                 tags = [{"name": t.strip()} for t in raw_tags.split(",") if t.strip()]
-            payload = {
-                "parent": {"database_id": self.gallery_db},
-                "properties": {
-                    "Title": {"title": self._format_title(v.get("title", "Untitled"))},
-                    "Slug": {"rich_text": self._format_rich(v.get("slug", ""))},
-                    "Description": {"rich_text": self._format_rich(v.get("description", "")[:200])},
-                    "Niche": {"select": {"name": v.get("niche", "general")}},
-                    "Platform": {"select": {"name": v.get("platform", "tiktok")}},
-                    "Product": {"rich_text": self._format_rich(v.get("product", ""))},
-                    "Tags": {"multi_select": tags} if tags else {"multi_select": []},
-                    "Views": {"number": v.get("views", 0)},
-                    "Likes": {"number": v.get("likes", 0)},
-                    "SEO Page": {"url": f"https://ugc-empire.ai/gallery/{v.get('slug','')}"},
-                    "Created At": {"date": self._date_obj(v.get("created_at", self._iso_now()))},
-                },
+            properties = {
+                "Title": {"title": self._format_title(title)},
+                "Slug": {"rich_text": self._format_rich(v.get("slug", ""))},
+                "Description": {"rich_text": self._format_rich(v.get("description", "")[:200])},
+                "Niche": {"select": {"name": v.get("niche", "general")}},
+                "Platform": {"select": {"name": v.get("platform", "tiktok")}},
+                "Product": {"rich_text": self._format_rich(v.get("product", ""))},
+                "Tags": {"multi_select": tags} if tags else {"multi_select": []},
+                "Views": {"number": v.get("views", 0)},
+                "Likes": {"number": v.get("likes", 0)},
+                "SEO Page": {"url": f"https://ugc-empire.ai/gallery/{v.get('slug','')}"},
+                "Created At": {"date": self._date_obj(v.get("created_at", self._iso_now()))},
             }
-            result = self._request("POST", "pages", payload)
-            pid = result.get("id")
-            if pid:
-                synced.append(pid)
+            existing = self._query_database(self.gallery_db, {"Title": {"title": {"equals": title}}})
+            if existing:
+                self._update_page(existing[0]["id"], properties)
+                synced.append(existing[0]["id"])
+            else:
+                payload = {"parent": {"database_id": self.gallery_db}, "properties": properties}
+                result = self._request("POST", "pages", payload)
+                pid = result.get("id")
+                if pid:
+                    synced.append(pid)
         print(f"[Notion] Synced {len(synced)} videos to Gallery")
         return synced
 
@@ -752,25 +818,29 @@ class NotionDashboard:
         for m in messages:
             if m.get("reply_sent"):
                 continue
-            payload = {
-                "parent": {"database_id": self.inbox_db},
-                "properties": {
-                    "Content": {"title": self._format_title(m.get("content", "")[:100])},
-                    "Platform": {"select": {"name": m.get("platform", "tiktok")}},
-                    "Sender": {"rich_text": self._format_rich(m.get("sender_username", ""))},
-                    "Account": {"rich_text": self._format_rich(m.get("account_id", ""))},
-                    "Type": {"select": {"name": m.get("message_type", "comment")}},
-                    "Sentiment": {"select": {"name": m.get("sentiment", "neutral")}},
-                    "AI Reply": {"rich_text": self._format_rich(m.get("ai_suggested_reply", "")[:200])},
-                    "Replied": {"checkbox": bool(m.get("reply_sent", False))},
-                    "Is Read": {"checkbox": bool(m.get("is_read", False))},
-                    "Created At": {"date": self._date_obj(m.get("created_at", self._iso_now()))},
-                },
+            content = m.get("content", "")[:100]
+            properties = {
+                "Content": {"title": self._format_title(content)},
+                "Platform": {"select": {"name": m.get("platform", "tiktok")}},
+                "Sender": {"rich_text": self._format_rich(m.get("sender_username", ""))},
+                "Account": {"rich_text": self._format_rich(m.get("account_id", ""))},
+                "Type": {"select": {"name": m.get("message_type", "comment")}},
+                "Sentiment": {"select": {"name": m.get("sentiment", "neutral")}},
+                "AI Reply": {"rich_text": self._format_rich(m.get("ai_suggested_reply", "")[:200])},
+                "Replied": {"checkbox": bool(m.get("reply_sent", False))},
+                "Is Read": {"checkbox": bool(m.get("is_read", False))},
+                "Created At": {"date": self._date_obj(m.get("created_at", self._iso_now()))},
             }
-            result = self._request("POST", "pages", payload)
-            pid = result.get("id")
-            if pid:
-                synced.append(pid)
+            existing = self._query_database(self.inbox_db, {"Content": {"title": {"equals": content}}})
+            if existing:
+                self._update_page(existing[0]["id"], properties)
+                synced.append(existing[0]["id"])
+            else:
+                payload = {"parent": {"database_id": self.inbox_db}, "properties": properties}
+                result = self._request("POST", "pages", payload)
+                pid = result.get("id")
+                if pid:
+                    synced.append(pid)
         print(f"[Notion] Synced {len(synced)} inbox messages")
         return synced
 
@@ -838,8 +908,9 @@ class NotionDashboard:
             return []
         synced = []
         for p in products:
+            name = p.get("name", "")
             properties = {
-                "Name": {"title": self._format_title(p.get("name", ""))},
+                "Name": {"title": self._format_title(name)},
                 "Platform": {"select": {"name": p.get("platform", "shopee")}},
                 "Price": self._num(p.get("price")),
                 "Commission Rate": self._num(p.get("commission_rate")),
@@ -854,14 +925,20 @@ class NotionDashboard:
                 "Created": {"date": self._date_obj(p.get("created_at", self._iso_now()))},
             }
             properties = {k: v for k, v in properties.items() if v is not None}
-            payload = {
-                "parent": {"database_id": self.products_db},
-                "properties": properties,
-            }
-            result = self._request("POST", "pages", payload)
-            pid = result.get("id")
-            if pid:
-                synced.append(pid)
+            existing = self._query_database(self.products_db, {"Name": {"title": {"equals": name}}})
+            if existing:
+                page_id = existing[0]["id"]
+                self._update_page(page_id, properties)
+                synced.append(page_id)
+            else:
+                payload = {
+                    "parent": {"database_id": self.products_db},
+                    "properties": properties,
+                }
+                result = self._request("POST", "pages", payload)
+                pid = result.get("id")
+                if pid:
+                    synced.append(pid)
         print(f"[Notion] Synced {len(synced)} affiliate products")
         return synced
 

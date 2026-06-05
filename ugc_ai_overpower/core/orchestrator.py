@@ -182,6 +182,32 @@ class Orchestrator:
         from ugc_ai_overpower.browser.queue_processor import QueueProcessor
         return QueueProcessor().process_all(platform)
 
+    def update_analytics(self, product: str, views: int = 0, likes: int = 0,
+                         comments: int = 0, shares: int = 0, clicks: int = 0) -> dict:
+        from ugc_ai_overpower.core.notion_sync import NotionDashboard
+        nd = NotionDashboard()
+        if not nd.ready:
+            return {"status": "error", "message": "Notion not configured"}
+        campaigns = nd.get_all_campaigns()
+        matched = [c for c in campaigns if c["product"].lower() == product.lower()]
+        if not matched:
+            return {"status": "error", "message": f"No campaign found for {product}"}
+        campaign_id = matched[0]["id"]
+        content_items = nd.get_content_for_campaign(campaign_id)
+        results = []
+        for item in content_items:
+            cid = nd.add_analytics(
+                content_id=item["id"],
+                views=views,
+                likes=likes,
+                comments=comments,
+                shares=shares,
+                clicks=clicks,
+            )
+            if cid:
+                results.append(cid)
+        return {"status": "ok", "synced": len(results), "campaign_id": campaign_id}
+
     def auto_campaign(self, product: str, product_image: str = None, platforms: list = None) -> dict:
         """Full auto campaign: generate → video → queue → auto-post."""
         platforms = platforms or ["tiktok"]

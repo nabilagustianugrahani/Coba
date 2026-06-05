@@ -1,32 +1,61 @@
-version: "3.9"
-
 services:
-  swarm-api:
+  ugc-api:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ugc-ai-overpower:latest
+    container_name: ugc-api
     ports:
       - "8000:8000"
     volumes:
-      - ./ugc_ai_overpower/data:/app/data
-      - ./ugc_ai_overpower/media:/app/media
+      - ./ugc_ai_overpower/data:/app/ugc_ai_overpower/data
+      - ./ugc_ai_overpower/media:/app/ugc_ai_overpower/media
+      - ./ugc_ai_overpower/logs:/app/ugc_ai_overpower/logs
+    environment:
+      NOTION_TOKEN: ${NOTION_TOKEN:-}
+      NOTION_PARENT_PAGE: ${NOTION_PARENT_PAGE:-}
+      NOTION_CAMPAIGN_DB: ${NOTION_CAMPAIGN_DB:-}
+      NOTION_CONTENT_DB: ${NOTION_CONTENT_DB:-}
+      NOTION_ANALYTICS_DB: ${NOTION_ANALYTICS_DB:-}
+      ROUTER_URL: ${ROUTER_URL:-http://host.docker.internal:20128}
+      ROUTER_KEY: ${ROUTER_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      AUTOPILOT_INTERVAL: ${AUTOPILOT_INTERVAL:-3600}
     env_file:
-      - ./ugc_ai_overpower/.env
+      - .env
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 20s
 
-  scheduler:
+  ugc-scheduler:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ugc-ai-overpower:latest
+    container_name: ugc-scheduler
+    depends_on:
+      ugc-api:
+        condition: service_healthy
     volumes:
-      - ./ugc_ai_overpower/data:/app/data
-      - ./ugc_ai_overpower/media:/app/media
+      - ./ugc_ai_overpower/data:/app/ugc_ai_overpower/data
+      - ./ugc_ai_overpower/media:/app/ugc_ai_overpower/media
+      - ./ugc_ai_overpower/logs:/app/ugc_ai_overpower/logs
+    environment:
+      NOTION_TOKEN: ${NOTION_TOKEN:-}
+      NOTION_PARENT_PAGE: ${NOTION_PARENT_PAGE:-}
+      NOTION_CAMPAIGN_DB: ${NOTION_CAMPAIGN_DB:-}
+      NOTION_CONTENT_DB: ${NOTION_CONTENT_DB:-}
+      NOTION_ANALYTICS_DB: ${NOTION_ANALYTICS_DB:-}
+      ROUTER_URL: ${ROUTER_URL:-http://ugc-api:8000}
+      ROUTER_KEY: ${ROUTER_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     env_file:
-      - ./ugc_ai_overpower/.env
+      - .env
     command: ["python", "main.py", "scheduler"]
     restart: unless-stopped

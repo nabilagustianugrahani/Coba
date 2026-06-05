@@ -45,3 +45,26 @@ def verify_token(token):
         return jwt.decode(token, SECRET, algorithms=[ALGO])
     except:
         return None
+
+# Aliases for MCP server compatibility
+USERS_DB = USERS
+
+def get_user(username):
+    return USERS.get(username)
+
+def authenticate_user(username, password):
+    user = verify_user(username, password)
+    if user is None:
+        return None
+    return {"username": username, "roles": [user["role"]]}
+
+def create_access_token(data=None, **kwargs):
+    payload = data if data is not None else kwargs
+    sub = (payload or {}).get("sub")
+    roles = (payload or {}).get("roles") or []
+    role = (payload or {}).get("role") or (roles[0] if roles else None)
+    return create_token(sub, role)
+
+def get_password_hash(password):
+    import hashlib
+    return hashlib.sha256(password.encode()).hexdigest()

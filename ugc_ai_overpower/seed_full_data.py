@@ -40,19 +40,19 @@ for product, hook, platform, script, status in content_items:
 def seed_products():
     bank = ContentBankV2()
     products = [
-        {"name": "Avoskin Miraculous Refining Oil", "platform": "shopee", "price": 85000, "commission_rate": 0.15,
+        {"name": "Avoskin Miraculous Refining Oil", "platform": "shopee", "price": 85000, "commission_rate": 15,
          "affiliate_link": "https://shopee.co.id/avoskin-miraculous-refining-oil", "product_url": "https://shopee.co.id/avoskin-miraculous-refining-oil",
          "rating": 4.8, "sold": 15200, "category": "skincare", "status": "active"},
-        {"name": "Scarlett Whitening Day Cream", "platform": "tokopedia", "price": 65000, "commission_rate": 0.10,
+        {"name": "Scarlett Whitening Day Cream", "platform": "tokopedia", "price": 65000, "commission_rate": 10,
          "affiliate_link": "https://tokopedia.link/scarlett-whitening-day-cream", "product_url": "https://tokopedia.link/scarlett-whitening-day-cream",
          "rating": 4.7, "sold": 9800, "category": "bodycare", "status": "active"},
-        {"name": "Somethinc Retinol 0.5%", "platform": "sociolla", "price": 120000, "commission_rate": 0.20,
+        {"name": "Somethinc Retinol 0.5%", "platform": "sociolla", "price": 120000, "commission_rate": 20,
          "affiliate_link": "https://sociolla.com/somethinc-retinol-0-5", "product_url": "https://sociolla.com/somethinc-retinol-0-5",
          "rating": 4.6, "sold": 7600, "category": "skincare", "status": "active"},
-        {"name": "Wardah UV Shield SPF 50", "platform": "shopee", "price": 45000, "commission_rate": 0.15,
+        {"name": "Wardah UV Shield SPF 50", "platform": "shopee", "price": 45000, "commission_rate": 15,
          "affiliate_link": "https://shopee.co.id/wardah-uv-shield-spf-50", "product_url": "https://shopee.co.id/wardah-uv-shield-spf-50",
          "rating": 4.9, "sold": 23100, "category": "skincare", "status": "active"},
-        {"name": "The Originote Hyalucera Moist", "platform": "tokopedia", "price": 55000, "commission_rate": 0.10,
+        {"name": "The Originote Hyalucera Moist", "platform": "tokopedia", "price": 55000, "commission_rate": 10,
          "affiliate_link": "https://tokopedia.link/the-originote-hyalucera-moist", "product_url": "https://tokopedia.link/the-originote-hyalucera-moist",
          "rating": 4.5, "sold": 5400, "category": "skincare", "status": "active"},
     ]
@@ -111,11 +111,11 @@ if db_id:
 
 # ── Analytics (direct API) ──
 analytics_data = [
-    {"post": "Avoskin review tiktok", "platform": "tiktok", "views": 32100, "likes": 5230, "comments": 312, "shares": 2100, "clicks": 890},
-    {"post": "Scarlett day cream IG", "platform": "instagram", "views": 15230, "likes": 2341, "comments": 156, "shares": 567, "clicks": 234},
-    {"post": "Somethinc retinol yt", "platform": "youtube", "views": 28450, "likes": 4120, "comments": 289, "shares": 1234, "clicks": 456},
-    {"post": "Dear Me sunscreen tiktok", "platform": "tiktok", "views": 19800, "likes": 3100, "comments": 198, "shares": 890, "clicks": 345},
-    {"post": "Wardah moisturizer tutorial", "platform": "youtube", "views": 8900, "likes": 1567, "comments": 89, "shares": 345, "clicks": 123},
+    {"post": "Avoskin review tiktok", "platform": "tiktok", "views": 32100, "likes": 5230, "comments": 312, "shares": 2100, "clicks": 890, "commission": 12750, "conversions": 45},
+    {"post": "Scarlett day cream IG", "platform": "instagram", "views": 15230, "likes": 2341, "comments": 156, "shares": 567, "clicks": 234, "commission": 6500, "conversions": 23},
+    {"post": "Somethinc retinol yt", "platform": "youtube", "views": 28450, "likes": 4120, "comments": 289, "shares": 1234, "clicks": 456, "commission": 24000, "conversions": 67},
+    {"post": "Dear Me sunscreen tiktok", "platform": "tiktok", "views": 19800, "likes": 3100, "comments": 198, "shares": 890, "clicks": 345, "commission": 4500, "conversions": 18},
+    {"post": "Wardah moisturizer tutorial", "platform": "youtube", "views": 8900, "likes": 1567, "comments": 89, "shares": 345, "clicks": 123, "commission": 6750, "conversions": 8},
 ]
 db_id = dashboard.analytics_db
 if db_id:
@@ -130,6 +130,9 @@ if db_id:
                 "Comments": {"number": a["comments"]},
                 "Shares": {"number": a["shares"]},
                 "Clicks": {"number": a["clicks"]},
+                "Commission": {"number": a["commission"]},
+                "Conversions": {"number": a["conversions"]},
+                "Commission Rate": {"number": 15},
             },
         }
         r = requests.post("https://api.notion.com/v1/pages", headers=headers, json=payload)

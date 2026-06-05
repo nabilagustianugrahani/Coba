@@ -1,0 +1,14 @@
+{
+  "pool": [
+    {"name": "pool-1-zen", "model": "opencode/deepseek-v4-flash-free", "region": "us-west-2", "machine": "basic-linux-32gb"},
+    {"name": "pool-2-zen", "model": "opencode/deepseek-v4-flash-free", "region": "us-east-1", "machine": "basic-linux-32gb"},
+    {"name": "pool-3-zen", "model": "opencode/deepseek-v4-flash-free", "region": "eu-west-1", "machine": "basic-linux-32gb"},
+    {"name": "pool-4-zen", "model": "opencode/glm-4.6-free", "region": "us-west-2", "machine": "basic-linux-32gb"},
+    {"name": "pool-5-zen", "model": "opencode/kimi-k2-free", "region": "us-east-1", "machine": "basic-linux-32gb"}
+  ],
+  "scheduler": {
+    "strategy": "round_robin",
+    "health_check_interval_seconds": 60,
+    "max_concurrent_per_pool": 3
+  }
+}

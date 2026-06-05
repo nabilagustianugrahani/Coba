@@ -1,20 +1,41 @@
 FROM python:3.12-slim AS builder
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /build
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt pyproject.toml ./
+RUN pip install --prefix=/install -r requirements.txt
 
 FROM python:3.12-slim
 
-WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
-COPY ugc_ai_overpower/ /app/
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 appuser
 
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+WORKDIR /app/ugc_ai_overpower
+
+COPY --from=builder /install /usr/local
+COPY ugc_ai_overpower/ /app/ugc_ai_overpower/
+
+RUN chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
 
-CMD ["python", "main.py"]
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -fsS http://localhost:8000/health || exit 1
+
+CMD ["python", "main.py", "auto-pipeline", "start"]
