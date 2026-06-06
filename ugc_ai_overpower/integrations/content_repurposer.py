@@ -322,6 +322,17 @@ class ContentRepurposer:
     # public API
     # ------------------------------------------------------------------
     async def repurpose_for_all_platforms(self, source: SourceContent) -> list[RepurposedContent]:
+        """Repurpose ``source`` for every supported platform.
+
+        Args:
+            source: The source content to re-encode / re-caption.
+
+        Returns:
+            A list of :class:`RepurposedContent` (one per supported platform).
+
+        Raises:
+            ValueError: If the source content is invalid.
+        """
         self._check_source(source)
         platforms = ["tiktok", "reels", "youtube_shorts", "twitter", "linkedin", "youtube"]
         out: list[RepurposedContent] = []
@@ -330,32 +341,52 @@ class ContentRepurposer:
         return out
 
     async def to_reels(self, source: SourceContent) -> RepurposedContent:
+        """Repurpose ``source`` for Instagram Reels (vertical 15-90s)."""
         self._check_source(source)
         return await self._build(source, "reels", tone="engaging")
 
     async def to_tiktok(self, source: SourceContent) -> RepurposedContent:
+        """Repurpose ``source`` for TikTok (vertical 15-90s, playful tone)."""
         self._check_source(source)
         return await self._build(source, "tiktok", tone="playful")
 
     async def to_youtube_shorts(self, source: SourceContent) -> RepurposedContent:
+        """Repurpose ``source`` for YouTube Shorts (vertical 15-60s)."""
         self._check_source(source)
         return await self._build(source, "youtube_shorts", tone="engaging")
 
     async def to_twitter_video(self, source: SourceContent) -> RepurposedContent:
+        """Repurpose ``source`` for Twitter video (horizontal 30-140s)."""
         self._check_source(source)
         return await self._build(source, "twitter", tone="engaging")
 
     async def to_linkedin_video(self, source: SourceContent) -> RepurposedContent:
+        """Repurpose ``source`` for LinkedIn (square 30-90s, professional tone)."""
         self._check_source(source)
         return await self._build(source, "linkedin", tone="professional")
 
     async def to_youtube_long(self, source: SourceContent) -> RepurposedContent:
+        """Repurpose ``source`` for long-form YouTube (horizontal 60-600s)."""
         self._check_source(source)
         return await self._build(source, "youtube", tone="authoritative")
 
     async def generate_caption(
         self, source: SourceContent, target_platform: str, tone: str = "engaging",
     ) -> str:
+        """Generate a tone-aware caption for the target platform.
+
+        Args:
+            source: The source content (title/description used).
+            target_platform: One of :data:`SUPPORTED_PLATFORMS`.
+            tone: One of :data:`SUPPORTED_TONES`.
+
+        Returns:
+            A caption string. Uses the AI dispatcher when configured,
+            otherwise a deterministic heuristic.
+
+        Raises:
+            ValueError: If platform or tone is unsupported.
+        """
         if target_platform not in PLATFORM_SPECS:
             raise ValueError(f"unsupported platform: {target_platform}")
         if tone not in SUPPORTED_TONES:
@@ -381,6 +412,19 @@ class ContentRepurposer:
     async def suggest_hashtags(
         self, source: SourceContent, target_platform: str, max_count: int = 5,
     ) -> list[str]:
+        """Suggest platform-tuned hashtags for the given niche.
+
+        Args:
+            source: Source content (niche + language matter).
+            target_platform: One of :data:`SUPPORTED_PLATFORMS`.
+            max_count: Clamped to [1, 10].
+
+        Returns:
+            A list of hashtag strings (without the leading ``#`` duplicated).
+
+        Raises:
+            ValueError: If ``target_platform`` is unsupported.
+        """
         if target_platform not in PLATFORM_SPECS:
             raise ValueError(f"unsupported platform: {target_platform}")
         max_count = max(1, min(int(max_count), 10))
@@ -389,6 +433,21 @@ class ContentRepurposer:
     async def best_posting_time(
         self, target_platform: str, timezone_name: str = "Asia/Jakarta",
     ) -> str:
+        """Return the best next posting time as an ISO-8601 UTC string.
+
+        Uses the analytics engine when configured; otherwise a per-platform
+        heuristic table calibrated for the given timezone.
+
+        Args:
+            target_platform: One of :data:`SUPPORTED_PLATFORMS`.
+            timezone_name: IANA timezone name (defaults to ``Asia/Jakarta``).
+
+        Returns:
+            ISO-8601 timestamp string.
+
+        Raises:
+            ValueError: If ``target_platform`` is unsupported.
+        """
         if target_platform not in PLATFORM_SPECS:
             raise ValueError(f"unsupported platform: {target_platform}")
         # If analytics present, try to learn from it. Otherwise heuristic.
@@ -408,12 +467,14 @@ class ContentRepurposer:
         return _best_time(target_platform, timezone_name)
 
     def get_cached(self, source_id: str, target_platform: str) -> Optional[RepurposedContent]:
+        """Return the cached repurposed variant for a source+platform pair."""
         for k, v in self._cache.items():
             if k.startswith(f"{source_id}:{target_platform}"):
                 return v
         return None
 
     def summary(self) -> dict[str, Any]:
+        """Return a small dashboard-friendly snapshot of repurposer state."""
         return {
             "cached_variants": len(self._cache),
             "spent_usd": self.spend_tracker["spent"],

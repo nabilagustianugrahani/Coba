@@ -132,7 +132,7 @@ class UnifiedAIDispatcher:
     def _decide(self, request: DispatchRequest) -> DispatchDecision:
         decision = DispatchDecision(request=request)
         modal_name = MODAL_TO_FAL_BRIDGE.get(request.model, request.model)
-        candidates = []
+        candidates: list[dict[str, Any]] = []
         for provider in request.modalities:
             if provider == "modal" and self.modal is not None:
                 if request.model in MODAL_TO_FAL_BRIDGE:
@@ -172,21 +172,22 @@ class UnifiedAIDispatcher:
                         "open_source": False,
                     })
         candidates.sort(key=lambda c: (
-            abs(c["cost_usd"] - request.max_cost_usd * 0.5),
+            abs(float(c["cost_usd"]) - request.max_cost_usd * 0.5),
             0 if c["provider"] == "modal" else 1,
-            c["cost_usd"],
+            float(c["cost_usd"]),
         ))
         for cand in candidates:
             if cand["cost_usd"] > request.max_cost_usd:
                 continue
             if request.prefer_open_source and not cand["open_source"]:
                 continue
-            decision.chosen_provider = cand["provider"]
-            decision.chosen_model = cand["model"]
-            decision.estimated_cost_usd = cand["cost_usd"]
+            cand_typed: dict[str, Any] = cand
+            decision.chosen_provider = str(cand_typed["provider"])
+            decision.chosen_model = str(cand_typed["model"])
+            decision.estimated_cost_usd = float(cand_typed["cost_usd"])
             decision.reason = (
-                f"zerocost-first: {cand['provider']}/{cand['model']} "
-                f"@ ${cand['cost_usd']:.4f} (max ${request.max_cost_usd:.4f})"
+                f"zerocost-first: {cand_typed['provider']}/{cand_typed['model']} "
+                f"@ ${cand_typed['cost_usd']:.4f} (max ${request.max_cost_usd:.4f})"
             )
             decision.alternatives = [
                 {k: v for k, v in c.items()} for c in candidates if c is not cand
@@ -194,9 +195,10 @@ class UnifiedAIDispatcher:
             return decision
         if candidates:
             cand = candidates[0]
-            decision.chosen_provider = cand["provider"]
-            decision.chosen_model = cand["model"]
-            decision.estimated_cost_usd = cand["cost_usd"]
+            fallback: dict[str, Any] = cand
+            decision.chosen_provider = str(fallback["provider"])
+            decision.chosen_model = str(fallback["model"])
+            decision.estimated_cost_usd = float(fallback["cost_usd"])
             decision.reason = (
                 f"no candidate under budget ${request.max_cost_usd:.4f}, "
                 f"using cheapest {cand['provider']}/{cand['model']} @ ${cand['cost_usd']:.4f}"

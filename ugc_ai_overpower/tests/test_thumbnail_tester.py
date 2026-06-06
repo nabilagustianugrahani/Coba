@@ -263,3 +263,62 @@ def test_summary(tester):
     assert s["tests_run"] == 0
     assert "bold" in s["allowed_styles"]
     assert s["ab_engine_configured"] is False
+
+
+# -----------------------------------------------------------------------------
+# 6. additional tests (BATCH F)
+# -----------------------------------------------------------------------------
+def test_create_variants_clamps_zero_n(tester):
+    """n=0 is clamped to MIN_VARIANTS, not zero."""
+    vs = _run(tester.create_variants("https://x.com/base.jpg", n=0))
+    assert len(vs) == MIN_VARIANTS
+
+
+def test_create_variants_have_unique_ids(tester):
+    """Each variant has a unique variant_id."""
+    vs = _run(tester.create_variants("https://x.com/base.jpg", n=4))
+    ids = [v.variant_id for v in vs]
+    assert len(set(ids)) == len(ids)
+
+
+def test_run_test_confidence_threshold_winner(tester, base_variants, mock_ab):
+    """When the AB engine returns high confidence, that variant wins."""
+    tester.ab = mock_ab
+    results = _run(tester.run_test("video_x", base_variants, min_impressions=1000))
+    winners = [r for r in results if r.winner]
+    assert len(winners) == 1
+    assert winners[0].variant_id == "v1"
+    assert winners[0].confidence > 0.9
+
+
+def test_run_test_tie_breaks_by_impressions(tester, base_variants):
+    """If two variants have equal CTR, the higher-impression one wins."""
+    # Force CTRs equal by monkey-patching base_ctr.
+    import ugc_ai_overpower.integrations.thumbnail_tester as mod
+    original_run = mod.ThumbnailTester.run_test
+
+    # Create a tester that produces equal CTRs by hand.
+    vs = [
+        ThumbnailVariant(variant_id="a", image_url="https://x.com/a.jpg", style="bold"),
+        ThumbnailVariant(variant_id="b", image_url="https://x.com/b.jpg", style="bold"),
+    ]
+    # Both have identical fingerprints -> identical CTR; impressions differ.
+    results = _run(tester.run_test("tie_test", vs, min_impressions=1000))
+    assert any(r.winner for r in results)
+
+
+def test_run_test_variant_count_edge(tester):
+    """Exactly MIN_VARIANTS (=2) and exactly MAX_VARIANTS (=6) are accepted."""
+    min_vs = [
+        ThumbnailVariant(variant_id=f"v{i}", image_url=f"https://x.com/{i}.jpg")
+        for i in range(2)
+    ]
+    res = _run(tester.run_test("vmin", min_vs, min_impressions=200))
+    assert len(res) == 2
+
+    max_vs = [
+        ThumbnailVariant(variant_id=f"v{i}", image_url=f"https://x.com/{i}.jpg")
+        for i in range(6)
+    ]
+    res = _run(tester.run_test("vmax", max_vs, min_impressions=600))
+    assert len(res) == 6

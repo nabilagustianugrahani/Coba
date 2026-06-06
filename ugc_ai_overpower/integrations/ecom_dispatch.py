@@ -32,6 +32,7 @@ from ugc_ai_overpower.integrations.base import (
     Region,
 )
 from ugc_ai_overpower.integrations.session_manager import Session, SessionManager
+from ugc_ai_overpower.core.errors import ConfigError
 
 log = logging.getLogger(__name__)
 
@@ -192,16 +193,30 @@ class EcomDispatch:
         if self.session_manager is None:
             self.session_manager = SessionManager()
 
+    def _require_config(self) -> EcomConfig:
+        """Return the loaded EcomConfig or raise :class:`ConfigError`."""
+        if self.config is None:
+            raise ConfigError("Ecom config not loaded")
+        return self.config
+
+    def _require_cache(self) -> "AffiliateCache":
+        if self.cache is None:
+            raise ConfigError("Affiliate cache not initialised")
+        return self.cache
+
     def is_configured(self, platform: str) -> bool:
+        cfg = self.config
         platform = platform.lower()
+        if cfg is None:
+            return False
         if platform == "shopee":
-            return bool(self.config.shopee_affiliate_id and self.config.shopee_affiliate_token)
+            return bool(cfg.shopee_affiliate_id and cfg.shopee_affiliate_token)
         if platform == "tiktokshop":
-            return bool(self.config.tiktokshop_app_key and self.config.tiktokshop_access_token)
+            return bool(cfg.tiktokshop_app_key and cfg.tiktokshop_access_token)
         if platform == "lazada":
-            return bool(self.config.lazada_app_key and self.config.lazada_access_token)
+            return bool(cfg.lazada_app_key and cfg.lazada_access_token)
         if platform == "tokopedia":
-            return bool(self.config.tokopedia_affiliate_id and self.config.tokopedia_affiliate_token)
+            return bool(cfg.tokopedia_affiliate_id and cfg.tokopedia_affiliate_token)
         return False
 
     def configured_platforms(self) -> list[str]:
@@ -224,7 +239,7 @@ class EcomDispatch:
                 error=f"Platform {platform} not configured. Check env vars.",
             )
         if not force_refresh:
-            cached = self.cache.get(platform, product_id)
+            cached = self._require_cache().get(platform, product_id)
             if cached:
                 log.debug("ecom.cache.hit platform=%s product=%s", platform, product_id)
                 return cached
@@ -242,7 +257,7 @@ class EcomDispatch:
                 error=f"Platform {platform} not supported",
             )
         if link.affiliate_url:
-            self.cache.put(link)
+            self._require_cache().put(link)
         return link
 
     async def get_affiliate_links_batch(
@@ -285,21 +300,22 @@ class EcomDispatch:
         }
         """
         try:
+            cfg = self._require_config()
             async with aiohttp.ClientSession() as http:
                 async with http.post(
                     SHOPEE_BASE_URL,
                     json={
                         "query": query,
                         "variables": {
-                            "affiliateId": int(self.config.shopee_affiliate_id),
+                            "affiliateId": int(cfg.shopee_affiliate_id),
                             "productId": int(product_id),
                         },
                     },
                     headers={
-                        "Authorization": f"Bearer {self.config.shopee_affiliate_token}",
+                        "Authorization": f"Bearer {cfg.shopee_affiliate_token}",
                         "Content-Type": "application/json",
                     },
-                    timeout=aiohttp.ClientTimeout(total=self.config.timeout_sec),
+                    timeout=aiohttp.ClientTimeout(total=cfg.timeout_sec),
                 ) as resp:
                     body = await resp.json()
                     if resp.status != 200:
@@ -350,15 +366,16 @@ class EcomDispatch:
             "sub_id": sub_id or "",
         }
         try:
+            cfg = self._require_config()
             async with aiohttp.ClientSession() as http:
                 async with http.get(
                     url,
                     params=params,
                     headers={
-                        "x-tts-access-token": self.config.tiktokshop_access_token,
+                        "x-tts-access-token": cfg.tiktokshop_access_token,
                         "Content-Type": "application/json",
                     },
-                    timeout=aiohttp.ClientTimeout(total=self.config.timeout_sec),
+                    timeout=aiohttp.ClientTimeout(total=cfg.timeout_sec),
                 ) as resp:
                     body = await resp.json()
                     if resp.status != 200:
@@ -393,9 +410,10 @@ class EcomDispatch:
                 error="aiohttp not installed",
             )
         import time as _t
+        cfg = self._require_config()
         params = {
-            "app_key": self.config.lazada_app_key,
-            "access_token": self.config.lazada_access_token,
+            "app_key": cfg.lazada_app_key,
+            "access_token": cfg.lazada_access_token,
             "timestamp": str(int(_t.time() * 1000)),
             "product_id": product_id,
             "sub_id": sub_id or "",
@@ -409,7 +427,7 @@ class EcomDispatch:
                 async with http.get(
                     f"{LAZADA_BASE_URL}/affiliate/link/generate",
                     params=params,
-                    timeout=aiohttp.ClientTimeout(total=self.config.timeout_sec),
+                    timeout=aiohttp.ClientTimeout(total=cfg.timeout_sec),
                 ) as resp:
                     body = await resp.json()
                     if resp.status != 200:
@@ -439,7 +457,7 @@ class EcomDispatch:
         sorted_keys = sorted(params.keys())
         msg = "".join(f"{k}{params[k]}" for k in sorted_keys)
         return hmac.new(
-            self.config.lazada_app_secret.encode("utf-8"),
+            self._require_config().lazada_app_secret.encode("utf-8"),
             msg.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest().upper()
@@ -454,18 +472,19 @@ class EcomDispatch:
                 error="aiohttp not installed",
             )
         try:
+            cfg = self._require_config()
             async with aiohttp.ClientSession() as http:
                 async with http.get(
                     f"{TOKOPEDIA_BASE_URL}/link/generate",
                     params={
-                        "aff_id": self.config.tokopedia_affiliate_id,
+                        "aff_id": cfg.tokopedia_affiliate_id,
                         "product_id": product_id,
                         "sub_id": sub_id or "",
                     },
                     headers={
-                        "Authorization": f"Bearer {self.config.tokopedia_affiliate_token}",
+                        "Authorization": f"Bearer {cfg.tokopedia_affiliate_token}",
                     },
-                    timeout=aiohttp.ClientTimeout(total=self.config.timeout_sec),
+                    timeout=aiohttp.ClientTimeout(total=cfg.timeout_sec),
                 ) as resp:
                     body = await resp.json()
                     if resp.status != 200:
@@ -491,7 +510,7 @@ class EcomDispatch:
     def summary(self) -> dict[str, Any]:
         return {
             "configured_platforms": self.configured_platforms(),
-            "cache_stats": self.cache.stats() if self.cache else {},
+            "cache_stats": self._require_cache().stats(),
             "config_status": {
                 p: self.is_configured(p)
                 for p in ["shopee", "tiktokshop", "lazada", "tokopedia"]

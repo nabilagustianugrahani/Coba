@@ -152,6 +152,22 @@ class VoiceCloner:
         target_text: str,
         language: str = "id",
     ) -> VoiceCloneResult:
+        """Clone a voice from audio samples and synthesise a preview.
+
+        Args:
+            samples: 1-5 reference audio samples with transcripts.
+            name: Human-readable voice name (used as cache key).
+            target_text: Text to synthesise as a preview (<= 5000 chars).
+            language: Target language code (must be in
+                :data:`SUPPORTED_LANGUAGES`).
+
+        Returns:
+            A :class:`VoiceCloneResult` with similarity, preview URL, and
+            cost ledger entry.
+
+        Raises:
+            ValueError: If samples/text/name/language are invalid.
+        """
         self._check_samples(samples)
         self._check_text(target_text)
         if not name or not name.strip():
@@ -217,6 +233,12 @@ class VoiceCloner:
         return result
 
     async def list_voices(self) -> list[dict[str, Any]]:
+        """List voices cloned in this session.
+
+        Returns:
+            Lightweight dict per voice (no audio bytes) suitable for
+            dashboards and selection UIs.
+        """
         return [
             {
                 "voice_id": r.voice_id,
@@ -235,6 +257,21 @@ class VoiceCloner:
         emotion: str = "neutral",
         speed: float = 1.0,
     ) -> bytes:
+        """Synthesise ``text`` using a previously-cloned voice.
+
+        Args:
+            voice_id: ID returned by :meth:`clone`.
+            text: Text to speak (1-5000 chars).
+            emotion: One of :data:`SUPPORTED_EMOTIONS`.
+            speed: Playback speed multiplier in [0.5, 2.0].
+
+        Returns:
+            WAV-like audio bytes (deterministic placeholder in tests).
+
+        Raises:
+            KeyError: If ``voice_id`` is unknown.
+            ValueError: If text/emotion/speed are out of range.
+        """
         self._check_text(text)
         if voice_id not in self._voices:
             raise KeyError(f"unknown voice_id: {voice_id}")
@@ -259,12 +296,14 @@ class VoiceCloner:
         return body[:1024]
 
     def get_cached(self, name: str) -> Optional[VoiceCloneResult]:
+        """Return the cached clone for ``name`` (linear scan), or None."""
         for r in self._cache.values():
             if r.name == name:
                 return r
         return None
 
     def summary(self) -> dict[str, Any]:
+        """Return a small dashboard-friendly snapshot of cloner state."""
         return {
             "cached_clones": len(self._cache),
             "active_voices": len(self._voices),

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
@@ -39,6 +40,11 @@ class AsyncPool:
         self._workers_started = False
         self._seq = 0
         self._seq_lock = asyncio.Lock()
+        # threading.RLock protects _tasks, _inflight, _drain_event, and the
+        # cancel/stats/shutdown transitions from both sync and async callers
+        # (workers, gather, drain, submit, cancel, stats). The critical
+        # sections never await, so a sync lock is safe in async contexts.
+        self._state_lock = threading.RLock()
         self._inflight = 0
         self._drain_event = asyncio.Event()
         self._drain_event.set()
@@ -57,8 +63,9 @@ class AsyncPool:
                 priority, seq, tid, task = await self._queue.get()
             except asyncio.CancelledError:
                 return
-            self._inflight += 1
-            self._drain_event.clear()
+            with self._state_lock:
+                self._inflight += 1
+                self._drain_event.clear()
             state = self._tasks.get(tid)
             try:
                 if state is None or state.get("cancelled"):
@@ -96,10 +103,11 @@ class AsyncPool:
                         except Exception as cb_err:
                             log.warning("on_error callback error: %s", cb_err)
             finally:
-                self._inflight -= 1
-                self._queue.task_done()
-                if self._inflight == 0 and self._queue.empty():
-                    self._drain_event.set()
+                with self._state_lock:
+                    self._inflight -= 1
+                    self._queue.task_done()
+                    if self._inflight == 0 and self._queue.empty():
+                        self._drain_event.set()
 
     async def submit(self, task: PoolTask) -> str:
         self._ensure_workers()
@@ -107,18 +115,20 @@ class AsyncPool:
         async with self._seq_lock:
             self._seq += 1
             seq = self._seq
-        self._tasks[tid] = {
-            "status": "pending",
-            "result": None,
-            "error": None,
-            "task": task,
-            "cancelled": False,
-        }
-        self._drain_event.clear()
+        with self._state_lock:
+            self._tasks[tid] = {
+                "status": "pending",
+                "result": None,
+                "error": None,
+                "task": task,
+                "cancelled": False,
+            }
+            self._drain_event.clear()
         try:
             self._queue.put_nowait((task.priority, seq, tid, task))
         except asyncio.QueueFull:
-            del self._tasks[tid]
+            with self._state_lock:
+                del self._tasks[tid]
             raise
         return tid
 
@@ -147,44 +157,50 @@ class AsyncPool:
         await self.drain()
         results = []
         errors = []
-        for tid in tids:
-            state = self._tasks[tid]
-            if state["status"] == "completed":
-                results.append(state["result"])
-            elif state["status"] == "failed" and state["error"] is not None:
-                errors.append(state["error"])
-            else:
-                errors.append(RuntimeError(f"task {tid} ended in status {state['status']}"))
+        with self._state_lock:
+            for tid in tids:
+                state = self._tasks.get(tid, {"status": "missing", "result": None, "error": None})
+                if state["status"] == "completed":
+                    results.append(state["result"])
+                elif state["status"] == "failed" and state["error"] is not None:
+                    errors.append(state["error"])
+                else:
+                    errors.append(RuntimeError(f"task {tid} ended in status {state['status']}"))
         return results, errors
 
     def cancel(self, task_id: str) -> bool:
-        state = self._tasks.get(task_id)
-        if state is None:
-            return False
-        if state["status"] != "pending":
-            return False
-        state["cancelled"] = True
-        state["status"] = "cancelled"
-        return True
+        """Mark a pending task as cancelled. Returns True if a pending task was found."""
+        with self._state_lock:
+            state = self._tasks.get(task_id)
+            if state is None:
+                return False
+            if state["status"] != "pending":
+                return False
+            state["cancelled"] = True
+            state["status"] = "cancelled"
+            return True
 
     def stats(self) -> dict:
+        """Snapshot counters under the lock so concurrent state writes don't tear."""
         pending = running = completed = failed = 0
-        for s in self._tasks.values():
-            st = s["status"]
-            if st == "pending":
-                pending += 1
-            elif st == "running":
-                running += 1
-            elif st == "completed":
-                completed += 1
-            elif st == "failed":
-                failed += 1
+        with self._state_lock:
+            for s in self._tasks.values():
+                st = s["status"]
+                if st == "pending":
+                    pending += 1
+                elif st == "running":
+                    running += 1
+                elif st == "completed":
+                    completed += 1
+                elif st == "failed":
+                    failed += 1
+            total = len(self._tasks)
         return {
             "pending": pending,
             "running": running,
             "completed": completed,
             "failed": failed,
-            "total": len(self._tasks),
+            "total": total,
         }
 
     async def drain(self, timeout_sec: float = 30.0) -> None:
@@ -194,10 +210,11 @@ class AsyncPool:
             pass
 
     async def shutdown(self) -> None:
-        for state in self._tasks.values():
-            if state["status"] == "pending":
-                state["cancelled"] = True
-                state["status"] = "cancelled"
+        with self._state_lock:
+            for state in self._tasks.values():
+                if state["status"] == "pending":
+                    state["cancelled"] = True
+                    state["status"] = "cancelled"
         try:
             await asyncio.wait_for(self._drain_event.wait(), timeout=5.0)
         except asyncio.TimeoutError:

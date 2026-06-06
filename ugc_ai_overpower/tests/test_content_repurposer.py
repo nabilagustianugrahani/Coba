@@ -299,3 +299,50 @@ def test_summary(repurposer):
 def test_supported_tones_includes_professional():
     assert "professional" in SUPPORTED_TONES
     assert "engaging" in SUPPORTED_TONES
+
+
+# -----------------------------------------------------------------------------
+# 6. additional tests (BATCH F)
+# -----------------------------------------------------------------------------
+def test_long_text_caption_truncation(repurposer):
+    """Captions are truncated at the per-tone word limit (no exceptions)."""
+    s = SourceContent(
+        content_id="c_long",
+        media_url="https://x.com/v.mp4",
+        title="T",
+        description=("lorem ipsum dolor sit amet " * 30).strip(),
+        duration_sec=60,
+        niche="tech",
+    )
+    c = _run(repurposer.generate_caption(s, "tiktok", tone="playful"))
+    assert isinstance(c, str)
+    assert len(c) < 1000  # reasonable upper bound
+
+
+def test_hashtags_handled_when_too_many_requested(repurposer, source):
+    """max_count above the cap is silently clamped."""
+    h = _run(repurposer.suggest_hashtags(source, "tiktok", max_count=999))
+    assert len(h) <= 10
+    assert all(isinstance(t, str) and t.startswith("#") for t in h)
+
+
+def test_caption_uses_platform_tone(repurposer, source):
+    """Different tones produce distinguishable captions."""
+    c_engaging = _run(repurposer.generate_caption(source, "linkedin", tone="engaging"))
+    c_professional = _run(repurposer.generate_caption(source, "linkedin", tone="professional"))
+    assert c_engaging != c_professional
+    assert "professionals" in c_professional.lower()
+
+
+def test_to_twitter_uses_horizontal_aspect(repurposer, source):
+    """Twitter target must use horizontal aspect ratio."""
+    r = _run(repurposer.to_twitter_video(source))
+    assert r.target_format == "horizontal"
+    assert list(ASPECT_HORIZONTAL) == r.metadata["aspect"]
+
+
+def test_to_youtube_long_uses_authoritative_tone(repurposer, source):
+    """YouTube long-form captions include authoritative phrasing."""
+    r = _run(repurposer.to_youtube_long(source))
+    assert r.caption.lower().startswith("test tips")
+    assert "what you need to know" in r.caption.lower()

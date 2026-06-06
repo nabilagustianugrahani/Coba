@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from dataclasses import dataclass, field, asdict
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -58,6 +59,15 @@ class ImageEnhancer:
         parsed = urlparse(image_url)
         if parsed.scheme not in ("http", "https", "data", "s3", "gs"):
             raise ValueError(f"Invalid URL scheme: {parsed.scheme}")
+        # Defensive path-traversal check: only the basename of the path is
+        # ever used downstream (e.g. for extension detection), and ``..``
+        # must never appear in the URL.
+        if ".." in image_url:
+            raise ValueError("URL must not contain '..'")
+        path = parsed.path or ""
+        if path and os.path.basename(path) != path.lstrip("/"):
+            # The path traverses upwards (e.g. /a/../../b.jpg)
+            raise ValueError("URL must not contain path traversal segments")
 
     def _make_output_url(
         self, image_url: str, operations: list[str], params: dict[str, Any]

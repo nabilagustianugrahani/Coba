@@ -16,6 +16,14 @@ from typing import Any, Optional
 log = logging.getLogger(__name__)
 
 
+# Hard caps to prevent the optimizer from blowing memory / CPU on pathological
+# inputs (e.g. a 1GB content blob).  Pydantic-style validators expressed as
+# constants so we don't add a Pydantic dependency for what amounts to two
+# length checks.
+MAX_CONTENT_LENGTH: int = 50_000
+MAX_KEYWORD_LENGTH: int = 200
+
+
 STOPWORDS = {
     "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "be", "been",
     "to", "of", "in", "on", "at", "for", "with", "by", "from", "as", "this", "that",
@@ -124,6 +132,14 @@ class SEOOptimizer:
         return len([w for w in self._tokenize(text) if w and w not in STOPWORDS])
 
     def score_content(self, content: str, target_keyword: str) -> SEOScore:
+        if content is not None and len(content) > MAX_CONTENT_LENGTH:
+            raise ValueError(
+                f"content too long: {len(content)} chars (max {MAX_CONTENT_LENGTH})"
+            )
+        if target_keyword and len(target_keyword) > MAX_KEYWORD_LENGTH:
+            raise ValueError(
+                f"target_keyword too long: {len(target_keyword)} chars (max {MAX_KEYWORD_LENGTH})"
+            )
         if not content:
             return SEOScore(
                 overall=0.0,
@@ -206,6 +222,14 @@ class SEOOptimizer:
         )
 
     def suggest_improvements(self, content: str, target_keyword: str) -> list[str]:
+        if content is not None and len(content) > MAX_CONTENT_LENGTH:
+            raise ValueError(
+                f"content too long: {len(content)} chars (max {MAX_CONTENT_LENGTH})"
+            )
+        if target_keyword and len(target_keyword) > MAX_KEYWORD_LENGTH:
+            raise ValueError(
+                f"target_keyword too long: {len(target_keyword)} chars (max {MAX_KEYWORD_LENGTH})"
+            )
         suggestions: list[str] = []
         if not content or not content.strip():
             return ["Add content"]
@@ -244,6 +268,10 @@ class SEOOptimizer:
         return suggestions
 
     def generate_meta_description(self, content: str, max_length: int = 160) -> str:
+        if content is not None and len(content) > MAX_CONTENT_LENGTH:
+            raise ValueError(
+                f"content too long: {len(content)} chars (max {MAX_CONTENT_LENGTH})"
+            )
         if not content or not content.strip():
             return ""
         text = re.sub(r"\s+", " ", content).strip()

@@ -150,6 +150,17 @@ class ThumbnailTester:
     # public API
     # ------------------------------------------------------------------
     async def create_variants(self, base_image_url: str, n: int = DEFAULT_VARIANT_COUNT) -> list[ThumbnailVariant]:
+        """Generate N stylistic variants of a base thumbnail image.
+
+        Args:
+            base_image_url: Source image URL (must be valid http/https).
+            n: Number of variants to create; clamped to
+                [:data:`MIN_VARIANTS`, :data:`MAX_VARIANTS`].
+
+        Returns:
+            A list of :class:`ThumbnailVariant` with unique IDs and
+            platform-friendly CDN URLs.
+        """
         self._check_url(base_image_url)
         n = max(MIN_VARIANTS, min(int(n), MAX_VARIANTS))
         styles_cycle = list(ALLOWED_STYLES)[:n]
@@ -190,6 +201,20 @@ class ThumbnailTester:
         min_impressions: int = 1000,
         max_days: int = 7,
     ) -> list[ThumbnailTestResult]:
+        """Simulate an A/B test for thumbnail variants and pick a winner.
+
+        Args:
+            video_id: ID of the video the thumbnails belong to.
+            variants: 2-6 :class:`ThumbnailVariant` objects.
+            min_impressions: Minimum impressions per variant (>= 100).
+            max_days: Maximum test duration in days (1-30).
+
+        Returns:
+            Per-variant :class:`ThumbnailTestResult` with one winner marked.
+
+        Raises:
+            ValueError: If any input is out of range or required.
+        """
         if not video_id or not video_id.strip():
             raise ValueError("video_id cannot be empty")
         self._check_variants(variants)
@@ -293,6 +318,18 @@ class ThumbnailTester:
             r.confidence = round(conf, 4)
 
     def declare_winner(self, test_id: str) -> ThumbnailVariant:
+        """Return the winning :class:`ThumbnailVariant` for a completed test.
+
+        Args:
+            test_id: ID returned by :meth:`run_test`.
+
+        Returns:
+            The winning variant.
+
+        Raises:
+            KeyError: If ``test_id`` is unknown.
+            ValueError: If the test has no declared winner.
+        """
         if test_id not in self._tests:
             raise KeyError(f"unknown test_id: {test_id}")
         t = self._tests[test_id]
@@ -304,6 +341,18 @@ class ThumbnailTester:
         raise RuntimeError(f"winner {t.winner_id} not in variants")
 
     async def predict_ctr(self, image_url: str, niche: str = "") -> float:
+        """Predict click-through rate for a thumbnail.
+
+        Uses the configured analytics pipeline when available; otherwise
+        falls back to a deterministic heuristic (style, face, niche).
+
+        Args:
+            image_url: Public image URL.
+            niche: Optional content niche ("fitness", "gaming", ...).
+
+        Returns:
+            Predicted CTR in [0.005, 0.30].
+        """
         self._check_url(image_url)
         if self.analytics is not None and hasattr(self.analytics, "fetch_metrics"):
             try:
@@ -322,14 +371,21 @@ class ThumbnailTester:
         return _predict_ctr_heuristic(v, niche)
 
     def get_test(self, test_id: str) -> ThumbnailTest:
+        """Return a stored :class:`ThumbnailTest` by ID.
+
+        Raises:
+            KeyError: If ``test_id`` is unknown.
+        """
         if test_id not in self._tests:
             raise KeyError(f"unknown test_id: {test_id}")
         return self._tests[test_id]
 
     def list_tests(self) -> list[ThumbnailTest]:
+        """Return all stored tests (insertion order)."""
         return list(self._tests.values())
 
     def summary(self) -> dict[str, Any]:
+        """Return a small dashboard-friendly snapshot of tester state."""
         return {
             "tests_run": len(self._tests),
             "active_ab_tests": len(self._active_ab),

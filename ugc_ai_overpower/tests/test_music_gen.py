@@ -272,3 +272,50 @@ def test_summary(mg):
     assert s["cached_tracks"] == 0
     assert "0-30s" in s["model_routing"]
     assert s["modal_configured"] is False
+
+
+# -----------------------------------------------------------------------------
+# 5. additional tests (BATCH F)
+# -----------------------------------------------------------------------------
+def test_generate_all_genres(mg):
+    """Every allowed genre is acceptable."""
+    for genre in ALLOWED_GENRES:
+        p = MusicPrompt(genre=genre, duration_sec=15)
+        t = _run(mg.generate(p, f"genre_{genre}"))
+        assert t.genre == genre
+
+
+def test_generate_bpm_boundaries(mg):
+    """Min and max BPM are accepted; just-out-of-range values are rejected."""
+    p_min = MusicPrompt(bpm=40)
+    p_max = MusicPrompt(bpm=220)
+    _run(mg.generate(p_min, "bpm_min"))
+    _run(mg.generate(p_max, "bpm_max"))
+    p_low = MusicPrompt(bpm=39)
+    with pytest.raises(ValueError, match="bpm"):
+        _run(mg.generate(p_low, "bpm_too_low"))
+
+
+def test_generate_all_keys(mg):
+    """Every allowed key is acceptable."""
+    for key in ALLOWED_KEYS:
+        p = MusicPrompt(key=key, duration_sec=10)
+        t = _run(mg.generate(p, f"key_{key}"))
+        assert t.key == key
+
+
+def test_generate_cost_scales_with_duration(mg):
+    """Longer tracks cost more (or equal) than shorter ones, all else equal."""
+    p_short = MusicPrompt(duration_sec=20)
+    p_long = MusicPrompt(duration_sec=120)
+    t_short = _run(mg.generate(p_short, "cost_short"))
+    t_long = _run(mg.generate(p_long, "cost_long"))
+    assert t_long.cost_usd > t_short.cost_usd
+
+
+def test_generate_for_video_lifestyle_default(mg):
+    """Lifestyle niche defaults to lo-fi genre."""
+    meta = {"id": "v_life", "tags": [], "description": "a day in the life", "niche": "lifestyle"}
+    t = _run(mg.generate_for_video(meta, target_duration_sec=45))
+    assert t.genre == "lo-fi"
+    assert t.bpm == 80

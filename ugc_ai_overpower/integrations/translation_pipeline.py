@@ -22,6 +22,11 @@ from typing import Any, Optional
 
 log = logging.getLogger(__name__)
 
+# Hard caps to keep translation inputs bounded.  Expressed as plain constants
+# so the pipeline has no Pydantic dependency.
+MAX_TEXT_LENGTH: int = 10_000
+MAX_BATCH_SIZE: int = 100
+
 SUPPORTED_LANGS = [
     "en", "id", "es", "pt", "fr", "de", "ja", "ko",
     "zh", "ar", "hi", "th", "vi", "ms",
@@ -95,6 +100,10 @@ class TranslationPipeline:
     ) -> TranslationResult:
         if target_lang not in SUPPORTED_LANGS:
             raise ValueError(f"Unsupported target language: {target_lang}")
+        if text is not None and len(text) > MAX_TEXT_LENGTH:
+            raise ValueError(
+                f"text too long: {len(text)} chars (max {MAX_TEXT_LENGTH})"
+            )
         if not text or not text.strip():
             return TranslationResult(
                 source_text=text,
@@ -138,12 +147,20 @@ class TranslationPipeline:
     async def translate_batch(
         self, texts: list[str], target_lang: str
     ) -> list[TranslationResult]:
+        if len(texts) > MAX_BATCH_SIZE:
+            raise ValueError(
+                f"batch too large: {len(texts)} items (max {MAX_BATCH_SIZE})"
+            )
         results: list[TranslationResult] = []
         for t in texts:
             results.append(await self.translate(t, target_lang))
         return results
 
     async def detect_language(self, text: str) -> str:
+        if text is not None and len(text) > MAX_TEXT_LENGTH:
+            raise ValueError(
+                f"text too long: {len(text)} chars (max {MAX_TEXT_LENGTH})"
+            )
         if not text or not text.strip():
             return "en"
         if re.search(r"[\u3040-\u309f\u30a0-\u30ff]", text):
@@ -198,6 +215,10 @@ class TranslationPipeline:
     async def generate_hashtags(
         self, text: str, target_lang: str, count: int = 10
     ) -> list[str]:
+        if text is not None and len(text) > MAX_TEXT_LENGTH:
+            raise ValueError(
+                f"text too long: {len(text)} chars (max {MAX_TEXT_LENGTH})"
+            )
         if target_lang not in HASHTAGS_BY_LANG:
             target_lang = "en"
         return HASHTAGS_BY_LANG[target_lang][:count]

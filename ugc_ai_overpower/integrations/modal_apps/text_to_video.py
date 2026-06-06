@@ -191,7 +191,7 @@ def _generate_wan(
         except Exception:
             try:
                 import imageio.v2 as imageio
-                imageio.mimsave(buf, pil_frames, format="mp4", fps=fps, codec="libx264")
+                imageio.mimsave(buf, pil_frames, format="mp4", fps=fps, codec="libx264")  # type: ignore[call-overload]
             except Exception:
                 arr = np.stack([np.array(f) for f in pil_frames])
                 buf.write(arr.tobytes())
@@ -257,7 +257,7 @@ def _generate_hunyuan(
         except Exception:
             try:
                 import imageio.v2 as imageio
-                imageio.mimsave(buf, pil_frames, format="mp4", fps=fps, codec="libx264")
+                imageio.mimsave(buf, pil_frames, format="mp4", fps=fps, codec="libx264")  # type: ignore[call-overload]
             except Exception:
                 arr = np.stack([np.array(f) for f in pil_frames])
                 buf.write(arr.tobytes())

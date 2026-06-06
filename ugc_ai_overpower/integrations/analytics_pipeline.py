@@ -128,8 +128,8 @@ class AnalyticsPipeline:
         by_plat: dict[str, float] = {}
         for m in metrics_list:
             by_plat[m.platform] = by_plat.get(m.platform, 0.0) + m.revenue_usd
-        best = max(by_plat, key=by_plat.get) if by_plat else ""
-        worst = min(by_plat, key=by_plat.get) if by_plat else ""
+        best = max(by_plat, key=lambda k: by_plat[k]) if by_plat else ""
+        worst = min(by_plat, key=lambda k: by_plat[k]) if by_plat else ""
         return ROIDashboard(
             total_revenue=total_revenue,
             total_spend=spend_usd,

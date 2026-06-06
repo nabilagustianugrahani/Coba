@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
 from collections import deque
@@ -86,7 +87,10 @@ class TokenBucketLimiter(RateLimiter):
         self.capacity = capacity
         self.refill_per_sec = refill_per_sec
         self._state: dict[str, dict[str, float]] = {}
-        self._lock = asyncio.Lock()
+        # threading.RLock so sync reads (get_remaining/reset) and async
+        # acquires share the same critical section. Operations under the lock
+        # never await, so a sync lock is safe in async contexts.
+        self._lock = threading.RLock()
 
     def _refill(self, key: str, now: float) -> float:
         state = self._state.setdefault(
@@ -104,7 +108,7 @@ class TokenBucketLimiter(RateLimiter):
         """Atomically refill, check, and deduct. Returns False if not enough tokens."""
         if tokens <= 0:
             return True
-        async with self._lock:
+        with self._lock:
             now = time.monotonic()
             current = self._refill(key, now)
             if current >= tokens:
@@ -113,13 +117,19 @@ class TokenBucketLimiter(RateLimiter):
             return False
 
     def get_remaining(self, key: str = _DEFAULT_KEY) -> int:
+        """Snapshot remaining tokens under the lock so concurrent refill+deduct
+        cannot tear the value.
+        """
         if key not in self._state:
             return self.capacity
-        now = time.monotonic()
-        return int(self._refill(key, now))
+        with self._lock:
+            now = time.monotonic()
+            return int(self._refill(key, now))
 
     def reset(self, key: str = _DEFAULT_KEY) -> None:
-        self._state.pop(key, None)
+        """Clear all state for ``key`` (no-op if unknown)."""
+        with self._lock:
+            self._state.pop(key, None)
 
     def __repr__(self) -> str:
         return f"TokenBucketLimiter(capacity={self.capacity}, refill_per_sec={self.refill_per_sec})"
@@ -139,7 +149,7 @@ class SlidingWindowLimiter(RateLimiter):
         self.max_requests = max_requests
         self.window_sec = window_sec
         self._state: dict[str, deque[float]] = {}
-        self._lock = asyncio.Lock()
+        self._lock = threading.RLock()
 
     def _trim(self, key: str, now: float) -> deque[float]:
         dq = self._state.setdefault(key, deque())
@@ -152,7 +162,7 @@ class SlidingWindowLimiter(RateLimiter):
         """Atomically trim, check, and record. Returns False if window is full."""
         if tokens <= 0:
             return True
-        async with self._lock:
+        with self._lock:
             now = time.monotonic()
             dq = self._trim(key, now)
             if len(dq) + tokens <= self.max_requests:
@@ -162,14 +172,20 @@ class SlidingWindowLimiter(RateLimiter):
             return False
 
     def get_remaining(self, key: str = _DEFAULT_KEY) -> int:
+        """Snapshot remaining request slots under the lock so concurrent
+        acquire+trim cannot tear the value.
+        """
         if key not in self._state:
             return self.max_requests
-        now = time.monotonic()
-        dq = self._trim(key, now)
-        return max(0, self.max_requests - len(dq))
+        with self._lock:
+            now = time.monotonic()
+            dq = self._trim(key, now)
+            return max(0, self.max_requests - len(dq))
 
     def reset(self, key: str = _DEFAULT_KEY) -> None:
-        self._state.pop(key, None)
+        """Clear all state for ``key`` (no-op if unknown)."""
+        with self._lock:
+            self._state.pop(key, None)
 
     def __repr__(self) -> str:
         return f"SlidingWindowLimiter(max_requests={self.max_requests}, window_sec={self.window_sec})"

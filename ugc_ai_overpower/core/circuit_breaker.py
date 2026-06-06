@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+import threading
 import time
 from datetime import datetime
 from enum import Enum
@@ -60,18 +61,23 @@ class CircuitBreaker:
         self._last_failure_at_wall: float | None = None
 
         self._probe_in_flight = False
-        self._lock = asyncio.Lock()
+        # Per-instance lock guards every state read/write. A `threading.RLock`
+        # is reentrant, works from both sync and async contexts, and is cheap
+        # for the short critical sections here (no awaits held under the lock).
+        self._lock = threading.RLock()
 
     @property
     def name(self) -> str:
         return self._name
 
     def state(self) -> CircuitState:
-        return self._state
+        """Return the current state, snapshotting under the lock."""
+        with self._lock:
+            return self._state
 
     async def call(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
         """Execute fn with circuit breaker protection."""
-        async with self._lock:
+        with self._lock:
             self._total_calls += 1
 
             if self._state == CircuitState.OPEN:
@@ -99,11 +105,11 @@ class CircuitBreaker:
             else:
                 result = await asyncio.to_thread(fn, *args, **kwargs)
         except Exception:
-            async with self._lock:
+            with self._lock:
                 self._record_failure()
             raise
         else:
-            async with self._lock:
+            with self._lock:
                 self._record_success()
             return result
 
@@ -148,6 +154,15 @@ class CircuitBreaker:
             self._failure_count = 0
 
     def stats(self) -> dict:
+        """Snapshot stats under the lock so concurrent writes don't tear."""
+        with self._lock:
+            return self._stats_unlocked()
+
+    def stats_sync(self) -> dict:
+        """Backward-compatible alias for :meth:`stats`."""
+        return self.stats()
+
+    def _stats_unlocked(self) -> dict:
         return {
             "name": self._name,
             "state": self._state.value,
@@ -168,14 +183,15 @@ class CircuitBreaker:
 
     def reset(self) -> None:
         """Force back to CLOSED, clear all counters."""
-        log.info("Circuit '%s' reset -> CLOSED", self._name)
-        self._state = CircuitState.CLOSED
-        self._failure_count = 0
-        self._success_count = 0
-        self._opened_at_mono = None
-        self._opened_at_wall = None
-        self._last_failure_at_wall = None
-        self._probe_in_flight = False
+        with self._lock:
+            log.info("Circuit '%s' reset -> CLOSED", self._name)
+            self._state = CircuitState.CLOSED
+            self._failure_count = 0
+            self._success_count = 0
+            self._opened_at_mono = None
+            self._opened_at_wall = None
+            self._last_failure_at_wall = None
+            self._probe_in_flight = False
 
 
 class CircuitBreakerRegistry:
@@ -203,4 +219,4 @@ class CircuitBreakerRegistry:
 
     def all_stats(self) -> dict[str, dict]:
         """Return stats dict for every registered breaker."""
-        return {n: b.stats() for n, b in self._breakers.items()}
+        return {n: b.stats_sync() for n, b in self._breakers.items()}

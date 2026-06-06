@@ -256,3 +256,56 @@ def test_summary(vc):
     assert s["cached_clones"] == 0
     assert "id" in s["supported_languages"]
     assert s["modal_configured"] is False
+
+
+# -----------------------------------------------------------------------------
+# 5. additional tests (BATCH F)
+# -----------------------------------------------------------------------------
+def test_clone_with_modal_budget_exceeded_falls_back(vc, mock_modal, samples):
+    """When modal budget is exceeded, fall back to kokoro-tts."""
+    mock_modal.check_budget.return_value = False
+    vc.modal = mock_modal
+    r = _run(vc.clone(samples, name="over_budget", target_text="halo"))
+    assert r.model == "kokoro-tts"
+    assert r.cost_usd == 0.01
+
+
+def test_clone_with_modal_raises_falls_back(vc, mock_modal, samples):
+    """When modal dispatch raises, fall back to kokoro-tts gracefully."""
+    mock_modal.estimate_cost.side_effect = RuntimeError("modal down")
+    vc.modal = mock_modal
+    r = _run(vc.clone(samples, name="modal_down", target_text="halo"))
+    assert r.model == "kokoro-tts"
+    assert r.metadata["modal_used"] is False
+
+
+def test_clone_different_niches(samples):
+    """Cloning with different language codes produces distinct voice_ids."""
+    vc = VoiceCloner()
+    r_id = _run(vc.clone(samples, name="indo", target_text="halo", language="id"))
+    r_en = _run(vc.clone(samples, name="english", target_text="hello", language="en"))
+    assert r_id.voice_id != r_en.voice_id
+    assert r_id.language == "id"
+    assert r_en.language == "en"
+
+
+def test_synthesize_cost_varies_with_speed(vc, samples):
+    """Faster speed = shorter duration = cheaper synthesis."""
+    r = _run(_setup_voice(vc, samples))
+    summary_before = dict(vc.summary())
+    _run(vc.synthesize(r.voice_id, "halo dunia", speed=2.0))
+    _run(vc.synthesize(r.voice_id, "halo dunia", speed=0.5))
+    summary_after = vc.summary()
+    # Two calls should add to the spend ledger.
+    assert summary_after["spent_usd"] > summary_before["spent_usd"]
+
+
+def test_get_cached_distinguishes_by_name(vc, samples):
+    """Cache returns the right result for the right name."""
+    _run(vc.clone(samples, name="alpha", target_text="halo"))
+    _run(vc.clone(samples, name="beta", target_text="halo"))
+    a = vc.get_cached("alpha")
+    b = vc.get_cached("beta")
+    assert a is not None and b is not None
+    assert a.name == "alpha"
+    assert b.name == "beta"

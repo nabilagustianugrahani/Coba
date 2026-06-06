@@ -30,6 +30,7 @@ from ugc_ai_overpower.integrations.session_manager import (
     SessionManager,
     SessionStatus,
 )
+from ugc_ai_overpower.core.errors import ConfigError
 
 log = logging.getLogger(__name__)
 
@@ -117,6 +118,21 @@ class SocialDispatch:
     def is_configured(self) -> bool:
         return bool(self.tiktokhub_config and self.tiktokhub_config.api_key)
 
+    def _require_tikhub(self) -> TikHubConfig:
+        """Return the loaded TikHub config or raise :class:`ConfigError`.
+
+        Centralises the ``is None`` guard so mypy sees the narrowed type and
+        individual methods stay readable.
+        """
+        if self.tiktokhub_config is None:
+            raise ConfigError("TikHub config not loaded")
+        return self.tiktokhub_config
+
+    def _require_session_manager(self) -> SessionManager:
+        if self.session_manager is None:
+            raise ConfigError("SessionManager not configured")
+        return self.session_manager
+
     def supported_platforms(self) -> list[str]:
         out = sorted(PLATFORMS_TIKHUB.keys())
         out.extend(["shopee", "tiktokshop", "lazada", "tokopedia"])
@@ -144,7 +160,7 @@ class SocialDispatch:
                 status="error",
                 error="TikHub not configured. Set TIKHUB_API_KEY env var.",
             )
-        session = self.session_manager.get(platform, username)
+        session = self._require_session_manager().get(platform, username)
         if not session or session.status != SessionStatus.ACTIVE.value:
             return PostResult(
                 platform=platform,
@@ -188,7 +204,8 @@ class SocialDispatch:
                 status="error",
                 error="aiohttp not installed. Run: pip install aiohttp",
             )
-        endpoint = f"{self.tiktokhub_config.base_url}/post/{PLATFORMS_TIKHUB.get(platform, platform)}/create"
+        cfg = self._require_tikhub()
+        endpoint = f"{cfg.base_url}/post/{PLATFORMS_TIKHUB.get(platform, platform)}/create"
         payload = {
             "content": content,
             "media_urls": media_urls or [],
@@ -204,11 +221,11 @@ class SocialDispatch:
                     endpoint,
                     json=payload,
                     headers={
-                        "Authorization": f"Bearer {self.tiktokhub_config.api_key}",
+                        "Authorization": f"Bearer {cfg.api_key}",
                         "Content-Type": "application/json",
                         "User-Agent": session.user_agent or "ugc-ai-overpower/1.0",
                     },
-                    timeout=aiohttp.ClientTimeout(total=self.tiktokhub_config.timeout_sec),
+                    timeout=aiohttp.ClientTimeout(total=cfg.timeout_sec),
                 ) as resp:
                     body = await resp.json()
                     if resp.status != 200:
@@ -233,14 +250,15 @@ class SocialDispatch:
             import aiohttp
         except ImportError:
             return EngagementMetrics()
-        endpoint = f"{self.tiktokhub_config.base_url}/engagement/{PLATFORMS_TIKHUB.get(platform, platform)}/fetch"
+        cfg = self._require_tikhub()
+        endpoint = f"{cfg.base_url}/engagement/{PLATFORMS_TIKHUB.get(platform, platform)}/fetch"
         try:
             async with aiohttp.ClientSession() as http:
                 async with http.get(
                     endpoint,
                     params={"url": post_url},
-                    headers={"Authorization": f"Bearer {self.tiktokhub_config.api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=self.tiktokhub_config.timeout_sec),
+                    headers={"Authorization": f"Bearer {cfg.api_key}"},
+                    timeout=aiohttp.ClientTimeout(total=cfg.timeout_sec),
                 ) as resp:
                     if resp.status != 200:
                         return EngagementMetrics()
@@ -264,14 +282,15 @@ class SocialDispatch:
             import aiohttp
         except ImportError:
             return AccountInfo(platform=platform, username=username)
-        endpoint = f"{self.tiktokhub_config.base_url}/user/{PLATFORMS_TIKHUB.get(platform, platform)}/info"
+        cfg = self._require_tikhub()
+        endpoint = f"{cfg.base_url}/user/{PLATFORMS_TIKHUB.get(platform, platform)}/info"
         try:
             async with aiohttp.ClientSession() as http:
                 async with http.get(
                     endpoint,
                     params={"username": username},
-                    headers={"Authorization": f"Bearer {self.tiktokhub_config.api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=self.tiktokhub_config.timeout_sec),
+                    headers={"Authorization": f"Bearer {cfg.api_key}"},
+                    timeout=aiohttp.ClientTimeout(total=cfg.timeout_sec),
                 ) as resp:
                     if resp.status != 200:
                         return AccountInfo(platform=platform, username=username)

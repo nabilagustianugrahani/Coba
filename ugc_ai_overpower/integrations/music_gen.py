@@ -145,6 +145,18 @@ class MusicGenerator:
     # public API
     # ------------------------------------------------------------------
     async def generate(self, prompt: MusicPrompt, name: str) -> MusicTrack:
+        """Generate a royalty-free music track for the given prompt.
+
+        Args:
+            prompt: Genre/mood/duration/BPM/key/instruments specification.
+            name: Track name (used as cache key for de-duplication).
+
+        Returns:
+            A :class:`MusicTrack` with audio URL, cost, and license.
+
+        Raises:
+            ValueError: If prompt fields or ``name`` are invalid.
+        """
         self._check_prompt(prompt)
         if not name or not name.strip():
             raise ValueError("name cannot be empty")
@@ -191,6 +203,20 @@ class MusicGenerator:
         return track
 
     async def generate_for_video(self, video_metadata: dict, target_duration_sec: int) -> MusicTrack:
+        """Infer genre/mood/BPM from video metadata and generate a track.
+
+        Args:
+            video_metadata: Dict with keys ``id``, ``tags``, ``description``,
+                and optional ``niche``.
+            target_duration_sec: Output duration in seconds
+                (:data:`MIN_DURATION`-:data:`MAX_DURATION`).
+
+        Returns:
+            The generated :class:`MusicTrack`.
+
+        Raises:
+            ValueError: If metadata is not a dict or duration is out of range.
+        """
         if not isinstance(video_metadata, dict):
             raise ValueError("video_metadata must be a dict")
         if target_duration_sec < MIN_DURATION or target_duration_sec > MAX_DURATION:
@@ -243,15 +269,18 @@ class MusicGenerator:
         return await self.generate(prompt, name)
 
     async def list_genres(self) -> list[str]:
+        """List the genres this generator accepts (see :data:`ALLOWED_GENRES`)."""
         return list(ALLOWED_GENRES)
 
     def get_cached(self, name: str) -> Optional[MusicTrack]:
+        """Return the cached track with the given name, or None."""
         for t in self._cache.values():
             if t.name == name:
                 return t
         return None
 
     def summary(self) -> dict[str, Any]:
+        """Return a small dashboard-friendly snapshot of generator state."""
         return {
             "cached_tracks": len(self._cache),
             "spent_usd": self.spend_tracker["spent"],
