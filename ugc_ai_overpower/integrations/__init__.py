@@ -34,6 +34,12 @@ Heavy work NEVER runs on VPS. Modal apps run serverless on pay-per-second GPU.
 """
 from __future__ import annotations
 
+from ugc_ai_overpower.integrations.ab_testing import (
+    ABTest,
+    ABTestResult,
+    ABTesting,
+    Variant,
+)
 from ugc_ai_overpower.integrations.ai_dispatch import (
     COST_TIERS,
     DispatchDecision,
@@ -41,6 +47,11 @@ from ugc_ai_overpower.integrations.ai_dispatch import (
     FAL_ONLY_MODELS,
     MODAL_TO_FAL_BRIDGE,
     UnifiedAIDispatcher,
+)
+from ugc_ai_overpower.integrations.analytics_pipeline import (
+    AnalyticsPipeline,
+    PostMetrics,
+    ROIDashboard,
 )
 from ugc_ai_overpower.integrations.base import (
     AccountInfo,
@@ -82,6 +93,15 @@ from ugc_ai_overpower.integrations.fal_dispatch import (
     FalBudgetExceeded,
     FalDispatcher,
     FalResult,
+)
+from ugc_ai_overpower.integrations.image_enhancer import (
+    ALLOWED_FIT_MODES,
+    ALLOWED_FORMATS,
+    ALLOWED_OPERATIONS,
+    ALLOWED_POSITIONS,
+    COST_PER_IMAGE_USD,
+    EnhanceResult,
+    ImageEnhancer,
 )
 from ugc_ai_overpower.integrations.modal_dispatch import (
     MODELS,
@@ -129,6 +149,11 @@ from ugc_ai_overpower.integrations.relationship_graph import (
     NodeType,
     RelationshipGraph,
 )
+from ugc_ai_overpower.integrations.seo_optimizer import (
+    Keyword,
+    SEOScore,
+    SEOOptimizer,
+)
 from ugc_ai_overpower.integrations.session_manager import (
     Session,
     SessionBackend,
@@ -144,27 +169,42 @@ from ugc_ai_overpower.integrations.social_dispatch import (
     TikHubConfig,
     detect_platform,
 )
+from ugc_ai_overpower.integrations.translation_pipeline import (
+    LANG_NAMES,
+    SUPPORTED_LANGS,
+    TranslationPipeline,
+    TranslationResult,
+)
 from ugc_ai_overpower.integrations.umami_dispatch import (
     TrackingEvent,
     UmamiDispatcher,
 )
 
 __all__ = [
-    "AUDIO_EDIT_GPU_PER_SEC",
+    "ABTest",
+    "ABTestResult",
+    "ABTesting",
     "ALLOWED_CAPTION_FONTS",
+    "ALLOWED_FIT_MODES",
+    "ALLOWED_FORMATS",
+    "ALLOWED_OPERATIONS",
+    "ALLOWED_POSITIONS",
     "ALLOWED_TRANSITIONS",
+    "AUDIO_EDIT_GPU_PER_SEC",
     "ASPECT_SQUARE",
     "ASPECT_VERTICAL",
     "AccountInfo",
+    "AnalyticsPipeline",
     "AudioResult",
     "AffiliateCache",
     "AffiliateLink",
+    "COST_PER_IMAGE_USD",
+    "COST_TIERS",
     "Character",
     "CharacterAgent",
     "CharacterStore",
     "ContentLanguage",
     "ContentTone",
-    "COST_TIERS",
     "DEFAULT_CODESPACE",
     "DEFAULT_TIMEOUT",
     "DispatchDecision",
@@ -173,14 +213,18 @@ __all__ = [
     "EcomConfig",
     "EcomDispatch",
     "Edge",
-    "FFMPEG_GPU_PER_SEC",
     "EdgeType",
     "EngagementMetrics",
+    "EnhanceResult",
     "FAL_MODELS",
     "FAL_ONLY_MODELS",
     "FalBudgetExceeded",
     "FalDispatcher",
     "FalResult",
+    "FFMPEG_GPU_PER_SEC",
+    "ImageEnhancer",
+    "Keyword",
+    "LANG_NAMES",
     "LOUDNESS_DEFAULT_LUFS",
     "LOUDNESS_MAX_LUFS",
     "LOUDNESS_MIN_LUFS",
@@ -205,10 +249,15 @@ __all__ = [
     "PlatformAdapter",
     "PlatformCategory",
     "PodcastCreator",
+    "PostMetrics",
     "PostResult",
+    "ROIDashboard",
     "Region",
     "RelationshipGraph",
+    "SEOScore",
+    "SEOOptimizer",
     "SHOWNOTES_MAX_WORDS",
+    "SUPPORTED_LANGS",
     "Session",
     "SessionBackend",
     "SessionManager",
@@ -220,9 +269,12 @@ __all__ = [
     "TrackingEvent",
     "TranscriptResult",
     "TranscriptSegment",
+    "TranslationPipeline",
+    "TranslationResult",
     "UmamiDispatcher",
     "UnifiedAIDispatcher",
     "VOICE_PRESETS",
+    "Variant",
     "VideoEditResult",
     "VideoEditor",
     "ViralMoment",
@@ -238,4 +290,4 @@ __all__ = [
     "register_adapter",
 ]
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
