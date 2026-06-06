@@ -22,7 +22,8 @@
   "plugin": [
     "superpowers@git+https://github.com/obra/superpowers.git",
     "opencode-skills-collection@latest",
-    "opencode-power-pack@git+https://github.com/amitdmore/opencode-power-pack.git"
+    "opencode-power-pack@git+https://github.com/amitdmore/opencode-power-pack.git",
+    "ecc-universal@latest"
   ],
 
   "agent": {
