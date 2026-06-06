@@ -9,7 +9,9 @@ Architecture:
     - runner.py: code that runs in codespace
     - session_manager.py: credential/session storage
     - character_agent.py: niche-based persona system
-    - modal_dispatch.py: Modal.com GPU dispatcher
+    - modal_dispatch.py: Modal.com GPU dispatcher (cheap, custom)
+    - fal_dispatch.py: fal.ai GPU dispatcher (premium, 985+ pre-deployed)
+    - ai_dispatch.py: unified AI dispatcher, picks zerocost-first
     - relationship_graph.py: creator/content/affiliate knowledge graph
     - umami_dispatch.py: web analytics for UGC post tracking
 
@@ -32,6 +34,14 @@ Heavy work NEVER runs on VPS. Modal apps run serverless on pay-per-second GPU.
 """
 from __future__ import annotations
 
+from ugc_ai_overpower.integrations.ai_dispatch import (
+    COST_TIERS,
+    DispatchDecision,
+    DispatchRequest,
+    FAL_ONLY_MODELS,
+    MODAL_TO_FAL_BRIDGE,
+    UnifiedAIDispatcher,
+)
 from ugc_ai_overpower.integrations.base import (
     AccountInfo,
     AffiliateLink,
@@ -66,6 +76,12 @@ from ugc_ai_overpower.integrations.ecom_dispatch import (
     AffiliateCache,
     EcomConfig,
     EcomDispatch,
+)
+from ugc_ai_overpower.integrations.fal_dispatch import (
+    FAL_MODELS,
+    FalBudgetExceeded,
+    FalDispatcher,
+    FalResult,
 )
 from ugc_ai_overpower.integrations.modal_dispatch import (
     MODELS,
@@ -115,14 +131,23 @@ __all__ = [
     "CharacterStore",
     "ContentLanguage",
     "ContentTone",
+    "COST_TIERS",
     "DEFAULT_CODESPACE",
     "DEFAULT_TIMEOUT",
+    "DispatchDecision",
     "DispatchError",
+    "DispatchRequest",
     "EcomConfig",
     "EcomDispatch",
     "Edge",
     "EdgeType",
     "EngagementMetrics",
+    "FAL_MODELS",
+    "FAL_ONLY_MODELS",
+    "FalBudgetExceeded",
+    "FalDispatcher",
+    "FalResult",
+    "MODAL_TO_FAL_BRIDGE",
     "MODELS",
     "ModalBudgetExceeded",
     "ModalDispatch",
@@ -150,6 +175,7 @@ __all__ = [
     "TikHubConfig",
     "TrackingEvent",
     "UmamiDispatcher",
+    "UnifiedAIDispatcher",
     "VOICE_PRESETS",
     "detect_platform",
     "dispatch_account",
@@ -162,4 +188,4 @@ __all__ = [
     "register_adapter",
 ]
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
