@@ -62,6 +62,11 @@ from ugc_ai_overpower.integrations.base import (
     PostResult,
     Region,
 )
+from ugc_ai_overpower.integrations.caption_optimizer import (
+    CaptionInput,
+    CaptionOptimizer,
+    CaptionResult,
+)
 from ugc_ai_overpower.integrations.character_agent import (
     Character,
     CharacterAgent,
@@ -73,6 +78,17 @@ from ugc_ai_overpower.integrations.character_agent import (
     PERSONA_TEMPLATES,
     PersonaIdentity,
     PersonalityTraits,
+)
+from ugc_ai_overpower.integrations.content_calendar import (
+    CalendarEntry,
+    CalendarInput,
+    CalendarResult,
+    ContentCalendar,
+)
+from ugc_ai_overpower.integrations.cta_generator import (
+    CTAInput,
+    CTAResult,
+    CTAGenerator,
 )
 from ugc_ai_overpower.integrations.dispatcher import (
     DEFAULT_CODESPACE,
@@ -200,9 +216,19 @@ __all__ = [
     "AffiliateLink",
     "COST_PER_IMAGE_USD",
     "COST_TIERS",
+    "CTAInput",
+    "CTAResult",
+    "CTAGenerator",
+    "CalendarEntry",
+    "CalendarInput",
+    "CalendarResult",
+    "CaptionInput",
+    "CaptionOptimizer",
+    "CaptionResult",
     "Character",
     "CharacterAgent",
     "CharacterStore",
+    "ContentCalendar",
     "ContentLanguage",
     "ContentTone",
     "DEFAULT_CODESPACE",
