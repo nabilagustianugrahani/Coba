@@ -24,16 +24,16 @@ def run_task(task: str, payload: dict[str, Any]) -> dict[str, Any]:
     log.info("Running task: %s with payload keys: %s", task, list(payload.keys()))
     try:
         if task == "post":
-            from ugc_ai_overpower.integrations.social_dispatch import do_post
+            from ugc_ai_overpower.integrations.social_dispatch import do_post  # type: ignore[attr-defined]
             return do_post(payload)
         if task == "engagement":
-            from ugc_ai_overpower.integrations.social_dispatch import do_engagement
+            from ugc_ai_overpower.integrations.social_dispatch import do_engagement  # type: ignore[attr-defined]
             return do_engagement(payload)
         if task == "account":
-            from ugc_ai_overpower.integrations.social_dispatch import do_account
+            from ugc_ai_overpower.integrations.social_dispatch import do_account  # type: ignore[attr-defined]
             return do_account(payload)
         if task == "affiliate":
-            from ugc_ai_overpower.integrations.ecom_dispatch import do_affiliate
+            from ugc_ai_overpower.integrations.ecom_dispatch import do_affiliate  # type: ignore[attr-defined]
             return do_affiliate(payload)
         return {"ok": False, "error": f"unknown task: {task}"}
     except Exception as e:

@@ -88,8 +88,8 @@ def _to_base64(s: str) -> str:
     return base64.b64encode(s.encode()).decode()
 
 
-def dispatch_post(platform: str, content: str, media_urls: list[str] = None,
-                  metadata: dict[str, Any] = None) -> PostResult:
+def dispatch_post(platform: str, content: str, media_urls: Optional[list[str]] = None,
+                  metadata: Optional[dict[str, Any]] = None) -> PostResult:
     """Dispatch a post request to codespace."""
     payload = {
         "platform": platform,
@@ -141,7 +141,7 @@ def dispatch_account(platform: str, username: str) -> AccountInfo:
 
 
 def dispatch_affiliate_link(platform: str, product_url: str,
-                            sub_ids: list[str] = None) -> AffiliateLink:
+                            sub_ids: Optional[list[str]] = None) -> AffiliateLink:
     """Dispatch affiliate link generation to codespace."""
     payload = {
         "platform": platform,

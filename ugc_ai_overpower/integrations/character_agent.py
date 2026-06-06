@@ -443,13 +443,12 @@ class CharacterAgent:
       - Get persona: get(character_id) -> Character
       - Voice consistency: get_voice(character) -> dict
     """
-    store: Optional[CharacterStore] = None
+    store: CharacterStore = field(default_factory=CharacterStore)
     niche_presets: dict[str, NicheAdaptation] = field(default_factory=lambda: NICHE_PRESETS.copy())
     templates: list[dict[str, Any]] = field(default_factory=lambda: PERSONA_TEMPLATES.copy())
 
     def __post_init__(self) -> None:
-        if self.store is None:
-            self.store = CharacterStore()
+        pass
 
     def list_niches(self) -> list[str]:
         return sorted(self.niche_presets.keys())

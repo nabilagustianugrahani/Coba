@@ -120,8 +120,8 @@ class PlatformAdapter(ABC):
         ...
 
     @abstractmethod
-    async def post(self, content: str, media_urls: list[str] = None,
-                   metadata: dict[str, Any] = None) -> PostResult:
+    async def post(self, content: str, media_urls: Optional[list[str]] = None,
+                   metadata: Optional[dict[str, Any]] = None) -> PostResult:
         """Publish content to the platform. Heavy — runs in codespace."""
         ...
 
