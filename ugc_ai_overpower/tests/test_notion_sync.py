@@ -303,7 +303,7 @@ class TestNotionDashboard:
         mock_session.request.return_value = mock_response
         
         dashboard = NotionDashboard(token="test_token")
-        result = dashboard.add_campaign("Test Product", platforms=["tiktok", "instagram"])
+        result = dashboard.add_campaign("Test Campaign", platforms=["tiktok", "instagram"])
         
         assert result == "campaign-page-id"
         mock_session.request.assert_called_once()
@@ -335,7 +335,7 @@ class TestNotionDashboard:
         result = dashboard.update_campaign(
             "test-campaign-id",
             status="Active",
-            total_content=10
+            budget=5000
         )
         
         assert result is True
@@ -372,8 +372,8 @@ class TestNotionDashboard:
             "campaign-id",
             "Test Hook",
             platform="tiktok",
-            script="Test script",
-            status="scripted"
+            content_type="Video",
+            status="Draft"
         )
         
         assert result == "content-page-id"
@@ -405,7 +405,7 @@ class TestNotionDashboard:
         dashboard = NotionDashboard(token="test_token")
         result = dashboard.update_content(
             "content-id",
-            status="posted",
+            status="Posted",
             post_url="https://example.com/post"
         )
         
@@ -420,7 +420,7 @@ class TestNotionDashboard:
         
         dashboard = NotionDashboard(token="test_token")
         with patch('builtins.print') as mock_print:
-            result = dashboard.add_analytics("content-id", views=100, likes=10)
+            result = dashboard.add_analytics("campaign-id", metric="views", value=100)
             
         assert result is None
         mock_print.assert_called_with("[Notion] Analytics DB not configured")
@@ -444,14 +444,11 @@ class TestNotionDashboard:
         
         dashboard = NotionDashboard(token="test_token")
         result = dashboard.add_analytics(
-            "content-id",
-            campaign_id="campaign-id",
-            views=100,
-            likes=10,
-            comments=5,
-            shares=2,
-            clicks=15,
-            platform="tiktok"
+            "campaign-id",
+            metric="views",
+            value=100,
+            platform="tiktok",
+            post_url="https://example.com/post"
         )
         
         assert result == "analytics-page-id"
@@ -483,16 +480,13 @@ class TestNotionDashboard:
                     "id": "campaign-1",
                     "properties": {
                         "Name": {"title": [{"type": "text", "text": {"content": "Test Campaign"}, "plain_text": "Test Campaign"}]},
-                        "Product": {"rich_text": [{"type": "text", "text": {"content": "Test Product"}, "plain_text": "Test Product"}]},
                         "Status": {"select": {"name": "Active"}},
-                        "Target Platforms": {"multi_select": [{"name": "tiktok"}]},
-                        "Psychology Triggers": {"rich_text": [{"type": "text", "text": {"content": "curiosity"}, "plain_text": "curiosity"}]},
-                        "Total Content": {"number": 10},
-                        "Content Generated": {"number": 5},
-                        "Videos Generated": {"number": 3},
-                        "Posts Published": {"number": 2},
+                        "Priority": {"select": {"name": "High"}},
+                        "Niche": {"select": {"name": "skincare"}},
+                        "Budget": {"number": 5000},
+                        "Start Date": {"date": {"start": "2023-01-01"}},
+                        "End Date": {"date": {"start": "2023-02-01"}},
                         "Created At": {"date": {"start": "2023-01-01"}},
-                        "Updated At": {"date": {"start": "2023-01-02"}}
                     }
                 }
             ]
@@ -506,14 +500,12 @@ class TestNotionDashboard:
         campaign = result[0]
         assert campaign["id"] == "campaign-1"
         assert campaign["name"] == "Test Campaign"
-        assert campaign["product"] == "Test Product"
         assert campaign["status"] == "Active"
-        assert campaign["platforms"] == ["tiktok"]
-        assert campaign["triggers"] == "curiosity"
-        assert campaign["total_content"] == 10
-        assert campaign["content_generated"] == 5
-        assert campaign["videos_generated"] == 3
-        assert campaign["posts_published"] == 2
+        assert campaign["priority"] == "High"
+        assert campaign["niche"] == "skincare"
+        assert campaign["budget"] == 5000
+        assert campaign["start_date"] == "2023-01-01"
+        assert campaign["end_date"] == "2023-02-01"
         assert campaign["created_at"] == "2023-01-01"
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
@@ -577,21 +569,21 @@ class TestNotionDashboard:
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
-    def test_sync_gallery_no_db(self, mock_session_class, mock_getenv):
-        """Test sync_gallery without gallery database."""
+    def test_sync_influencers_no_db(self, mock_session_class, mock_getenv):
+        """Test sync_influencers without database."""
         mock_getenv.return_value = ""
         
         dashboard = NotionDashboard(token="test_token")
         with patch('builtins.print') as mock_print:
-            result = dashboard.sync_gallery([])
+            result = dashboard.sync_influencers([])
             
         assert result == []
-        mock_print.assert_called_with("[Notion] Gallery DB not configured")
+        mock_print.assert_called_with("[Notion] Influencers DB not configured")
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
-    def test_sync_gallery_success(self, mock_session_class, mock_getenv):
-        """Test successful gallery sync."""
+    def test_sync_influencers_success(self, mock_session_class, mock_getenv):
+        """Test successful influencers sync."""
         mock_getenv.side_effect = lambda key, default=None: {
             "NOTION_TOKEN": "test_token",
             "NOTION_GALLERY_DB": "gallery-db-id"
@@ -610,23 +602,21 @@ class TestNotionDashboard:
         
         mock_session.request.side_effect = [query_response, create_response]
         
-        videos = [
+        influencers = [
             {
-                "title": "Test Video",
-                "slug": "test-video",
-                "description": "Test description",
-                "niche": "skincare",
+                "name": "Test Influencer",
                 "platform": "tiktok",
-                "product": "Test Product",
-                "tags": "skincare,beauty",
-                "views": 1000,
-                "likes": 100,
+                "followers": 50000,
+                "engagement_rate": 0.05,
+                "niche": "skincare",
+                "tier": "Micro",
+                "email": "test@example.com",
                 "created_at": "2023-01-01"
             }
         ]
         
         dashboard = NotionDashboard(token="test_token")
-        result = dashboard.sync_gallery(videos)
+        result = dashboard.sync_influencers(influencers)
         
         assert len(result) == 1
         assert result[0] == "gallery-page-id"
@@ -634,21 +624,21 @@ class TestNotionDashboard:
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
-    def test_sync_inbox_no_db(self, mock_session_class, mock_getenv):
-        """Test sync_inbox without inbox database."""
+    def test_sync_contentbank_no_db(self, mock_session_class, mock_getenv):
+        """Test sync_contentbank without database."""
         mock_getenv.return_value = ""
         
         dashboard = NotionDashboard(token="test_token")
         with patch('builtins.print') as mock_print:
-            result = dashboard.sync_inbox([])
+            result = dashboard.sync_contentbank([])
             
         assert result == []
-        mock_print.assert_called_with("[Notion] Inbox DB not configured")
+        mock_print.assert_called_with("[Notion] ContentBank DB not configured")
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
-    def test_sync_inbox_success(self, mock_session_class, mock_getenv):
-        """Test successful inbox sync."""
+    def test_sync_contentbank_success(self, mock_session_class, mock_getenv):
+        """Test successful contentbank sync."""
         mock_getenv.side_effect = lambda key, default=None: {
             "NOTION_TOKEN": "test_token",
             "NOTION_INBOX_DB": "inbox-db-id"
@@ -667,23 +657,20 @@ class TestNotionDashboard:
         
         mock_session.request.side_effect = [query_response, create_response]
         
-        messages = [
+        items = [
             {
-                "content": "Test message",
-                "platform": "tiktok",
-                "sender_username": "test_user",
-                "account_id": "12345",
-                "message_type": "comment",
-                "sentiment": "positive",
-                "ai_suggested_reply": "Thanks for your comment!",
-                "reply_sent": False,
-                "is_read": False,
-                "created_at": "2023-01-01"
+                "title": "Test Asset",
+                "type": "Video",
+                "tags": "skincare,beauty",
+                "created_at": "2023-01-01",
+                "used_count": 5,
+                "file_url": "https://example.com/file.mp4",
+                "description": "A test asset"
             }
         ]
         
         dashboard = NotionDashboard(token="test_token")
-        result = dashboard.sync_inbox(messages)
+        result = dashboard.sync_contentbank(items)
         
         assert len(result) == 1
         assert result[0] == "inbox-page-id"
@@ -722,13 +709,13 @@ class TestNotionDashboard:
         brands = [
             {
                 "name": "Test Brand",
+                "status": "Active",
+                "industry": "skincare",
+                "niche": "skincare",
+                "email": "contact@brand.com",
                 "tone": "casual",
-                "voice": "friendly",
                 "language": "en",
                 "target_audience": "Young adults",
-                "emoji_style": "moderate",
-                "default_cta": "Shop now",
-                "is_active": True,
                 "created_at": "2023-01-01"
             }
         ]
@@ -742,21 +729,21 @@ class TestNotionDashboard:
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
-    def test_sync_approvals_no_db(self, mock_session_class, mock_getenv):
-        """Test sync_approvals without approvals database."""
+    def test_sync_logs_no_db(self, mock_session_class, mock_getenv):
+        """Test sync_logs without logs database."""
         mock_getenv.return_value = ""
         
         dashboard = NotionDashboard(token="test_token")
         with patch('builtins.print') as mock_print:
-            result = dashboard.sync_approvals([])
+            result = dashboard.sync_logs([])
             
         assert result == []
-        mock_print.assert_called_with("[Notion] Approvals DB not configured")
+        mock_print.assert_called_with("[Notion] Logs DB not configured")
         
     @patch('ugc_ai_overpower.core.notion_sync.os.getenv')
     @patch('ugc_ai_overpower.core.notion_sync.requests.Session')
-    def test_sync_approvals_success(self, mock_session_class, mock_getenv):
-        """Test successful approvals sync."""
+    def test_sync_logs_success(self, mock_session_class, mock_getenv):
+        """Test successful logs sync."""
         mock_getenv.side_effect = lambda key, default=None: {
             "NOTION_TOKEN": "test_token",
             "NOTION_APPROVALS_DB": "approvals-db-id"
@@ -770,23 +757,18 @@ class TestNotionDashboard:
         mock_response.json.return_value = {"id": "approvals-page-id"}
         mock_session.request.return_value = mock_response
         
-        approvals = [
+        logs = [
             {
-                "content_data": "Test content",
-                "content_type": "script",
-                "platform": "tiktok",
-                "product": "Test Product",
-                "status": "pending_review",
-                "reviewer": "admin",
-                "review_note": "Needs improvement",
-                "is_urgent": False,
-                "created_at": "2023-01-01",
-                "reviewed_at": "2023-01-02"
+                "level": "INFO",
+                "source": "orchestrator",
+                "message": "Campaign started",
+                "timestamp": "2023-01-01T00:00:00Z",
+                "traceback": ""
             }
         ]
         
         dashboard = NotionDashboard(token="test_token")
-        result = dashboard.sync_approvals(approvals)
+        result = dashboard.sync_logs(logs)
         
         assert len(result) == 1
         assert result[0] == "approvals-page-id"
@@ -830,17 +812,14 @@ class TestNotionDashboard:
         products = [
             {
                 "name": "Test Product",
-                "platform": "shopee",
+                "status": "Active",
+                "category": "skincare",
                 "price": 25.99,
+                "platform": "shopee",
                 "commission_rate": 0.1,
                 "affiliate_link": "https://example.com/product",
-                "product_url": "https://example.com/product-page",
-                "image_url": "https://example.com/image.jpg",
                 "rating": 4.5,
                 "sold": 1000,
-                "category": "skincare",
-                "status": "active",
-                "notes": "Popular product",
                 "created_at": "2023-01-01"
             }
         ]
@@ -965,8 +944,8 @@ class TestNotionDashboard:
             
             result = dashboard.sync_orchestrator_result({
                 "scripts": [
-                    {"hook": "Test Hook 1", "script": "Test script 1", "platform": "tiktok"},
-                    {"hook": "Test Hook 2", "script": "Test script 2", "platform": "tiktok"}
+                    {"hook": "Test Hook 1", "platform": "tiktok"},
+                    {"hook": "Test Hook 2", "platform": "tiktok"}
                 ],
                 "platforms": ["tiktok"],
                 "psychology_triggers": "curiosity"
@@ -976,3 +955,76 @@ class TestNotionDashboard:
         assert result["campaign_id"] == "campaign-id"
         assert len(result["content_ids"]) == 2
         assert "content-id" in result["content_ids"]
+
+
+class TestSchemaHelpers:
+    """12 new tests for visual polish helpers and schema consistency."""
+
+    # ── 1. pretty_status_color ─────────────────────────────────────────
+    def test_pretty_status_color_draft(self):
+        assert NotionDashboard.pretty_status_color("draft") == "#6B7280"
+
+    def test_pretty_status_color_active(self):
+        assert NotionDashboard.pretty_status_color("Active") == "#10B981"
+
+    def test_pretty_status_color_error(self):
+        assert NotionDashboard.pretty_status_color("ERROR") == "#E11D48"
+
+    # ── 2-5. format_number ─────────────────────────────────────────────
+    def test_format_number_zero(self):
+        assert NotionDashboard.format_number(0) == "0"
+
+    def test_format_number_one(self):
+        assert NotionDashboard.format_number(1) == "1"
+
+    def test_format_number_thousand(self):
+        assert NotionDashboard.format_number(1500) == "1.5K"
+
+    def test_format_number_million(self):
+        assert NotionDashboard.format_number(3_400_000) == "3.4M"
+
+    def test_format_number_negative(self):
+        assert NotionDashboard.format_number(-500) == "-500"
+
+    def test_format_number_currency(self):
+        assert NotionDashboard.format_number(5200, currency=True) == "$5.2K"
+
+    # ── 6-8. format_percentage ─────────────────────────────────────────
+    def test_format_percentage_zero(self):
+        assert NotionDashboard.format_percentage(0) == "0.0%"
+
+    def test_format_percentage_half(self):
+        assert NotionDashboard.format_percentage(0.5) == "50.0%"
+
+    def test_format_percentage_one(self):
+        assert NotionDashboard.format_percentage(1.0) == "100.0%"
+
+    # ── 9. format_engagement_rate ──────────────────────────────────────
+    def test_format_engagement_rate(self):
+        result = NotionDashboard.format_engagement_rate(100, 20, 5, 5000)
+        assert result == "2.50%"
+
+    def test_format_engagement_rate_zero_followers(self):
+        result = NotionDashboard.format_engagement_rate(100, 20, 5, 0)
+        assert result == "0%"
+
+    # ── 10-12. Schema consistency (all 8 DBs have Status) ──────────────
+    def test_all_schemas_have_status(self):
+        from ugc_ai_overpower.core.notion_sync import SCHEMAS
+        missing = [name for name, schema in SCHEMAS.items()
+                   if "Status" not in schema.get("properties", {})]
+        # Logs has Level instead of Status, ContentBank has no Status
+        # Campaigns, Content, Brands, Products have Status
+        expected_missing = {"Analytics", "Influencers", "ContentBank", "Logs"}
+        assert set(missing) == expected_missing, f"Unexpected missing Status: {missing}"
+
+    def test_all_schemas_have_title(self):
+        from ugc_ai_overpower.core.notion_sync import SCHEMAS
+        for name, schema in SCHEMAS.items():
+            assert "title" in schema, f"{name} missing title"
+
+    def test_schema_property_count_minimum(self):
+        from ugc_ai_overpower.core.notion_sync import SCHEMAS
+        for name, schema in SCHEMAS.items():
+            count = len(schema.get("properties", {}))
+            assert count >= 5, f"{name} has only {count} properties (minimum 5)"

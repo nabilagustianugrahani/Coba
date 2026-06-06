@@ -8,103 +8,103 @@ from typing import Optional, Any, Dict, cast
 NOTION_VERSION = "2022-06-28"
 NOTION_API = "https://api.notion.com/v1"
 
+# ── ui-ux-pro-max Notion Dashboard Schema Design ──────────────────────
+# Design system applied:
+#   - Status colors: Red #E11D48, Yellow #F59E0B, Green #10B981, Blue #3B82F6
+#   - Emoji prefix only for category tags (not visual decoration)
+#   - Page icons use first letter of category, no emoji decoration
+#   - Column types: Status (select with color), Date, Number (formatted), URL
+#   - Card density: compact view, no decorative dividers
+#   - Property order: Status first, then key info, then relations
+#   8 databases: Campaigns, Content, Analytics, Brands, Influencers,
+#                Products, ContentBank, Logs
+
 SCHEMAS = {
     "Campaigns": {
         "title": "Campaign Name",
         "properties": {
             "Name": {"title": {}},
-            "Product": {"rich_text": {}},
             "Status": {"select": {"options": [
+                {"name": "Draft", "color": "gray"},
                 {"name": "Active", "color": "green"},
                 {"name": "Paused", "color": "yellow"},
                 {"name": "Completed", "color": "blue"},
-                {"name": "Failed", "color": "red"},
+                {"name": "Archived", "color": "red"},
             ]}},
-            "Target Platforms": {"multi_select": {"options": [
-                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
-                {"name": "youtube", "color": "red"}, {"name": "shopee", "color": "orange"},
-                {"name": "tokopedia", "color": "green"}, {"name": "lazada", "color": "blue"},
+            "Priority": {"select": {"options": [
+                {"name": "Low", "color": "gray"},
+                {"name": "Med", "color": "yellow"},
+                {"name": "High", "color": "red"},
+                {"name": "Urgent", "color": "red"},
             ]}},
-            "Psychology Triggers": {"rich_text": {}},
-            "Total Content": {"number": {}},
-            "Content Generated": {"number": {}},
-            "Videos Generated": {"number": {}},
-            "Posts Published": {"number": {}},
+            "Niche": {"select": {"options": [
+                {"name": "skincare", "color": "pink"}, {"name": "fashion", "color": "purple"},
+                {"name": "food", "color": "orange"}, {"name": "tech", "color": "blue"},
+                {"name": "lifestyle", "color": "green"}, {"name": "general", "color": "gray"},
+            ]}},
+            "Budget": {"number": {"format": "dollar"}},
+            "Start Date": {"date": {}},
+            "End Date": {"date": {}},
+            "Brand": {"relation": {}},
+            "Owner": {"people": {}},
             "Created At": {"date": {}},
             "Updated At": {"date": {}},
-            "Last Run": {"date": {}},
         },
     },
     "Content": {
         "title": "Content Hook",
         "properties": {
             "Hook": {"title": {}},
-            "Campaign": {"relation": {}},
+            "Status": {"select": {"options": [
+                {"name": "Draft", "color": "gray"},
+                {"name": "Review", "color": "yellow"},
+                {"name": "Approved", "color": "green"},
+                {"name": "Scheduled", "color": "blue"},
+                {"name": "Posted", "color": "green"},
+                {"name": "Rejected", "color": "red"},
+            ]}},
+            "Type": {"select": {"options": [
+                {"name": "Image", "color": "blue"},
+                {"name": "Video", "color": "purple"},
+                {"name": "Carousel", "color": "green"},
+                {"name": "Story", "color": "orange"},
+            ]}},
             "Platform": {"select": {"options": [
                 {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
                 {"name": "youtube", "color": "red"}, {"name": "shopee", "color": "orange"},
                 {"name": "tokopedia", "color": "green"}, {"name": "lazada", "color": "blue"},
             ]}},
-            "Status": {"select": {"options": [
-                {"name": "pending", "color": "gray"},
-                {"name": "scripted", "color": "yellow"},
-                {"name": "video_generated", "color": "orange"},
-                {"name": "posted", "color": "green"},
-                {"name": "failed", "color": "red"},
-            ]}},
-            "Script": {"rich_text": {}},
-            "Post URL": {"url": {}},
-            "File Path": {"rich_text": {}},
-            "Created At": {"date": {}},
-            "Updated At": {"date": {}},
-            "Affiliate Product": {"relation": {"database_id": "", "type": "single_property", "single_property": {}}},
-        },
-    },
-    "Gallery": {
-        "title": "Video Title",
-        "properties": {
-            "Title": {"title": {}},
-            "Slug": {"rich_text": {}},
-            "Description": {"rich_text": {}},
             "Niche": {"select": {"options": [
                 {"name": "skincare", "color": "pink"}, {"name": "fashion", "color": "purple"},
                 {"name": "food", "color": "orange"}, {"name": "tech", "color": "blue"},
                 {"name": "lifestyle", "color": "green"}, {"name": "general", "color": "gray"},
             ]}},
-            "Platform": {"select": {"options": [
-                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
-                {"name": "youtube", "color": "red"},
-            ]}},
-            "Product": {"rich_text": {}},
-            "Tags": {"multi_select": {}},
-            "Views": {"number": {}},
-            "Likes": {"number": {}},
-            "SEO Page": {"url": {}},
+            "Engagement Rate": {"number": {"format": "percent"}},
+            "Caption": {"rich_text": {}},
+            "Hashtags": {"multi_select": {}},
+            "Campaign": {"relation": {}},
+            "Post URL": {"url": {}},
             "Created At": {"date": {}},
+            "Updated At": {"date": {}},
         },
     },
-    "Inbox": {
-        "title": "Message",
+    "Analytics": {
+        "title": "Metric",
         "properties": {
-            "Content": {"title": {}},
             "Platform": {"select": {"options": [
                 {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
-                {"name": "youtube", "color": "red"}, {"name": "telegram", "color": "blue"},
-                {"name": "whatsapp", "color": "green"}, {"name": "discord", "color": "gray"},
+                {"name": "youtube", "color": "red"}, {"name": "shopee", "color": "orange"},
+                {"name": "tokopedia", "color": "green"}, {"name": "lazada", "color": "blue"},
             ]}},
-            "Sender": {"rich_text": {}},
-            "Account": {"rich_text": {}},
-            "Type": {"select": {"options": [
-                {"name": "comment", "color": "green"}, {"name": "dm", "color": "purple"},
-                {"name": "mention", "color": "blue"}, {"name": "reply", "color": "gray"},
+            "Metric": {"select": {"options": [
+                {"name": "views", "color": "blue"}, {"name": "likes", "color": "green"},
+                {"name": "comments", "color": "yellow"}, {"name": "shares", "color": "purple"},
+                {"name": "clicks", "color": "orange"}, {"name": "conversions", "color": "red"},
             ]}},
-            "Sentiment": {"select": {"options": [
-                {"name": "positive", "color": "green"}, {"name": "negative", "color": "red"},
-                {"name": "neutral", "color": "gray"}, {"name": "urgent", "color": "orange"},
-            ]}},
-            "AI Reply": {"rich_text": {}},
-            "Replied": {"checkbox": {}},
-            "Is Read": {"checkbox": {}},
+            "Value": {"number": {}},
+            "Date": {"date": {}},
+            "Campaign": {"relation": {}},
+            "Post URL": {"url": {}},
             "Created At": {"date": {}},
         },
     },
@@ -112,16 +112,25 @@ SCHEMAS = {
         "title": "Brand Name",
         "properties": {
             "Name": {"title": {}},
+            "Status": {"select": {"options": [
+                {"name": "Active", "color": "green"},
+                {"name": "Inactive", "color": "gray"},
+                {"name": "Onboarding", "color": "yellow"},
+            ]}},
+            "Industry": {"select": {"options": [
+                {"name": "skincare", "color": "pink"}, {"name": "fashion", "color": "purple"},
+                {"name": "food", "color": "orange"}, {"name": "tech", "color": "blue"},
+                {"name": "lifestyle", "color": "green"}, {"name": "beauty", "color": "red"},
+            ]}},
+            "Niche": {"select": {"options": [
+                {"name": "skincare", "color": "pink"}, {"name": "fashion", "color": "purple"},
+                {"name": "food", "color": "orange"}, {"name": "tech", "color": "blue"},
+                {"name": "lifestyle", "color": "green"}, {"name": "general", "color": "gray"},
+            ]}},
+            "Contact Email": {"email": {}},
             "Tone": {"select": {"options": [
                 {"name": "professional", "color": "blue"}, {"name": "casual", "color": "green"},
-                {"name": "humorous", "color": "yellow"}, {"name": "aspirational", "color": "purple"},
-                {"name": "urgent", "color": "red"}, {"name": "luxury", "color": "orange"},
-                {"name": "educational", "color": "gray"}, {"name": "playful", "color": "pink"},
-            ]}},
-            "Voice": {"select": {"options": [
-                {"name": "formal", "color": "blue"}, {"name": "friendly", "color": "green"},
-                {"name": "authoritative", "color": "red"}, {"name": "playful", "color": "pink"},
-                {"name": "empathetic", "color": "purple"}, {"name": "bold", "color": "orange"},
+                {"name": "humorous", "color": "yellow"}, {"name": "luxury", "color": "purple"},
             ]}},
             "Language": {"select": {"options": [
                 {"name": "en", "color": "blue"}, {"name": "id", "color": "red"},
@@ -129,87 +138,44 @@ SCHEMAS = {
             ]}},
             "Color Palette": {"rich_text": {}},
             "Target Audience": {"rich_text": {}},
-            "Emoji Style": {"select": {"options": [
-                {"name": "none", "color": "gray"}, {"name": "minimal", "color": "blue"},
-                {"name": "moderate", "color": "green"}, {"name": "heavy", "color": "pink"},
-            ]}},
-            "Default CTA": {"rich_text": {}},
-            "Active": {"checkbox": {}},
             "Created At": {"date": {}},
         },
     },
-    "Approvals": {
-        "title": "Content Preview",
+    "Influencers": {
+        "title": "Name",
         "properties": {
-            "Preview": {"title": {}},
-            "Type": {"select": {"options": [
-                {"name": "script", "color": "blue"}, {"name": "caption", "color": "green"},
-                {"name": "video", "color": "purple"}, {"name": "image", "color": "orange"},
-                {"name": "hashtag_set", "color": "gray"},
-            ]}},
+            "Name": {"title": {}},
             "Platform": {"select": {"options": [
                 {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
                 {"name": "youtube", "color": "red"},
             ]}},
-            "Product": {"rich_text": {}},
-            "Status": {"select": {"options": [
-                {"name": "pending_review", "color": "yellow"},
-                {"name": "approved", "color": "green"},
-                {"name": "rejected", "color": "red"},
-                {"name": "auto_approved", "color": "blue"},
+            "Followers": {"number": {}},
+            "Engagement Rate": {"number": {"format": "percent"}},
+            "Niche": {"select": {"options": [
+                {"name": "skincare", "color": "pink"}, {"name": "fashion", "color": "purple"},
+                {"name": "food", "color": "orange"}, {"name": "tech", "color": "blue"},
+                {"name": "lifestyle", "color": "green"}, {"name": "general", "color": "gray"},
             ]}},
-            "Reviewer": {"rich_text": {}},
-            "Review Note": {"rich_text": {}},
-            "Urgent": {"checkbox": {}},
+            "Tier": {"select": {"options": [
+                {"name": "Nano", "color": "gray"},
+                {"name": "Micro", "color": "yellow"},
+                {"name": "Mid", "color": "blue"},
+                {"name": "Macro", "color": "purple"},
+                {"name": "Mega", "color": "red"},
+            ]}},
+            "Contact Email": {"email": {}},
             "Created At": {"date": {}},
-            "Reviewed At": {"date": {}},
         },
     },
-    "Analytics": {
-        "title": "Post URL",
-        "properties": {
-            "Post": {"title": {}},
-            "Content": {"relation": {}},
-            "Campaign": {"relation": {}},
-            "Date": {"date": {}},
-            "Views": {"number": {}},
-            "Likes": {"number": {}},
-            "Comments": {"number": {}},
-            "Shares": {"number": {}},
-            "Clicks": {"number": {}},
-            "📊 Engagement Rate": {"formula": {"expression": "if(prop(\"Views\") > 0, format(round((prop(\"Likes\") + prop(\"Comments\") + prop(\"Shares\")) / prop(\"Views\") * 10000) / 100) + \"%\", \"0%\")"}},
-            "📈 Click Rate": {"formula": {"expression": "if(prop(\"Views\") > 0, format(round(prop(\"Clicks\") / prop(\"Views\") * 10000) / 100) + \"%\", \"0%\")"}},
-            "Commission": {"number": {"format": "dollar"}},
-            "Commission Rate": {"number": {"format": "percent"}},
-            "Estimated Earnings": {"formula": {"expression": "prop(\"Clicks\") * prop(\"Commission Rate\")"}},
-            "Conversion Rate": {"formula": {"expression": "if(prop(\"Clicks\") > 0, prop(\"Conversions\") / prop(\"Clicks\"), 0)"}},
-            "Platform": {"select": {"options": [
-                {"name": "tiktok", "color": "purple"}, {"name": "instagram", "color": "pink"},
-                {"name": "youtube", "color": "red"}, {"name": "shopee", "color": "orange"},
-                {"name": "tokopedia", "color": "green"}, {"name": "lazada", "color": "blue"},
-            ]}},
-        },
-    },
-    "Affiliate Products": {
+    "Products": {
         "title": "Product Name",
         "properties": {
             "Name": {"title": {}},
-            "Platform": {"select": {"options": [
-                {"name": "shopee", "color": "orange"},
-                {"name": "tokopedia", "color": "green"},
-                {"name": "lazada", "color": "blue"},
-                {"name": "tiktok", "color": "purple"},
-                {"name": "sociolla", "color": "pink"},
-                {"name": "blibli", "color": "red"},
+            "Status": {"select": {"options": [
+                {"name": "Active", "color": "green"},
+                {"name": "Inactive", "color": "gray"},
+                {"name": "Discontinued", "color": "red"},
             ]}},
-            "Price": {"number": {"format": "dollar"}},
-            "Commission Rate": {"number": {"format": "percent"}},
-            "Commission Amount": {"formula": {"expression": "prop(\"Price\") * prop(\"Commission Rate\")"}},
-            "Affiliate Link": {"url": {}},
-            "Product URL": {"url": {}},
-            "Image URL": {"url": {}},
-            "Rating": {"number": {"format": "number"}},
-            "Sold": {"number": {"format": "number"}},
             "Category": {"select": {"options": [
                 {"name": "skincare", "color": "pink"},
                 {"name": "makeup", "color": "purple"},
@@ -218,12 +184,58 @@ SCHEMAS = {
                 {"name": "fragrance", "color": "blue"},
                 {"name": "supplements", "color": "orange"},
             ]}},
-            "Status": {"select": {"options": [
-                {"name": "active", "color": "green"},
-                {"name": "inactive", "color": "gray"},
+            "Price": {"number": {"format": "dollar"}},
+            "Platform": {"select": {"options": [
+                {"name": "shopee", "color": "orange"},
+                {"name": "tokopedia", "color": "green"},
+                {"name": "lazada", "color": "blue"},
+                {"name": "tiktok", "color": "purple"},
             ]}},
-            "Notes": {"rich_text": {}},
-            "Created": {"date": {}},
+            "Brand": {"relation": {}},
+            "Commission Rate": {"number": {"format": "percent"}},
+            "Affiliate Link": {"url": {}},
+            "Rating": {"number": {}},
+            "Sold": {"number": {}},
+            "Created At": {"date": {}},
+        },
+    },
+    "ContentBank": {
+        "title": "Title",
+        "properties": {
+            "Title": {"title": {}},
+            "Type": {"select": {"options": [
+                {"name": "Image", "color": "blue"},
+                {"name": "Video", "color": "purple"},
+                {"name": "Carousel", "color": "green"},
+                {"name": "Story", "color": "orange"},
+                {"name": "Audio", "color": "pink"},
+            ]}},
+            "Tags": {"multi_select": {}},
+            "Created Date": {"date": {}},
+            "Used Count": {"number": {}},
+            "File URL": {"url": {}},
+            "Description": {"rich_text": {}},
+        },
+    },
+    "Logs": {
+        "title": "Message",
+        "properties": {
+            "Level": {"select": {"options": [
+                {"name": "DEBUG", "color": "gray"},
+                {"name": "INFO", "color": "blue"},
+                {"name": "WARN", "color": "yellow"},
+                {"name": "ERROR", "color": "red"},
+                {"name": "CRITICAL", "color": "red"},
+            ]}},
+            "Source": {"select": {"options": [
+                {"name": "orchestrator", "color": "purple"},
+                {"name": "notion_sync", "color": "blue"},
+                {"name": "content_bank", "color": "green"},
+                {"name": "main", "color": "orange"},
+            ]}},
+            "Message": {"rich_text": {}},
+            "Timestamp": {"date": {}},
+            "Traceback": {"rich_text": {}},
         },
     },
 }
@@ -323,6 +335,53 @@ class NotionDashboard:
     def _num(val: Optional[float]) -> Optional[dict]:
         return {"number": val} if val is not None else None
 
+    # ── Visual Polish Helpers ──────────────────────────────────────────
+    @staticmethod
+    def pretty_status_color(status: str) -> str:
+        """Return hex color for a status string (ui-ux-pro-max palette)."""
+        palette = {
+            "draft": "#6B7280", "active": "#10B981", "paused": "#F59E0B",
+            "completed": "#3B82F6", "archived": "#E11D48", "failed": "#E11D48",
+            "review": "#F59E0B", "approved": "#10B981", "scheduled": "#3B82F6",
+            "posted": "#10B981", "rejected": "#E11D48", "pending": "#F59E0B",
+            "inactive": "#6B7280", "onboarding": "#F59E0B", "discontinued": "#E11D48",
+            "error": "#E11D48", "warn": "#F59E0B", "info": "#3B82F6", "debug": "#6B7280",
+            "critical": "#E11D48",
+        }
+        return palette.get(status.lower(), "#6B7280")
+
+    @staticmethod
+    def format_number(value: float, currency: bool = False) -> str:
+        """Format number: 1.2K, 3.4M, $5.2K etc."""
+        if value is None:
+            return "$0" if currency else "0"
+        abs_val = abs(value)
+        sign = "-" if value < 0 else ""
+        if abs_val >= 1_000_000:
+            formatted = f"{abs_val / 1_000_000:.1f}M"
+        elif abs_val >= 1_000:
+            formatted = f"{abs_val / 1_000:.1f}K"
+        else:
+            formatted = str(int(abs_val))
+        if currency:
+            return f"{sign}${formatted}"
+        return f"{sign}{formatted}"
+
+    @staticmethod
+    def format_percentage(value: float) -> str:
+        """Format decimal as percentage string (0.123 -> '12.3%')."""
+        if value is None:
+            return "0%"
+        return f"{value * 100:.1f}%"
+
+    @staticmethod
+    def format_engagement_rate(likes: float, comments: float, shares: float, followers: float) -> str:
+        """Compute and format engagement rate as percentage."""
+        if not followers or followers <= 0:
+            return "0%"
+        rate = (likes + comments + shares) / followers
+        return f"{rate * 100:.2f}%"
+
     @property
     def ready(self) -> bool:
         return bool(self.token)
@@ -347,19 +406,20 @@ class NotionDashboard:
             "Campaigns": "campaign_db",
             "Content": "content_db",
             "Analytics": "analytics_db",
-            "Gallery": "gallery_db",
-            "Inbox": "inbox_db",
+            "Influencers": "gallery_db",
+            "ContentBank": "inbox_db",
             "Brands": "brands_db",
-            "Approvals": "approvals_db",
-            "Affiliate Products": "products_db",
+            "Logs": "approvals_db",
+            "Products": "products_db",
         }
 
         # Dependency order: databases without relations FIRST
-        DB_ORDER = ["Campaigns", "Gallery", "Inbox", "Brands", "Approvals", "Affiliate Products", "Content", "Analytics"]
+        DB_ORDER = ["Campaigns", "Influencers", "ContentBank", "Brands", "Logs", "Products", "Content", "Analytics"]
         # Map relation property names to their target database keys
         RELATION_MAP = {
-            "Content": {"Campaign": "Campaigns", "Affiliate Product": "Affiliate Products"},
-            "Analytics": {"Content": "Content", "Campaign": "Campaigns"},
+            "Content": {"Campaign": "Campaigns"},
+            "Products": {"Brand": "Brands"},
+            "Analytics": {"Campaign": "Campaigns"},
         }
 
         for name in DB_ORDER:
@@ -454,51 +514,49 @@ class NotionDashboard:
     # ── Campaigns ─────────────────────────────────────────────────────
     def add_campaign(
         self,
-        product: str,
+        name: str,
         platforms: Optional[list] = None,
         triggers: str = "",
+        priority: str = "Med",
+        niche: str = "general",
+        budget: Optional[float] = None,
     ) -> Optional[str]:
         if not self.campaign_db:
             print("[Notion] Campaign DB not configured")
             return None
 
         now = self._iso_now()
-        payload = {
+        payload: Dict[str, Any] = {
             "parent": {"database_id": self.campaign_db},
             "properties": {
-                "Name": {"title": self._format_title(product)},
-                "Product": {"rich_text": self._format_rich(product)},
-                "Status": {"select": {"name": "Active"}},
-                "Target Platforms": {
-                    "multi_select": [{"name": p} for p in (platforms or ["tiktok"])]
-                },
-                "Psychology Triggers": {"rich_text": self._format_rich(triggers)},
-                "Total Content": {"number": 0},
-                "Content Generated": {"number": 0},
-                "Videos Generated": {"number": 0},
-                "Posts Published": {"number": 0},
+                "Name": {"title": self._format_title(name)},
+                "Status": {"select": {"name": "Draft"}},
+                "Priority": {"select": {"name": priority}},
+                "Niche": {"select": {"name": niche}},
+                "Budget": self._num(budget),
+                "Start Date": {"date": self._date_obj(now)},
+                "End Date": None,
                 "Created At": {"date": self._date_obj(now)},
                 "Updated At": {"date": self._date_obj(now)},
             },
         }
+        payload["properties"] = {k: v for k, v in payload["properties"].items() if v is not None}
 
         result = self._request("POST", "pages", payload)
         cid = result.get("id")
         if cid:
-            print(f"[Notion] Campaign created: {product} -> {cid}")
+            print(f"[Notion] Campaign created: {name} -> {cid}")
         return cid
 
     def update_campaign(self, campaign_id: str, **kwargs) -> bool:
         props = {}
         field_map = {
             "status": ("Status", lambda v: {"select": {"name": v}}),
-            "product": ("Product", lambda v: {"rich_text": self._format_rich(v)}),
-            "triggers": ("Psychology Triggers", lambda v: {"rich_text": self._format_rich(v)}),
-            "total_content": ("Total Content", lambda v: {"number": v}),
-            "content_generated": ("Content Generated", lambda v: {"number": v}),
-            "videos_generated": ("Videos Generated", lambda v: {"number": v}),
-            "posts_published": ("Posts Published", lambda v: {"number": v}),
-            "last_run": ("Last Run", lambda v: {"date": self._date_obj(v)}),
+            "priority": ("Priority", lambda v: {"select": {"name": v}}),
+            "niche": ("Niche", lambda v: {"select": {"name": v}}),
+            "budget": ("Budget", lambda v: {"number": v}),
+            "start_date": ("Start Date", lambda v: {"date": self._date_obj(v)}),
+            "end_date": ("End Date", lambda v: {"date": self._date_obj(v)}),
         }
 
         for key, val in kwargs.items():
@@ -554,8 +612,9 @@ class NotionDashboard:
         campaign_id: str,
         hook: str,
         platform: str = "tiktok",
-        script: str = "",
-        status: str = "pending",
+        content_type: str = "Video",
+        caption: str = "",
+        status: str = "Draft",
     ) -> Optional[str]:
         if not self.content_db:
             print("[Notion] Content DB not configured")
@@ -566,10 +625,11 @@ class NotionDashboard:
             "parent": {"database_id": self.content_db},
             "properties": {
                 "Hook": {"title": self._format_title(hook)},
-                "Campaign": {"relation": [{"id": campaign_id}]},
-                "Platform": {"select": {"name": platform}},
                 "Status": {"select": {"name": status}},
-                "Script": {"rich_text": self._format_rich(script)},
+                "Type": {"select": {"name": content_type}},
+                "Platform": {"select": {"name": platform}},
+                "Caption": {"rich_text": self._format_rich(caption)},
+                "Campaign": {"relation": [{"id": campaign_id}]},
                 "Created At": {"date": self._date_obj(now)},
                 "Updated At": {"date": self._date_obj(now)},
             },
@@ -581,14 +641,14 @@ class NotionDashboard:
             print(f"[Notion] Content added: {hook[:40]}... -> {cid}")
         return cid
 
-    def update_content(self, content_id: str, status: Optional[str] = None, post_url: Optional[str] = None, file_path: Optional[str] = None) -> bool:
+    def update_content(self, content_id: str, status: Optional[str] = None, post_url: Optional[str] = None, caption: Optional[str] = None) -> bool:
         props: Dict[str, Any] = {}
         if status:
             props["Status"] = {"select": {"name": status}}
         if post_url:
             props["Post URL"] = {"url": post_url}
-        if file_path:
-            props["File Path"] = {"rich_text": self._format_rich(file_path)}
+        if caption:
+            props["Caption"] = {"rich_text": self._format_rich(caption)}
 
         if not props:
             return False
@@ -600,13 +660,9 @@ class NotionDashboard:
     # ── Analytics ─────────────────────────────────────────────────────
     def add_analytics(
         self,
-        content_id: str,
         campaign_id: str = "",
-        views: int = 0,
-        likes: int = 0,
-        comments: int = 0,
-        shares: int = 0,
-        clicks: int = 0,
+        metric: str = "views",
+        value: float = 0,
         platform: str = "tiktok",
         post_url: str = "",
     ) -> Optional[str]:
@@ -617,25 +673,23 @@ class NotionDashboard:
         payload = {
             "parent": {"database_id": self.analytics_db},
             "properties": {
-                "Post": {"title": self._format_title(post_url or f"Content {content_id[:8]}")},
-                "Content": {"relation": [{"id": content_id}]},
+                "Platform": {"select": {"name": platform}},
+                "Metric": {"select": {"name": metric}},
+                "Value": {"number": value},
+                "Date": {"date": self._date_obj()},
                 "Campaign": (
                     {"relation": [{"id": campaign_id}]} if campaign_id else {"relation": []}
                 ),
-                "Date": {"date": self._date_obj()},
-                "Views": {"number": views},
-                "Likes": {"number": likes},
-                "Comments": {"number": comments},
-                "Shares": {"number": shares},
-                "Clicks": {"number": clicks},
-                "Platform": {"select": {"name": platform}},
+                "Post URL": {"url": post_url or None},
+                "Created At": {"date": self._date_obj(self._iso_now())},
             },
         }
+        payload["properties"] = {k: v for k, v in payload["properties"].items() if v is not None}
 
         result = self._request("POST", "pages", payload)
         aid = result.get("id")
         if aid:
-            print(f"[Notion] Analytics recorded: {views}v/{likes}l/{comments}c/{shares}s")
+            print(f"[Notion] Analytics recorded: {platform}/{metric}={value}")
         else:
             code = result.get("code", "unknown")
             message = result.get("message", str(result))
@@ -652,7 +706,7 @@ class NotionDashboard:
         campaigns = self.get_all_campaigns()
 
         # Aggregate today's analytics
-        total_views = total_likes = total_comments = total_shares = total_clicks = 0
+        total_value = 0
         active_campaigns = 0
 
         for c in campaigns:
@@ -670,28 +724,23 @@ class NotionDashboard:
             an_resp = self._request("POST", f"databases/{self.analytics_db}/query", query)
             for row in an_resp.get("results", []):
                 p = row.get("properties", {})
-                total_views += (p.get("Views", {}).get("number") or 0)
-                total_likes += (p.get("Likes", {}).get("number") or 0)
-                total_comments += (p.get("Comments", {}).get("number") or 0)
-                total_shares += (p.get("Shares", {}).get("number") or 0)
-                total_clicks += (p.get("Clicks", {}).get("number") or 0)
+                total_value += (p.get("Value", {}).get("number") or 0)
         except Exception as e:
             print(f"[Notion] Could not query analytics for daily report: {e}")
 
-        report_title = f"📊 Daily Report — {date_str}"
+        report_title = f"Daily Report — {date_str}"
         payload = {
             "parent": {"database_id": self.analytics_db},
             "properties": {
-                "Post": {"title": self._format_title(report_title)},
-                "Date": {"date": self._date_obj(date_str)},
-                "Views": {"number": total_views},
-                "Likes": {"number": total_likes},
-                "Comments": {"number": total_comments},
-                "Shares": {"number": total_shares},
-                "Clicks": {"number": total_clicks},
                 "Platform": {"select": {"name": "report"}},
+                "Metric": {"select": {"name": "daily_summary"}},
+                "Value": {"number": total_value},
+                "Date": {"date": self._date_obj(date_str)},
+                "Post URL": None,
+                "Created At": {"date": self._date_obj(self._iso_now())},
             },
         }
+        payload["properties"] = {k: v for k, v in payload["properties"].items() if v is not None}
 
         result = self._request("POST", "pages", payload)
         rid = result.get("id")
@@ -714,16 +763,12 @@ class NotionDashboard:
             campaign = {
                 "id": row["id"],
                 "name": self._extract_title(p, "Name"),
-                "product": self._extract_rich(p, "Product"),
                 "status": p.get("Status", {}).get("select", {}).get("name", ""),
-                "platforms": [
-                    o["name"] for o in p.get("Target Platforms", {}).get("multi_select", [])
-                ],
-                "triggers": self._extract_rich(p, "Psychology Triggers"),
-                "total_content": (p.get("Total Content", {}).get("number") or 0),
-                "content_generated": (p.get("Content Generated", {}).get("number") or 0),
-                "videos_generated": (p.get("Videos Generated", {}).get("number") or 0),
-                "posts_published": (p.get("Posts Published", {}).get("number") or 0),
+                "priority": p.get("Priority", {}).get("select", {}).get("name", ""),
+                "niche": p.get("Niche", {}).get("select", {}).get("name", ""),
+                "budget": (p.get("Budget", {}).get("number") or 0),
+                "start_date": (p.get("Start Date", {}).get("date", {}) or {}).get("start", ""),
+                "end_date": (p.get("End Date", {}).get("date", {}) or {}).get("start", ""),
                 "created_at": (p.get("Created At", {}).get("date", {}) or {}).get("start", ""),
             }
             campaigns.append(campaign)
@@ -771,32 +816,26 @@ class NotionDashboard:
         items = props.get(key, {}).get("rich_text", [])
         return "".join(t.get("plain_text", "") for t in items) if items else ""
 
-    # ── Gallery ────────────────────────────────────────────────────────
-    def sync_gallery(self, videos: list) -> list:
+    # ── Influencers (formerly Gallery) ────────────────────────────────
+    def sync_influencers(self, influencers: list) -> list:
         if not self.gallery_db:
-            print("[Notion] Gallery DB not configured")
+            print("[Notion] Influencers DB not configured")
             return []
         synced = []
-        for v in videos:
-            title = v.get("title", "Untitled")
-            tags = []
-            raw_tags = v.get("tags", "")
-            if raw_tags:
-                tags = [{"name": t.strip()} for t in raw_tags.split(",") if t.strip()]
+        for inf in influencers:
+            name = inf.get("name", "Unknown")
             properties = {
-                "Title": {"title": self._format_title(title)},
-                "Slug": {"rich_text": self._format_rich(v.get("slug", ""))},
-                "Description": {"rich_text": self._format_rich(v.get("description", "")[:200])},
-                "Niche": {"select": {"name": v.get("niche", "general")}},
-                "Platform": {"select": {"name": v.get("platform", "tiktok")}},
-                "Product": {"rich_text": self._format_rich(v.get("product", ""))},
-                "Tags": {"multi_select": tags} if tags else {"multi_select": []},
-                "Views": {"number": v.get("views", 0)},
-                "Likes": {"number": v.get("likes", 0)},
-                "SEO Page": {"url": f"https://ugc-empire.ai/gallery/{v.get('slug','')}"},
-                "Created At": {"date": self._date_obj(v.get("created_at", self._iso_now()))},
+                "Name": {"title": self._format_title(name)},
+                "Platform": {"select": {"name": inf.get("platform", "tiktok")}},
+                "Followers": {"number": inf.get("followers", 0)},
+                "Engagement Rate": {"number": inf.get("engagement_rate", 0)},
+                "Niche": {"select": {"name": inf.get("niche", "general")}},
+                "Tier": {"select": {"name": inf.get("tier", "Micro")}},
+                "Contact Email": {"email": inf.get("email") or None},
+                "Created At": {"date": self._date_obj(inf.get("created_at", self._iso_now()))},
             }
-            existing = self._query_database(self.gallery_db, {"Title": {"title": {"equals": title}}})
+            properties = {k: v for k, v in properties.items() if v is not None}
+            existing = self._query_database(self.gallery_db, {"Name": {"title": {"equals": name}}})
             if existing:
                 self._update_page(existing[0]["id"], properties)
                 synced.append(existing[0]["id"])
@@ -806,32 +845,32 @@ class NotionDashboard:
                 pid = result.get("id")
                 if pid:
                     synced.append(pid)
-        print(f"[Notion] Synced {len(synced)} videos to Gallery")
+        print(f"[Notion] Synced {len(synced)} influencers")
         return synced
 
-    # ── Inbox ──────────────────────────────────────────────────────────
-    def sync_inbox(self, messages: list) -> list:
+    # ── ContentBank (formerly Inbox) ──────────────────────────────────
+    def sync_contentbank(self, items: list) -> list:
         if not self.inbox_db:
-            print("[Notion] Inbox DB not configured")
+            print("[Notion] ContentBank DB not configured")
             return []
         synced = []
-        for m in messages:
-            if m.get("reply_sent"):
-                continue
-            content = m.get("content", "")[:100]
+        for item in items:
+            title = item.get("title", "Untitled")
+            tags = []
+            raw_tags = item.get("tags", "")
+            if raw_tags:
+                tags = [{"name": t.strip()} for t in raw_tags.split(",") if t.strip()]
             properties = {
-                "Content": {"title": self._format_title(content)},
-                "Platform": {"select": {"name": m.get("platform", "tiktok")}},
-                "Sender": {"rich_text": self._format_rich(m.get("sender_username", ""))},
-                "Account": {"rich_text": self._format_rich(m.get("account_id", ""))},
-                "Type": {"select": {"name": m.get("message_type", "comment")}},
-                "Sentiment": {"select": {"name": m.get("sentiment", "neutral")}},
-                "AI Reply": {"rich_text": self._format_rich(m.get("ai_suggested_reply", "")[:200])},
-                "Replied": {"checkbox": bool(m.get("reply_sent", False))},
-                "Is Read": {"checkbox": bool(m.get("is_read", False))},
-                "Created At": {"date": self._date_obj(m.get("created_at", self._iso_now()))},
+                "Title": {"title": self._format_title(title)},
+                "Type": {"select": {"name": item.get("type", "Image")}},
+                "Tags": {"multi_select": tags} if tags else {"multi_select": []},
+                "Created Date": {"date": self._date_obj(item.get("created_at", self._iso_now()))},
+                "Used Count": {"number": item.get("used_count", 0)},
+                "File URL": {"url": item.get("file_url") or None},
+                "Description": {"rich_text": self._format_rich(item.get("description", "")[:200])},
             }
-            existing = self._query_database(self.inbox_db, {"Content": {"title": {"equals": content}}})
+            properties = {k: v for k, v in properties.items() if v is not None}
+            existing = self._query_database(self.inbox_db, {"Title": {"title": {"equals": title}}})
             if existing:
                 self._update_page(existing[0]["id"], properties)
                 synced.append(existing[0]["id"])
@@ -841,7 +880,7 @@ class NotionDashboard:
                 pid = result.get("id")
                 if pid:
                     synced.append(pid)
-        print(f"[Notion] Synced {len(synced)} inbox messages")
+        print(f"[Notion] Synced {len(synced)} content bank items")
         return synced
 
     # ── Brands ─────────────────────────────────────────────────────────
@@ -855,16 +894,17 @@ class NotionDashboard:
                 "parent": {"database_id": self.brands_db},
                 "properties": {
                     "Name": {"title": self._format_title(b.get("name", ""))},
+                    "Status": {"select": {"name": b.get("status", "Active")}},
+                    "Industry": {"select": {"name": b.get("industry", "lifestyle")}},
+                    "Niche": {"select": {"name": b.get("niche", "general")}},
+                    "Contact Email": {"email": b.get("email") or None},
                     "Tone": {"select": {"name": b.get("tone", "casual")}},
-                    "Voice": {"select": {"name": b.get("voice", "friendly")}},
                     "Language": {"select": {"name": b.get("language", "en")}},
                     "Target Audience": {"rich_text": self._format_rich(b.get("target_audience", ""))},
-                    "Emoji Style": {"select": {"name": b.get("emoji_style", "moderate")}},
-                    "Default CTA": {"rich_text": self._format_rich(b.get("default_cta", ""))},
-                    "Active": {"checkbox": bool(b.get("is_active", False))},
                     "Created At": {"date": self._date_obj(b.get("created_at", self._iso_now()))},
                 },
             }
+            payload["properties"] = {k: v for k, v in payload["properties"].items() if v is not None}
             result = self._request("POST", "pages", payload)
             pid = result.get("id")
             if pid:
@@ -872,36 +912,31 @@ class NotionDashboard:
         print(f"[Notion] Synced {len(synced)} brand profiles")
         return synced
 
-    # ── Approvals ──────────────────────────────────────────────────────
-    def sync_approvals(self, approvals: list) -> list:
+    # ── Logs (formerly Approvals) ─────────────────────────────────────
+    def sync_logs(self, logs: list) -> list:
         if not self.approvals_db:
-            print("[Notion] Approvals DB not configured")
+            print("[Notion] Logs DB not configured")
             return []
         synced = []
-        for a in approvals:
+        for log_entry in logs:
             payload = {
                 "parent": {"database_id": self.approvals_db},
                 "properties": {
-                    "Preview": {"title": self._format_title(a.get("content_data", "")[:100])},
-                    "Type": {"select": {"name": a.get("content_type", "script")}},
-                    "Platform": {"select": {"name": a.get("platform", "tiktok")}},
-                    "Product": {"rich_text": self._format_rich(a.get("product", ""))},
-                    "Status": {"select": {"name": a.get("status", "pending_review")}},
-                    "Reviewer": {"rich_text": self._format_rich(a.get("reviewer", ""))},
-                    "Review Note": {"rich_text": self._format_rich((a.get("review_note") or "")[:200])},
-                    "Urgent": {"checkbox": bool(a.get("is_urgent", False))},
-                    "Created At": {"date": self._date_obj(a.get("created_at", self._iso_now()))},
-                    "Reviewed At": {"date": self._date_obj(a.get("reviewed_at")) if a.get("reviewed_at") else None},
+                    "Level": {"select": {"name": log_entry.get("level", "INFO")}},
+                    "Source": {"select": {"name": log_entry.get("source", "main")}},
+                    "Message": {"rich_text": self._format_rich(log_entry.get("message", "")[:500])},
+                    "Timestamp": {"date": self._date_obj(log_entry.get("timestamp", self._iso_now()))},
+                    "Traceback": {"rich_text": self._format_rich(log_entry.get("traceback", "")[:1000])},
                 },
             }
             result = self._request("POST", "pages", payload)
             pid = result.get("id")
             if pid:
                 synced.append(pid)
-        print(f"[Notion] Synced {len(synced)} approval items")
+        print(f"[Notion] Synced {len(synced)} log entries")
         return synced
 
-    # ── Affiliate Products ─────────────────────────────────────────────
+    # ── Products ───────────────────────────────────────────────────────
     def sync_products(self, products: list) -> list:
         if not self.products_db:
             print("[Notion] Products DB not configured")
@@ -911,18 +946,15 @@ class NotionDashboard:
             name = p.get("name", "")
             properties = {
                 "Name": {"title": self._format_title(name)},
-                "Platform": {"select": {"name": p.get("platform", "shopee")}},
+                "Status": {"select": {"name": p.get("status", "Active")}},
+                "Category": {"select": {"name": p.get("category", "skincare")}},
                 "Price": self._num(p.get("price")),
+                "Platform": {"select": {"name": p.get("platform", "shopee")}},
                 "Commission Rate": self._num(p.get("commission_rate")),
                 "Affiliate Link": {"url": p.get("affiliate_link") or None},
-                "Product URL": {"url": p.get("product_url") or None},
-                "Image URL": {"url": p.get("image_url") or None},
                 "Rating": self._num(p.get("rating")),
                 "Sold": self._num(p.get("sold")),
-                "Category": {"select": {"name": p.get("category", "skincare")}},
-                "Status": {"select": {"name": p.get("status", "active")}},
-                "Notes": {"rich_text": self._format_rich(p.get("notes", ""))},
-                "Created": {"date": self._date_obj(p.get("created_at", self._iso_now()))},
+                "Created At": {"date": self._date_obj(p.get("created_at", self._iso_now()))},
             }
             properties = {k: v for k, v in properties.items() if v is not None}
             existing = self._query_database(self.products_db, {"Name": {"title": {"equals": name}}})
@@ -939,27 +971,23 @@ class NotionDashboard:
                 pid = result.get("id")
                 if pid:
                     synced.append(pid)
-        print(f"[Notion] Synced {len(synced)} affiliate products")
+        print(f"[Notion] Synced {len(synced)} products")
         return synced
 
     # ── Full Dashboard Sync ────────────────────────────────────────────
-    def sync_all(self, gallery=None, inbox=None, brand_profile=None, approval_workflow=None) -> dict:
+    def sync_all(self, influencers=None, contentbank=None, brand_profile=None, logs=None) -> dict:
         """Sync all local data to Notion databases in one call."""
         results = {}
-        if gallery:
+        if influencers:
             try:
-                videos = gallery.list_videos(limit=50)
-                if videos:
-                    results["gallery"] = self.sync_gallery(videos)
+                results["influencers"] = self.sync_influencers(influencers)
             except Exception as e:
-                print(f"[Notion] Gallery sync error: {e}")
-        if inbox:
+                print(f"[Notion] Influencers sync error: {e}")
+        if contentbank:
             try:
-                msgs = inbox.list_messages(limit=50)
-                if msgs:
-                    results["inbox"] = self.sync_inbox(msgs)
+                results["contentbank"] = self.sync_contentbank(contentbank)
             except Exception as e:
-                print(f"[Notion] Inbox sync error: {e}")
+                print(f"[Notion] ContentBank sync error: {e}")
         if brand_profile:
             try:
                 brands = brand_profile.list_all()
@@ -967,15 +995,11 @@ class NotionDashboard:
                     results["brands"] = self.sync_brands(brands)
             except Exception as e:
                 print(f"[Notion] Brands sync error: {e}")
-        if approval_workflow:
+        if logs:
             try:
-                pending = approval_workflow.list_pending(limit=50)
-                history = approval_workflow.list_history(limit=50)
-                all_items = pending + [{"content_data": h.get("note",""), "content_type": "review", "status": h.get("action",""), "reviewer": h.get("reviewer",""), "review_note": h.get("note",""), "created_at": h.get("created_at","")} for h in history]
-                if all_items:
-                    results["approvals"] = self.sync_approvals(all_items)
+                results["logs"] = self.sync_logs(logs)
             except Exception as e:
-                print(f"[Notion] Approvals sync error: {e}")
+                print(f"[Notion] Logs sync error: {e}")
         return results
 
     # ── Orchestrator Sync ──────────────────────────────────────────────
@@ -992,13 +1016,13 @@ class NotionDashboard:
 
         # Find or create campaign
         campaigns = self.get_all_campaigns()
-        existing = [c for c in campaigns if c["product"].lower() == product.lower()]
+        existing = [c for c in campaigns if c["name"].lower() == product.lower()]
         if existing:
             campaign_id = existing[0]["id"]
-            self.update_campaign(campaign_id, last_run=self._iso_now())
+            self.update_campaign(campaign_id, start_date=self._iso_now())
             print(f"[Notion] Found existing campaign: {product}")
         else:
-            campaign_id = self.add_campaign(product=product, platforms=result.get("platforms"), triggers=result.get("psychology_triggers", ""))
+            campaign_id = self.add_campaign(name=product, platforms=result.get("platforms"), triggers=result.get("psychology_triggers", ""))
             if not campaign_id:
                 return {"synced": False, "reason": "campaign_create_failed"}
 
@@ -1006,13 +1030,9 @@ class NotionDashboard:
         content_ids = []
         scripts = result.get("scripts", [])
         for s in scripts:
-            cid = self.add_content(campaign_id, hook=s.get("hook", ""), platform=s.get("platform", "tiktok"), script=s.get("script", ""), status="scripted")
+            cid = self.add_content(campaign_id, hook=s.get("hook", ""), platform=s.get("platform", "tiktok"), status="Review")
             if cid:
                 content_ids.append(cid)
-
-        # Update counts
-        total = len(scripts)
-        self.update_campaign(campaign_id, total_content=total, content_generated=total)
 
         return {
             "synced": True,
