@@ -33,7 +33,7 @@ SUBCOMMANDS = [
     "notion-campaigns", "notion-daily-report", "notion-sync", "notion-sync-all",
     "notion-dbs", "notion-sync-products", "notion-list", "notion-find",
     "notion-analytics", "run-pipeline", "auto-pipeline", "list-products",
-    "codespace-pool",
+    "codespace-pool", "status", "ui", "do-everything",
 ]
 
 # ---------------------------------------------------------------------------
@@ -100,7 +100,22 @@ _CMD_HANDLERS = [
     "ugc_ai_overpower.main._cmd_notion_sync_products",
     "ugc_ai_overpower.main._cmd_list_products",
     "ugc_ai_overpower.main._cmd_codespace_pool",
+    "ugc_ai_overpower.main._cmd_status",
+    "ugc_ai_overpower.main._cmd_ui",
+    "ugc_ai_overpower.main._cmd_do_everything",
     "ugc_ai_overpower.main._get_notion",
+    "ugc_ai_overpower.cli.output.colorize",
+    "ugc_ai_overpower.cli.output.success",
+    "ugc_ai_overpower.cli.output.error",
+    "ugc_ai_overpower.cli.output.warning",
+    "ugc_ai_overpower.cli.output.info",
+    "ugc_ai_overpower.cli.output.header",
+    "ugc_ai_overpower.cli.output.ProgressBar",
+    "ugc_ai_overpower.cli.output.table",
+    "ugc_ai_overpower.cli.dashboard_launcher.launch_dashboard",
+    "ugc_ai_overpower.cli.dashboard_launcher.DashboardConfig",
+    "ugc_ai_overpower.cli.dashboard_launcher.is_port_in_use",
+    "ugc_ai_overpower.cli.dashboard_launcher.find_available_port",
 ]
 
 

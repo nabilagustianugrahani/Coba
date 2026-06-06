@@ -22,6 +22,8 @@ def main():
     from ugc_ai_overpower.core.content_bank import ContentBank
     from ugc_ai_overpower.core.orchestrator import Orchestrator
     from ugc_ai_overpower.mcp_server.tools.influencer_tools import InfluencerManager
+    from ugc_ai_overpower.cli.output import success, error, warning, info, header, ProgressBar, table, colorize
+    from ugc_ai_overpower.cli.dashboard_launcher import launch_dashboard, DashboardConfig, is_port_in_use
 
     ai = AIRouter(router_url, router_key)
     bank = ContentBank()
@@ -89,6 +91,9 @@ def main():
         logger.info("  scrape-engagement      — Scrape/simulate engagement metrics for content items")
         logger.info("  health-check           — Run daemon health check, alert Notion Inbox on failure")
         logger.info("  autoheal               — Run auto-heal cycle (run|dry-run|stats|incidents)")
+        logger.info("  status [--json]        — Show one-line health check of all services")
+        logger.info("  ui [--host H] [--port P] [--reload] [--workers N] — Launch web dashboard")
+        logger.info("  do-everything [--dry-run] — Run all daily tasks in sequence")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -645,6 +650,15 @@ def main():
         sub = sys.argv[2] if len(sys.argv) > 2 else "status"
         _cmd_codespace_pool(sub, sys.argv[3:])
 
+    elif cmd == "status":
+        _cmd_status()
+
+    elif cmd == "ui":
+        _cmd_ui()
+
+    elif cmd == "do-everything":
+        _cmd_do_everything()
+
     else:
         logger.warning(f"Unknown command: {cmd}")
 
@@ -1044,6 +1058,215 @@ def _cmd_codespace_pool(sub: str, args: list) -> None:
         logger.error(f"Unknown codespace-pool subcommand: {sub}")
         logger.error("Usage: codespace-pool status | dispatch <task> | list")
         sys.exit(1)
+
+
+# ======================================================================
+# Batch P: CLI polish commands
+# ======================================================================
+
+
+def _cmd_status() -> None:
+    """Show one-line health check of all services."""
+    from ugc_ai_overpower.cli.output import success, error, warning, info, header
+    import os as _os
+
+    show_json = "--json" in sys.argv
+
+    checks = {}
+
+    # Notion token
+    notion_token = _os.getenv("NOTION_TOKEN", "")
+    checks["notion"] = bool(notion_token)
+
+    # Modal token
+    modal_token = _os.getenv("MODAL_TOKEN_ID", "") and _os.getenv("MODAL_TOKEN_SECRET", "")
+    checks["modal"] = bool(modal_token)
+
+    # fal token
+    fal_token = _os.getenv("FAL_KEY", "")
+    checks["fal"] = bool(fal_token)
+
+    # Database connection
+    db_ok = False
+    try:
+        from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+        cb = ContentBankV2()
+        conn = cb._get_conn()
+        conn.execute("SELECT 1")
+        conn.close()
+        db_ok = True
+    except Exception:
+        db_ok = False
+    checks["database"] = db_ok
+
+    # Latest sync timestamp
+    sync_ts = "never"
+    try:
+        import sqlite3
+        bank_path = None
+        # Try to get the bank path from environment or default
+        from ugc_ai_overpower.core.content_bank_v2 import ContentBankV2
+        cb = ContentBankV2()
+        if hasattr(cb, "_db_path"):
+            bank_path = cb._db_path
+        elif hasattr(cb, "db_path"):
+            bank_path = cb.db_path
+        if bank_path and _os.path.exists(bank_path):
+            conn = sqlite3.connect(bank_path)
+            row = conn.execute("SELECT MAX(updated_at) FROM content").fetchone()
+            if row and row[0]:
+                sync_ts = row[0]
+            conn.close()
+    except Exception:
+        sync_ts = "error"
+
+    all_ok = all(v for k, v in checks.items() if k != "sync_ts")
+
+    if show_json:
+        print(json.dumps({
+            "status": "ok" if all_ok else "degraded",
+            "checks": {k: "ok" if v else "error" for k, v in checks.items()},
+            "sync_timestamp": sync_ts,
+        }, indent=2))
+        return
+
+    print()
+    print(header(" System Health Status "))
+    print()
+    for name, ok in checks.items():
+        if ok:
+            print(success(f"{name} configured"))
+        else:
+            print(error(f"{name} not configured"))
+    if db_ok:
+        print(success("database connected"))
+    else:
+        print(error("database connection failed"))
+    print(info(f"last sync: {sync_ts}"))
+    print()
+    if all_ok:
+        print(success("All systems nominal"))
+    else:
+        print(warning("Some services need attention"))
+    print()
+
+
+def _cmd_ui() -> None:
+    """Launch the web dashboard."""
+    args = iter(sys.argv[2:])
+    host = "127.0.0.1"
+    port = 8000
+    reload_ = False
+    workers = 1
+    try:
+        while True:
+            a = next(args)
+            if a == "--host":
+                host = next(args)
+            elif a == "--port":
+                port = int(next(args))
+            elif a == "--reload":
+                reload_ = True
+            elif a == "--workers":
+                workers = int(next(args))
+    except StopIteration:
+        pass
+
+    from ugc_ai_overpower.cli.dashboard_launcher import DashboardConfig, launch_dashboard
+
+    config = DashboardConfig(host=host, port=port, reload=reload_, workers=workers)
+    launch_dashboard(config)
+
+
+def _cmd_do_everything() -> None:
+    """Run all daily tasks in sequence with progress bars."""
+    from ugc_ai_overpower.cli.output import success, error, warning, info, header, ProgressBar
+    import time as _time
+
+    dry_run = "--dry-run" in sys.argv
+
+    print()
+    print(header(" Daily Routine "))
+    print()
+
+    steps = [
+        ("Syncing Notion", "_sync_notion"),
+        ("Generating content for active campaigns", "_gen_content"),
+        ("Scheduling posts", "_schedule_posts"),
+        ("Sending daily report", "_send_report"),
+    ]
+
+    results = {}
+    for label, _ in steps:
+        bar = ProgressBar(total=3, prefix=label, width=30)
+        bar.update()
+        _time.sleep(0.05)
+        bar.update()
+        try:
+            if label == "Syncing Notion":
+                if not dry_run:
+                    from ugc_ai_overpower.core.notion_sync import NotionDashboard
+                    from ugc_ai_overpower.core.gallery import Gallery
+                    from ugc_ai_overpower.browser.social_inbox import SocialInbox
+                    from ugc_ai_overpower.core.brand_profile import BrandProfile
+                    from ugc_ai_overpower.core.approval_workflow import ApprovalWorkflow
+                    from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
+                    nd = NotionDashboard()
+                    if nd.ready:
+                        ai = AIRouter(
+                            base_url=_os.getenv("ROUTER_URL", "http://localhost:20128"),
+                            api_key=_os.getenv("ROUTER_KEY", ""),
+                        )
+                        nd.sync_all(
+                            gallery=Gallery(),
+                            inbox=SocialInbox(ai_router=ai),
+                            brand_profile=BrandProfile(),
+                            approval_workflow=ApprovalWorkflow(),
+                        )
+                results[label] = "ok"
+                bar.update()
+                bar.finish()
+                print(success(f"  {label} complete"))
+            elif label == "Generating content for active campaigns":
+                if not dry_run:
+                    from ugc_ai_overpower.core.pipeline_engine import PipelineEngine
+                    engine = PipelineEngine(ai_router=ai)
+                    engine.run_full_pipeline()
+                results[label] = "ok"
+                bar.update()
+                bar.finish()
+                print(success(f"  {label} complete"))
+            elif label == "Scheduling posts":
+                if not dry_run:
+                    from ugc_ai_overpower.scheduler.engine import SkynetScheduler
+                    sched = SkynetScheduler()
+                    sched.start()
+                results[label] = "ok"
+                bar.update()
+                bar.finish()
+                print(success(f"  {label} complete"))
+            elif label == "Sending daily report":
+                if not dry_run:
+                    from ugc_ai_overpower.core.notion_sync import NotionDashboard
+                    nd = NotionDashboard()
+                    if nd.ready:
+                        nd.create_daily_report()
+                results[label] = "ok"
+                bar.update()
+                bar.finish()
+                print(success(f"  {label} complete"))
+        except Exception as e:
+            results[label] = str(e)
+            bar.finish()
+            print(error(f"  {label} failed: {e}"))
+
+    print()
+    all_ok = all(v == "ok" for v in results.values())
+    if all_ok:
+        print(success("Daily routine complete"))
+    else:
+        print(warning("Daily routine completed with errors"))
+    print()
 
 
 if __name__ == "__main__":
