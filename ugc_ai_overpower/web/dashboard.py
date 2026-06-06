@@ -19,6 +19,8 @@ from ugc_ai_overpower.mcp_server.tools.ai_tools import AIRouter
 from ugc_ai_overpower.core.orchestrator import Orchestrator
 from ugc_ai_overpower.core.psychology import PsychologyEngine
 from ugc_ai_overpower.monitoring.metrics import MetricsCollector, get_metrics_collector
+from ugc_ai_overpower.web.middleware import TracingMiddleware
+from ugc_ai_overpower.web.metrics import register_metrics_route
 
 logger = setup_logging("dashboard")
 
@@ -34,6 +36,10 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# ── Production hardening: tracing middleware + prometheus /metrics ──
+app.add_middleware(TracingMiddleware)
+register_metrics_route(app)
 
 class AppState:
     def __init__(self):
