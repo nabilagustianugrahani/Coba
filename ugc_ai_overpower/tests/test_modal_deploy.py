@@ -153,6 +153,74 @@ class TestModalDeployConfig:
     def test_default_budget_constant(self):
         assert DEFAULT_BUDGET_USD == 5.0
 
+    # ----- Real Modal config field tests -----
+
+    def test_config_matches_modal_schema(self):
+        """Verify ModalDeployConfig fields match real Modal config schema."""
+        cfg = ModalDeployConfig(app_name="test")
+        assert hasattr(cfg, "environment")
+        assert hasattr(cfg, "loglevel")
+        assert hasattr(cfg, "stream_logs")
+        assert hasattr(cfg, "sync_buffer_size")
+        assert hasattr(cfg, "server_url")
+        assert hasattr(cfg, "web_url")
+        assert hasattr(cfg, "checkpoints_dir")
+        assert hasattr(cfg, "forward_env")
+        assert hasattr(cfg, "image_builder_version")
+
+    def test_generates_modal_toml(self):
+        """Verify to_modal_toml() generates valid INI content matching Modal spec."""
+        cfg = ModalDeployConfig(app_name="test", environment="staging")
+        toml = cfg.to_modal_toml()
+        assert "[modal]" in toml
+        assert "server_url = https://api.modal.com" in toml
+        assert "web_url = https://modal.com" in toml
+        assert "environment = staging" in toml
+        assert "loglevel = INFO" in toml
+        assert "stream_logs = True" in toml
+        assert "sync_buffer_size = 20" in toml
+
+    def test_reads_existing_modal_toml(self, tmp_path):
+        """Verify from_modal_toml() parses a real modal.toml file."""
+        toml_path = tmp_path / "modal.toml"
+        toml_path.write_text(
+            "[modal]\n"
+            "server_url = https://api.modal.com\n"
+            "web_url = https://modal.com\n"
+            "environment = staging\n"
+            "loglevel = DEBUG\n"
+            "stream_logs = False\n"
+            "sync_buffer_size = 50\n"
+        )
+        cfg = ModalDeployConfig.from_modal_toml(str(toml_path))
+        assert cfg.environment == "staging"
+        assert cfg.loglevel == "DEBUG"
+        assert cfg.stream_logs is False
+        assert cfg.sync_buffer_size == 50
+        assert cfg.server_url == "https://api.modal.com"
+
+    def test_validates_required_fields(self):
+        """Verify validate() catches invalid Modal config fields."""
+        cfg = ModalDeployConfig(app_name="test", loglevel="INVALID", sync_buffer_size=0)
+        errors = cfg.validate()
+        assert any("loglevel" in e for e in errors)
+        assert any("sync_buffer_size" in e for e in errors)
+
+        cfg2 = ModalDeployConfig(app_name="test", server_url="http://bad", web_url="ftp://bad")
+        errors2 = cfg2.validate()
+        assert any("server_url" in e for e in errors2)
+        assert any("web_url" in e for e in errors2)
+
+    def test_default_values_match_modal_docs(self):
+        """Verify defaults match modal.com/docs/reference/modal.config spec."""
+        cfg = ModalDeployConfig(app_name="test")
+        assert cfg.server_url == "https://api.modal.com"
+        assert cfg.web_url == "https://modal.com"
+        assert cfg.environment == "main"
+        assert cfg.loglevel == "INFO"
+        assert cfg.stream_logs is True
+        assert cfg.sync_buffer_size == 20
+
 
 # ---------------------------------------------------------------------------
 # ModalDeployer tests

@@ -10,6 +10,8 @@ Usage:
 """
 from __future__ import annotations
 
+import configparser
+import io
 import json
 import logging
 import os
@@ -17,6 +19,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 log = logging.getLogger(__name__)
@@ -30,10 +33,25 @@ GPU_HOURLY_RATES: dict[str, float] = {
     "H100": 7.88,
 }
 
+# Real Modal config field names matching modal.com/docs/reference/modal.config
+MODAL_CONFIG_FIELDS = {
+    "token_id": "",
+    "token_secret": "",
+    "server_url": "https://api.modal.com",
+    "web_url": "https://modal.com",
+    "environment": "main",
+    "loglevel": "INFO",
+    "stream_logs": "True",
+    "sync_buffer_size": "20",
+}
+
 
 @dataclass
 class ModalDeployConfig:
-    """Configuration for a single Modal app deployment."""
+    """Configuration for a single Modal app deployment.
+
+    Uses real Modal config field names matching modal.com/docs/reference/modal.config.
+    """
 
     app_name: str
     python_version: str = "3.12"
@@ -44,6 +62,16 @@ class ModalDeployConfig:
     concurrency_limit: int = 10
     secrets: list[str] = field(default_factory=list)
     schedule: Optional[str] = None
+    # Real Modal config fields
+    environment: str = "main"
+    loglevel: str = "INFO"
+    stream_logs: bool = True
+    sync_buffer_size: int = 20
+    server_url: str = "https://api.modal.com"
+    web_url: str = "https://modal.com"
+    checkpoints_dir: Optional[str] = None
+    forward_env: list[str] = field(default_factory=list)
+    image_builder_version: Optional[str] = None
 
     def to_app_kwargs(self) -> dict[str, Any]:
         """Convert config to Modal @app.function kwargs."""
@@ -55,7 +83,55 @@ class ModalDeployConfig:
         }
         if self.schedule:
             kwargs["schedule"] = self.schedule
+        if self.environment != "main":
+            kwargs["environment"] = self.environment
         return kwargs
+
+    def to_modal_toml(self) -> str:
+        """Generate modal.toml / .modal.toml config file content matching Modal schema."""
+        cp = configparser.ConfigParser()
+        cp["modal"] = {
+            "token_id": "",
+            "token_secret": "",
+            "server_url": self.server_url,
+            "web_url": self.web_url,
+            "environment": self.environment,
+            "loglevel": self.loglevel,
+            "stream_logs": str(self.stream_logs),
+            "sync_buffer_size": str(self.sync_buffer_size),
+        }
+        if self.checkpoints_dir:
+            cp["modal"]["checkpoints_dir"] = self.checkpoints_dir
+        if self.forward_env:
+            cp["modal"]["forward_env"] = ",".join(self.forward_env)
+        if self.image_builder_version:
+            cp["modal"]["image_builder_version"] = self.image_builder_version
+        buf = io.StringIO()
+        cp.write(buf)
+        return buf.getvalue()
+
+    @classmethod
+    def from_modal_toml(cls, path: str | Path) -> ModalDeployConfig:
+        """Read existing modal.toml config file and return a ModalDeployConfig."""
+        cp = configparser.ConfigParser()
+        cp.read(str(path))
+        if "modal" not in cp:
+            raise ValueError(f"Missing [modal] section in {path}")
+        section = cp["modal"]
+        cfg = cls(app_name="from-config")
+        cfg.environment = section.get("environment", "main")
+        cfg.loglevel = section.get("loglevel", "INFO")
+        cfg.stream_logs = section.getboolean("stream_logs", True)
+        cfg.sync_buffer_size = section.getint("sync_buffer_size", 20)
+        cfg.server_url = section.get("server_url", "https://api.modal.com")
+        cfg.web_url = section.get("web_url", "https://modal.com")
+        if "checkpoints_dir" in section:
+            cfg.checkpoints_dir = section["checkpoints_dir"]
+        if "forward_env" in section:
+            cfg.forward_env = [x.strip() for x in section["forward_env"].split(",") if x.strip()]
+        if "image_builder_version" in section:
+            cfg.image_builder_version = section["image_builder_version"]
+        return cfg
 
     def validate(self) -> list[str]:
         """Validate config and return list of error messages (empty = valid)."""
@@ -73,6 +149,14 @@ class ModalDeployConfig:
             errors.append("timeout_sec must be >= 10")
         if self.concurrency_limit < 1:
             errors.append("concurrency_limit must be >= 1")
+        if self.loglevel.upper() not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+            errors.append(f"loglevel must be one of DEBUG/INFO/WARNING/ERROR/CRITICAL, got {self.loglevel!r}")
+        if self.sync_buffer_size < 1:
+            errors.append("sync_buffer_size must be >= 1")
+        if self.server_url and not self.server_url.startswith("https://"):
+            errors.append(f"server_url must start with https://, got {self.server_url!r}")
+        if self.web_url and not self.web_url.startswith("https://"):
+            errors.append(f"web_url must start with https://, got {self.web_url!r}")
         return errors
 
 

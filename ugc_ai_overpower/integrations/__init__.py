@@ -34,6 +34,19 @@ Heavy work NEVER runs on VPS. Modal apps run serverless on pay-per-second GPU.
 """
 from __future__ import annotations
 
+from ugc_ai_overpower.integrations.affiliate import (
+    AffiliateLink as AffiliateTrackingLink,
+    ClickEvent,
+    ConversionEvent,
+    AffiliateTracker,
+)
+from ugc_ai_overpower.integrations.affiliate_analytics import (
+    RevenueReport,
+    AffiliateAnalytics,
+)
+from ugc_ai_overpower.integrations.caption_link_injector import (
+    CaptionLinkInjector,
+)
 from ugc_ai_overpower.integrations.ab_test_optimizer import (
     ABTestInput,
     ABTestOptimizer,
@@ -231,6 +244,13 @@ from ugc_ai_overpower.core.notification_events import (
 
 __all__ = [
     "ABTest",
+    "AffiliateAnalytics",
+    "AffiliateTracker",
+    "AffiliateTrackingLink",
+    "CaptionLinkInjector",
+    "ClickEvent",
+    "ConversionEvent",
+    "RevenueReport",
     "ABTestInput",
     "ABTestOptimizer",
     "ABTestResult",
