@@ -15,7 +15,13 @@ from ugc_ai_overpower.core.notion_sync import NotionDashboard
 
 class TestNotionDashboard:
     """Test suite for NotionDashboard class."""
-    
+
+    @pytest.fixture(autouse=True)
+    def _clear_notion_env(self, monkeypatch):
+        """Auto-clear Notion env vars before each test to prevent pollution."""
+        for key in ("NOTION_TOKEN", "NOTION_PARENT_PAGE", "NOTION_CAMPAIGN_DB", "NOTION_CONTENT_DB", "NOTION_ANALYTICS_DB"):
+            monkeypatch.delenv(key, raising=False)
+
     def test_init_with_token(self):
         """Test initialization with explicit token."""
         dashboard = NotionDashboard(token="test_token")
