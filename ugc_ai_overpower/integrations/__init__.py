@@ -34,9 +34,14 @@ Heavy work NEVER runs on VPS. Modal apps run serverless on pay-per-second GPU.
 """
 from __future__ import annotations
 
+from ugc_ai_overpower.integrations.ab_test_optimizer import (
+    ABTestInput,
+    ABTestOptimizer,
+    ABTestResult,
+)
 from ugc_ai_overpower.integrations.ab_testing import (
     ABTest,
-    ABTestResult,
+    ABTestResult as ABTestingResult,
     ABTesting,
     Variant,
 )
@@ -119,6 +124,10 @@ from ugc_ai_overpower.integrations.image_enhancer import (
     EnhanceResult,
     ImageEnhancer,
 )
+from ugc_ai_overpower.integrations.niche_presets import (
+    NichePreset,
+    NichePresets,
+)
 from ugc_ai_overpower.integrations.modal_dispatch import (
     MODELS,
     ModalBudgetExceeded,
@@ -198,8 +207,11 @@ from ugc_ai_overpower.integrations.umami_dispatch import (
 
 __all__ = [
     "ABTest",
+    "ABTestInput",
+    "ABTestOptimizer",
     "ABTestResult",
     "ABTesting",
+    "ABTestingResult",
     "ALLOWED_CAPTION_FONTS",
     "ALLOWED_FIT_MODES",
     "ALLOWED_FORMATS",
@@ -262,6 +274,8 @@ __all__ = [
     "ModalDispatch",
     "NEGATIVE_WORDS",
     "NICHE_PRESETS",
+    "NichePreset",
+    "NichePresets",
     "Node",
     "NodeType",
     "PERSONA_TEMPLATES",
