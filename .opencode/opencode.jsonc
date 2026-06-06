@@ -21,6 +21,7 @@
 
   "plugin": [
     "superpowers@git+https://github.com/obra/superpowers.git",
+    "opencode-swarm@git+https://github.com/zaxbysauce/opencode-swarm.git",
     "opencode-skills-collection@latest",
     "opencode-power-pack@git+https://github.com/amitdmore/opencode-power-pack.git",
     "ecc-universal@latest"
