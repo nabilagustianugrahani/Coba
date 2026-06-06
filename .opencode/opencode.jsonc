@@ -20,7 +20,9 @@
   },
 
   "plugin": [
-    "superpowers@git+https://github.com/obra/superpowers.git"
+    "superpowers@git+https://github.com/obra/superpowers.git",
+    "opencode-skills-collection@latest",
+    "opencode-power-pack@git+https://github.com/amitdmore/opencode-power-pack.git"
   ],
 
   "agent": {
