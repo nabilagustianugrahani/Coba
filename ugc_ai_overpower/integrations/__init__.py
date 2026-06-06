@@ -204,6 +204,30 @@ from ugc_ai_overpower.integrations.umami_dispatch import (
     TrackingEvent,
     UmamiDispatcher,
 )
+from ugc_ai_overpower.core.notifications import (
+    NotificationEvent,
+    NotificationChannel,
+    NotificationDispatcher,
+    SlackChannel,
+    DiscordChannel,
+    EmailChannel,
+    WebhookChannel,
+    ConsoleChannel,
+)
+from ugc_ai_overpower.core.notification_events import (
+    campaign_launched,
+    content_viral,
+    rate_limit_hit,
+    circuit_breaker_open,
+    autoheal_restart,
+    webhook_received,
+    notion_sync_success,
+    notion_sync_failed,
+    quota_warning,
+    quota_exceeded,
+    cost_alert,
+    deploy_success,
+)
 
 __all__ = [
     "ABTest",
@@ -328,6 +352,26 @@ __all__ = [
     "get_registry_stats",
     "list_platforms",
     "register_adapter",
+    "NotificationEvent",
+    "NotificationChannel",
+    "NotificationDispatcher",
+    "SlackChannel",
+    "DiscordChannel",
+    "EmailChannel",
+    "WebhookChannel",
+    "ConsoleChannel",
+    "campaign_launched",
+    "content_viral",
+    "rate_limit_hit",
+    "circuit_breaker_open",
+    "autoheal_restart",
+    "webhook_received",
+    "notion_sync_success",
+    "notion_sync_failed",
+    "quota_warning",
+    "quota_exceeded",
+    "cost_alert",
+    "deploy_success",
 ]
 
 __version__ = "1.4.0"
