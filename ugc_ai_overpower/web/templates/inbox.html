@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Social Inbox — Skynet{% endblock %}
+{% block content %}
+<div class="page-title">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+Unified Social Inbox
+</div>
+
+<div class="stats" id="inboxStats"></div>
+
+<div class="section">
+  <h3>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+    Messages
+    <button class="refresh-btn" onclick="loadInbox()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="bulkAutoReply()">Auto-Reply</button>
+  </h3>
+  <div class="filter-bar">
+    <select id="filterPlatform" class="form-select" onchange="loadInbox()">
+      <option value="">All Platforms</option>
+      <option value="tiktok">TikTok</option><option value="instagram">Instagram</option>
+      <option value="youtube">YouTube</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option>
+    </select>
+    <select id="filterStatus" class="form-select" onchange="loadInbox()">
+      <option value="all">All</option><option value="unread">Unread</option><option value="urgent">Urgent</option><option value="unreplied">Unreplied</option>
+    </select>
+  </div>
+  <div id="inboxMessages"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let expandedMsg=null;
+function toggleReply(id){
+  const el=document.getElementById('reply-'+id);const ai=document.getElementById('ai-'+id);
+  if(expandedMsg&&expandedMsg!==id){const oldEl=document.getElementById('reply-'+expandedMsg);const oldAi=document.getElementById('ai-'+expandedMsg);if(oldEl)oldEl.classList.remove('show');if(oldAi)oldAi.classList.remove('show')}
+  if(el)el.classList.toggle('show');if(ai)ai.classList.toggle('show');expandedMsg=el&&el.classList.contains('show')?id:null
+}
+async function sendReply(id){const txt=document.getElementById('replyText-'+id).value;if(!txt.trim())return;const r=await api('/api/v1/inbox/reply/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reply_text:txt})});if(r&&r.status==='ok'){toast('Reply sent!','success');loadInbox()}else{toast('Failed','error')}}
+async function useAiReply(id){const r=await api('/api/v1/inbox/approve-ai/'+id,{method:'POST'});if(r&&r.reply){document.getElementById('replyText-'+id).value=r.reply;toast('AI reply loaded','info')}else{toast('No AI reply available','error')}}
+async function loadInbox(){
+  const plat=document.getElementById('filterPlatform').value;
+  const status=document.getElementById('filterStatus').value;
+  const d=await api('/api/v1/inbox/list?platform='+plat+'&status='+status);
+  if(!d)return;
+  const st=d.stats||{};
+  document.getElementById('inboxStats').innerHTML=
+    '<div class="stat-card"><div class="stat-value">'+st.total+'</div><div class="stat-label">Total</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+st.unread+'</div><div class="stat-label">Unread</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+st.urgent+'</div><div class="stat-label">Urgent</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+st.unreplied+'</div><div class="stat-label">Unreplied</div></div>';
+  const c=document.getElementById('inboxMessages');
+  if(d.messages&&d.messages.length){
+    c.innerHTML='<div class="msg-list">'+d.messages.map(m=>{const s=m.sentiment||'neutral';const u=m.is_read?'':'unread';const ur=m.is_urgent?'urgent':'';const avatar=m.sender_username?m.sender_username[0].toUpperCase():'?';
+      return '<div class="msg '+u+' '+ur+'" onclick="toggleReply('+m.id+')"><div class="msg-avatar">'+avatar+'</div><div class="msg-body"><div class="msg-header"><span><span class="msg-sender">'+m.sender_username+'</span><span class="msg-platform">'+m.platform+'</span><span class="status-badge status-'+s+'">'+s+'</span></span><span class="msg-time">'+m.created_at.substr(11,5)+'</span></div><div class="msg-content">'+m.content+'</div><div class="msg-footer"><span style="font-size:0.688rem;color:var(--color-text-muted)">'+m.message_type+'</span></div><div class="ai-reply" id="ai-'+m.id+'" style="background:var(--color-info-bg);border:1px solid #BFDBFE;border-radius:var(--border-radius-md);padding:var(--space-sm);margin-top:var(--space-sm);font-size:0.813rem;color:var(--color-primary);display:none">AI suggestion: '+m.ai_suggested_reply+'</div><div class="reply-box" id="reply-'+m.id+'" style="display:none;margin-top:var(--space-sm)"><textarea id="replyText-'+m.id+'" class="form-input" placeholder="Type reply..." style="min-height:60px;resize:none"></textarea><div style="display:flex;gap:var(--space-xs);margin-top:var(--space-xs)"><button class="btn btn-success btn-sm" onclick="event.stopPropagation();sendReply('+m.id+')">Send</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();useAiReply('+m.id+')">AI</button></div></div></div></div>'}).join('')+'</div>';
+  }else{
+    showEmpty('inboxMessages','No messages','Your inbox is clean');
+  }
+  document.querySelectorAll('.ai-reply').forEach(el=>{if(el.id.startsWith('ai-'))el.style.display='none'});
+  document.querySelectorAll('.reply-box').forEach(el=>{if(el.id.startsWith('reply-'))el.style.display='none'});
+}
+async function bulkAutoReply(){const r=await api('/api/v1/inbox/auto-reply',{method:'POST'});if(r&&r.status==='ok'){toast(r.replied+' replied, '+r.skipped+' skipped','success');loadInbox()}else{toast('Failed','error')}}
+loadInbox();setInterval(loadInbox,15000);
+</script>
+{% endblock %}

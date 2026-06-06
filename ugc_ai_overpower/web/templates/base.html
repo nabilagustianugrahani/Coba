@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Skynet UGC Empire{% endblock %}</title>
+<link rel="stylesheet" href="/static/css/dashboard.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+{% if show_navbar %}
+<nav class="navbar">
+  <a href="/" class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    Skynet
+  </a>
+  <span class="badge">v2.0.0</span>
+  <div class="nav-links">
+    <a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="/queue" class="{% if active_page == 'queue' %}active{% endif %}">Queue</a>
+    <a href="/campaigns" class="{% if active_page == 'campaigns' %}active{% endif %}">Campaigns</a>
+    <a href="/contents" class="{% if active_page == 'contents' %}active{% endif %}">Content</a>
+    <a href="/analytics" class="{% if active_page == 'analytics' %}active{% endif %}">Analytics</a>
+    <a href="/gallery-page" class="{% if active_page == 'gallery' %}active{% endif %}">Gallery</a>
+    <a href="/inbox" class="{% if active_page == 'inbox' %}active{% endif %}">Inbox</a>
+    <a href="/brands" class="{% if active_page == 'brands' %}active{% endif %}">Brands</a>
+    <a href="/approvals" class="{% if active_page == 'approvals' %}active{% endif %}">Approvals</a>
+    <a href="#" onclick="logout()" style="color:var(--color-error)">Logout</a>
+  </div>
+</nav>
+{% endif %}
+<div class="container">
+{% block content %}{% endblock %}
+</div>
+<div class="footer">Skynet UGC Empire v2.0.0</div>
+<script>
+const TOKEN=()=>localStorage.getItem('token');
+async function api(path,opts){
+  try{
+    const r=await fetch(path,{
+      headers:{'Authorization':'Bearer '+TOKEN(),...(opts?.headers||{})},
+      ...(opts||{})
+    });
+    if(r.status===401){localStorage.removeItem('token');window.location.href='/login';return null}
+    const ct=r.headers.get('content-type')||'';
+    if(ct.includes('application/json')) return await r.json();
+    return r;
+  }catch(e){return null}
+}
+function toast(msg,type){
+  const icons={success:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',error:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'};
+  const d=document.createElement('div');d.className='toast toast-'+type;
+  d.innerHTML=icons[type]||'';const s=document.createElement('span');s.textContent=msg;d.appendChild(s);
+  document.body.appendChild(d);setTimeout(()=>d.remove(),4000);
+}
+function logout(){localStorage.removeItem('token');window.location.href='/login'}
+function showSkeleton(containerId,count=4,type='card'){
+  const c=document.getElementById(containerId);if(!c)return;
+  let html='';
+  for(let i=0;i<count;i++){
+    if(type==='card') html+='<div class="skeleton skeleton-card" style="margin-bottom:8px"></div>';
+    else if(type==='text') html+='<div class="skeleton skeleton-text"></div>';
+    else if(type==='value') html+='<div class="skeleton skeleton-value"></div>';
+  }
+  c.innerHTML=html;
+}
+function showEmpty(containerId,title,desc,btnText,btnAction){
+  const c=document.getElementById(containerId);if(!c)return;
+  c.innerHTML='<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><div class="empty-title">'+(title||'No data')+'</div><div class="empty-desc">'+(desc||'')+'</div>'+(btnText?'<button class="btn btn-primary" onclick="'+btnAction+'">'+btnText+'</button>':'')+'</div>';
+}
+function showError(containerId,title,desc,retryFn){
+  const c=document.getElementById(containerId);if(!c)return;
+  c.innerHTML='<div class="error-state"><svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div class="error-title">'+(title||'Something went wrong')+'</div><div class="error-desc">'+(desc||'Please try again')+'</div>'+(retryFn?'<button class="btn btn-primary" onclick="'+retryFn+'">Retry</button>':'')+'</div>';
+}
+{% block scripts %}{% endblock %}
+</script>
+<script>
+if(!TOKEN() && window.location.pathname !== '/login' && !window.location.pathname.startsWith('/gallery-page')){
+  window.location.href='/login';
+}
+</script>
+</body>
+</html>

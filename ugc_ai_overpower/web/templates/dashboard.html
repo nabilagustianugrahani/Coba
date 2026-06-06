@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Skynet UGC Empire{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+<div class="page-title">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+Dashboard
+</div>
+
+<div class="stats" id="stats">
+  <div class="stat-card"><div class="stat-value skeleton skeleton-value" id="statCampaigns">-</div><div class="stat-label">Campaigns</div></div>
+  <div class="stat-card"><div class="stat-value skeleton skeleton-value" id="statContent">-</div><div class="stat-label">Content</div></div>
+  <div class="stat-card"><div class="stat-value skeleton skeleton-value" id="statInfluencers">-</div><div class="stat-label">Influencers</div></div>
+  <div class="stat-card"><div class="stat-value skeleton skeleton-value" id="statUptime">-</div><div class="stat-label">Uptime</div></div>
+</div>
+
+<div class="section">
+  <h3>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    Recent Campaigns
+    <button class="refresh-btn" onclick="loadCampaigns()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+  </h3>
+  <table class="data-table">
+    <thead><tr><th>ID</th><th>Product</th><th>Status</th><th>Content</th><th>Created</th></tr></thead>
+    <tbody id="campaignTable"><tr><td colspan="5" class="loading"><div class="spinner"></div></td></tr></tbody>
+  </table>
+</div>
+
+<div class="chart-grid">
+  <div class="section"><h3>Daily Activity</h3><canvas id="barChart" height="200"></canvas></div>
+  <div class="section"><h3>Content Distribution</h3><canvas id="pieChart" height="200"></canvas></div>
+</div>
+
+<div class="section">
+  <h3>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Content Queue
+    <button class="refresh-btn" onclick="loadQueue()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="processAll()">Process All</button>
+    <button class="btn btn-secondary btn-sm" onclick="retryFailed()">Retry Failed</button>
+  </h3>
+  <div class="stats" id="queueStats" style="margin-bottom:var(--space-md)"></div>
+  <table class="data-table">
+    <thead><tr><th>ID</th><th>Content</th><th>Platform</th><th>Status</th><th>Scheduled</th><th>Post URL</th><th>Actions</th></tr></thead>
+    <tbody id="queueTable"><tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadStats(){
+  showSkeleton('stats',4,'value');
+  const d=await api('/api/v1/analytics/dashboard');
+  if(d){
+    document.getElementById('statCampaigns').textContent=d.total_campaigns;
+    document.getElementById('statContent').textContent=d.total_content;
+    document.getElementById('statInfluencers').textContent=d.influencers;
+    document.getElementById('statUptime').textContent=d.uptime_hours+'h';
+  }else{
+    document.getElementById('statCampaigns').textContent='—';
+    document.getElementById('statContent').textContent='—';
+    document.getElementById('statInfluencers').textContent='—';
+    document.getElementById('statUptime').textContent='—';
+  }
+}
+async function loadCampaigns(){
+  const d=await api('/api/v1/campaigns');
+  const t=document.getElementById('campaignTable');
+  if(d&&d.data&&d.data.length){
+    t.innerHTML=d.data.map(c=>'<tr><td><span class="cell-link">#'+c.id+'</span></td><td>'+(c.product||'-')+'</td><td><span class="status-badge status-'+c.status+'">'+c.status+'</span></td><td>'+(c.content_count||0)+'</td><td>'+(c.created_at||'-')+'</td></tr>').join('');
+  }else if(d&&d.data){
+    showEmpty('campaignTable','No campaigns yet','Create your first campaign to get started','New Campaign','showCreateCampaign()');
+  }else{
+    showError('campaignTable','Failed to load campaigns','Could not fetch campaign data','loadCampaigns()');
+  }
+}
+let barChart=null,pieChart=null;
+async function loadCharts(){
+  const d=await api('/api/v1/analytics/daily');
+  const td=await api('/api/v1/analytics/summary');
+  if(d&&d.data){
+    const labels=Object.keys(d.data);
+    const vals=labels.map(l=>{let s=0;for(let k in d.data[l])s+=d.data[l][k];return s});
+    if(barChart){barChart.destroy()}
+    barChart=new Chart(document.getElementById('barChart'),{
+      type:'bar',
+      data:{labels,datasets:[{label:'Events',data:vals,backgroundColor:'#3B82F6',borderRadius:4}]},
+      options:{responsive:true,plugins:{legend:{labels:{color:'#64748B',font:{family:'Fira Sans'}}}},scales:{x:{ticks:{color:'#94A3B8',font:{family:'Fira Sans'}}},y:{ticks:{color:'#94A3B8',font:{family:'Fira Sans'}}}}}}
+    );
+  }
+  if(td&&td.data){
+    const{total_campaigns,total_contents}=td.data;
+    if(pieChart){pieChart.destroy()}
+    pieChart=new Chart(document.getElementById('pieChart'),{
+      type:'pie',
+      data:{labels:['Content','Campaigns'],datasets:[{data:[total_contents||1,total_campaigns||1],backgroundColor:['#3B82F6','#1E40AF']}]},
+      options:{responsive:true,plugins:{legend:{labels:{color:'#64748B',font:{family:'Fira Sans'}}}}}}
+    );
+  }
+}
+async function loadQueue(){
+  const d=await api('/api/v1/queue/status');
+  if(!d)return;
+  const st=d.stats||{};
+  const qs=document.getElementById('queueStats');
+  qs.innerHTML='<div class="stat-card"><div class="stat-value">'+(st.pending||0)+'</div><div class="stat-label" data-tooltip="Items awaiting processing">Pending</div></div><div class="stat-card"><div class="stat-value">'+(st.processing||0)+'</div><div class="stat-label">Processing</div></div><div class="stat-card"><div class="stat-value">'+(st.done||0)+'</div><div class="stat-label">Done</div></div><div class="stat-card"><div class="stat-value">'+(st.failed||0)+'</div><div class="stat-label">Failed</div></div>';
+  const t=document.getElementById('queueTable');
+  if(d.items&&d.items.length){
+    t.innerHTML=d.items.map(i=>{const s=i.status||'pending';
+      return '<tr><td>#'+i.id+'</td><td>'+(i.content_id||'-')+'</td><td>'+i.platform+'</td><td><span class="status-badge status-'+s+'">'+s+'</span></td><td>'+(i.scheduled_at||'-')+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">'+(i.post_url||'-')+'</td><td>'+(s==='failed'?'<button class="btn btn-secondary btn-sm" onclick="retryItem('+i.id+')">Retry</button><button class="btn btn-error btn-sm" onclick="deleteItem('+i.id+')">Del</button>':s==='pending'?'<button class="btn btn-success btn-sm" onclick="postItem('+i.id+')">Post</button><button class="btn btn-error btn-sm" onclick="deleteItem('+i.id+')">Del</button>':'')+'</td></tr>'}).join('');
+  }else{
+    showEmpty('queueTable','Queue is empty','No items in the content queue');
+  }
+}
+async function postItem(id){toast('Posting #'+id+'...','info');const r=await api('/api/v1/queue/post/'+id,{method:'POST'});if(r&&r.status==='done'){toast('#'+id+' posted!','success')}else{toast('Failed: '+(r?.error||'unknown'),'error')}loadQueue()}
+async function retryItem(id){toast('Retrying #'+id+'...','info');const r=await api('/api/v1/queue/retry/'+id,{method:'POST'});if(r&&r.status==='ok'){toast('#'+'id reset','success')}else{toast('Failed','error')}loadQueue()}
+async function deleteItem(id){if(!confirm('Delete queue item #'+id+'?'))return;const r=await api('/api/v1/queue/delete/'+id,{method:'DELETE'});if(r&&r.status==='ok'){toast('#'+id+' deleted','success')}else{toast('Failed','error')}loadQueue()}
+async function processAll(){if(!confirm('Process ALL pending items?'))return;toast('Processing...','info');const r=await api('/api/v1/queue/process',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(r&&r.data){toast('Done: '+r.data.success+' success, '+r.data.failed+' failed','success')}else{toast('Failed','error')}loadQueue()}
+async function retryFailed(){if(!confirm('Reset ALL failed items to pending?'))return;const r=await api('/api/v1/queue/retry',{method:'POST'});if(r)toast(r.reset+' items reset','success');loadQueue()}
+loadStats();loadCampaigns();loadCharts();loadQueue();
+setInterval(function(){loadStats();loadCharts();loadQueue()},10000);
+</script>
+{% endblock %}

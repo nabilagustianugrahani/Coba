@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Approvals — Skynet{% endblock %}
+{% block content %}
+<div class="page-title">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+Pending Reviews
+</div>
+
+<div class="stats" id="approvalStats"></div>
+
+<div class="section">
+  <h3>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    Pending Reviews
+    <button class="refresh-btn" onclick="loadApprovals()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+  </h3>
+  <div id="approvalList"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function approve(id){const note=prompt('Approval note (optional):')||'';const r=await api('/api/v1/approvals/'+id+'/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewer:'admin',note})});if(r&&r.status==='ok'){toast('Approved!','success');loadApprovals()}else{toast('Failed','error')}}
+async function reject(id){const note=prompt('Rejection reason:');if(note===null)return;const r=await api('/api/v1/approvals/'+id+'/reject',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reviewer:'admin',note})});if(r&&r.status==='ok'){toast('Rejected','success');loadApprovals()}else{toast('Failed','error')}}
+async function loadApprovals(){
+  const d=await api('/api/v1/approvals/list');
+  if(!d)return;
+  const st=d.stats||{};
+  document.getElementById('approvalStats').innerHTML=
+    '<div class="stat-card"><div class="stat-value">'+st.pending_review+'</div><div class="stat-label">Pending</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+st.approved+'</div><div class="stat-label">Approved</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+st.rejected+'</div><div class="stat-label">Rejected</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+st.auto_approved+'</div><div class="stat-label">Auto</div></div>';
+  const c=document.getElementById('approvalList');
+  if(d.items&&d.items.length){
+    c.innerHTML=d.items.map(i=>'<div class="approval-item"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-sm)"><span><span class="status-badge status-pending">'+i.content_type+'</span> <span style="font-size:0.75rem;color:var(--color-text-muted)">'+(i.product||'')+'</span></span><span style="font-size:0.688rem;color:var(--color-text-muted)">#'+i.content_id+'</span></div><div style="font-size:0.813rem;color:var(--color-text-secondary);margin-bottom:var(--space-md);padding:var(--space-sm);background:var(--bg-surface-hover);border-radius:var(--border-radius-md);max-height:100px;overflow-y:auto;white-space:pre-wrap">'+i.content_data+'</div><div style="display:flex;gap:var(--space-sm)"><button class="btn btn-success btn-sm" onclick="approve('+i.id+')">Approve</button><button class="btn btn-error btn-sm" onclick="reject('+i.id+')">Reject</button></div></div>').join('');
+  }else{
+    showEmpty('approvalList','No pending reviews','All caught up!');
+  }
+}
+loadApprovals();setInterval(loadApprovals,15000);
+</script>
+{% endblock %}

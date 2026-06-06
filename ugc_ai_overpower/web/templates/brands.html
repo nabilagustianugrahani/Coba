@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Brand Profiles — Skynet{% endblock %}
+{% block content %}
+<div class="page-title">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+Brand Profiles
+</div>
+
+<div class="section">
+  <h3>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+    Brand Profiles
+    <button class="refresh-btn" onclick="loadBrands()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+    <button class="btn btn-primary btn-sm" onclick="showAddModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Brand
+    </button>
+  </h3>
+  <div id="brandList"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
+<div class="modal" id="addModal">
+  <div class="modal-content">
+    <h3 id="modalTitle">Add Brand Profile</h3>
+    <div class="form-group"><label>Name</label><input id="fName" class="form-input" placeholder="My Brand"></div>
+    <div class="form-group"><label>Tone</label><select id="fTone" class="form-select"><option value="casual">Casual</option><option value="professional">Professional</option><option value="humorous">Humorous</option><option value="aspirational">Aspirational</option><option value="urgent">Urgent</option><option value="luxury">Luxury</option><option value="educational">Educational</option></select></div>
+    <div class="form-group"><label>Voice</label><select id="fVoice" class="form-select"><option value="friendly">Friendly</option><option value="formal">Formal</option><option value="authoritative">Authoritative</option><option value="playful">Playful</option><option value="empathetic">Empathetic</option></select></div>
+    <div class="form-group"><label>Language</label><select id="fLang" class="form-select"><option value="en">English</option><option value="id">Indonesian</option><option value="mix">Mix</option></select></div>
+    <div class="form-group"><label>Emoji Style</label><select id="fEmoji" class="form-select"><option value="moderate">Moderate</option><option value="none">None</option><option value="minimal">Minimal</option><option value="heavy">Heavy</option></select></div>
+    <div class="form-group"><label>Target Audience</label><input id="fAudience" class="form-input" placeholder="e.g. Gen Z women 18-25"></div>
+    <div class="form-group"><label>Default CTA</label><input id="fCta" class="form-input" placeholder="Link in bio!"></div>
+    <div class="form-group"><label>Hashtag Bank</label><input id="fHashtags" class="form-input" placeholder="#ugc #review #musttry"></div>
+    <div style="display:flex;gap:var(--space-sm);margin-top:var(--space-lg)">
+      <button class="btn btn-primary" onclick="saveBrand()">Save</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function closeModal(){document.getElementById('addModal').classList.remove('show')}
+function showAddModal(){document.getElementById('modalTitle').textContent='Add Brand Profile';['fName','fAudience','fCta','fHashtags'].forEach(id=>document.getElementById(id).value='');document.getElementById('addModal').classList.add('show')}
+async function saveBrand(){
+  const data={name:document.getElementById('fName').value,tone:document.getElementById('fTone').value,voice:document.getElementById('fVoice').value,language:document.getElementById('fLang').value,emoji_style:document.getElementById('fEmoji').value,target_audience:document.getElementById('fAudience').value,default_cta:document.getElementById('fCta').value,hashtag_bank:document.getElementById('fHashtags').value};
+  if(!data.name)return toast('Name required','error');
+  const r=await api('/api/v1/brands',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(r&&r.id){toast('Brand created!','success');closeModal();loadBrands()}else{toast('Failed','error')}
+}
+async function setActive(id){const r=await api('/api/v1/brands/'+id+'/activate',{method:'POST'});if(r&&r.status==='ok'){toast('Brand activated','success');loadBrands()}else{toast('Failed','error')}}
+async function deleteBrand(id){if(!confirm('Delete this brand?'))return;const r=await api('/api/v1/brands/'+id,{method:'DELETE'});if(r&&r.status==='ok'){toast('Brand deleted','success');loadBrands()}else{toast('Failed','error')}}
+async function loadBrands(){
+  const d=await api('/api/v1/brands');
+  if(!d)return;
+  const c=document.getElementById('brandList');
+  if(d.brands&&d.brands.length){
+    c.innerHTML=d.brands.map(b=>{const colors=Array.isArray(b.color_palette)?b.color_palette:['#3B82F6','#1E40AF','#F59E0B'];
+      return '<div class="brand-card'+(b.is_active?' active':'')+'">'+(b.is_active?'<div class="status-badge status-active" style="position:absolute;top:1rem;right:1rem">ACTIVE</div>':'')+'<div class="msg-sender" style="margin-bottom:var(--space-sm)">'+b.name+'</div><div class="colors" style="display:flex;gap:6px;margin:var(--space-sm) 0">'+colors.map(c=>'<div class="color-swatch" style="background:'+c+'"></div>').join('')+'</div><div class="detail-grid"><div><span class="label">Tone:</span> '+b.tone+'</div><div><span class="label">Voice:</span> '+b.voice+'</div><div><span class="label">Language:</span> '+b.language+'</div><div><span class="label">Emoji:</span> '+b.emoji_style+'</div><div><span class="label">Audience:</span> '+(b.target_audience||'-')+'</div><div><span class="label">CTA:</span> '+(b.default_cta||'-')+'</div></div><div style="margin-top:var(--space-md);display:flex;gap:var(--space-sm)">'+(!b.is_active?'<button class="btn btn-success btn-sm" onclick="setActive('+b.id+')">Activate</button>':'')+'<button class="btn btn-error btn-sm" onclick="deleteBrand('+b.id+')">Delete</button></div></div>'}).join('');
+  }else{
+    showEmpty('brandList','No brand profiles','Create your first brand profile to get started','Add Brand','showAddModal()');
+  }
+}
+loadBrands();
+</script>
+{% endblock %}

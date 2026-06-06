@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Queue — Skynet UGC Empire{% endblock %}
+{% block content %}
+<div class="page-title">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+Queue Manager
+</div>
+
+<div class="stats" id="queueStats"></div>
+
+<div class="section">
+  <h3>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Queue Manager
+    <button class="refresh-btn" onclick="loadQueue()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="processAll()">Process All Pending</button>
+    <button class="btn btn-secondary btn-sm" onclick="processParallel()">Process Parallel (3x)</button>
+    <button class="btn btn-secondary btn-sm" onclick="retryFailed()">Retry All Failed</button>
+  </h3>
+  <div class="filter-bar">
+    <select id="filterPlatform" class="form-select" onchange="loadQueue()">
+      <option value="">All Platforms</option>
+      <option value="tiktok">TikTok</option>
+      <option value="instagram">Instagram</option>
+      <option value="youtube">YouTube</option>
+    </select>
+    <select id="filterStatus" class="form-select" onchange="loadQueue()">
+      <option value="">All Status</option>
+      <option value="pending">Pending</option>
+      <option value="processing">Processing</option>
+      <option value="done">Done</option>
+      <option value="failed">Failed</option>
+    </select>
+    <input type="text" id="searchInput" class="form-input" placeholder="Search content..." style="flex:1;min-width:200px">
+  </div>
+  <table class="data-table">
+    <thead><tr><th>ID</th><th>Content ID</th><th>Platform</th><th>Status</th><th>Retries</th><th>Error</th><th>Scheduled</th><th>Actions</th></tr></thead>
+    <tbody id="queueBody"><tr><td colspan="8" class="loading"><div class="spinner"></div></td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadQueue(){
+  const d=await api('/api/v1/queue/status');
+  if(!d)return;
+  const st=d.stats||{};
+  document.getElementById('queueStats').innerHTML=
+    '<div class="stat-card"><div class="stat-value">'+(st.total||0)+'</div><div class="stat-label">Total</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+(st.pending||0)+'</div><div class="stat-label">Pending</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+(st.done||0)+'</div><div class="stat-label">Done</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+(st.failed||0)+'</div><div class="stat-label">Failed</div></div>';
+  const plat=document.getElementById('filterPlatform').value;
+  const stat=document.getElementById('filterStatus').value;
+  let items=(d.items||[]).filter(i=>!plat||i.platform===plat).filter(i=>!stat||i.status===stat);
+  const t=document.getElementById('queueBody');
+  if(items.length){
+    t.innerHTML=items.map(i=>{const s=i.status||'pending';
+      return '<tr><td>#'+i.id+'</td><td>'+(i.content_id||'-')+'</td><td>'+i.platform+'</td><td><span class="status-badge status-'+s+'">'+s+'</span></td><td>'+(i.retry_count||0)+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;color:var(--color-error)">'+(i.error||'-')+'</td><td>'+(i.scheduled_at||'-')+'</td><td>'+(s==='failed'?'<button class="btn btn-secondary btn-sm" onclick="retryItem('+i.id+')">Retry</button>':s==='pending'?'<button class="btn btn-success btn-sm" onclick="postItem('+i.id+')">Post</button>':'')+'<button class="btn btn-error btn-sm" onclick="deleteItem('+i.id+')">Del</button></td></tr>'}).join('');
+  }else{
+    showEmpty('queueBody','No items found','Try adjusting your filters');
+  }
+}
+async function postItem(id){toast('Posting #'+id+'...','info');const r=await api('/api/v1/queue/post/'+id,{method:'POST'});if(r&&r.status==='done'){toast('#'+id+' posted!','success')}else{toast('Failed: '+(r?.error||'unknown'),'error')}loadQueue()}
+async function retryItem(id){await api('/api/v1/queue/retry/'+id,{method:'POST'});loadQueue()}
+async function deleteItem(id){if(!confirm('Delete #'+id+'?'))return;await api('/api/v1/queue/delete/'+id,{method:'DELETE'});loadQueue()}
+async function processAll(){if(!confirm('Process ALL pending?'))return;toast('Processing...','info');const r=await api('/api/v1/queue/process',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(r&&r.data){toast(r.data.success+' success, '+r.data.failed+' failed','success')}else{toast('Failed','error')}loadQueue()}
+async function processParallel(){if(!confirm('Process pending in parallel (3 workers)?'))return;toast('Parallel processing...','info');const r=await api('/api/v1/queue/process-parallel',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(r&&r.data){toast(r.data.success+' success, '+r.data.failed+' failed','success')}else{toast('Failed','error')}loadQueue()}
+async function retryFailed(){if(!confirm('Reset ALL failed to pending?'))return;const r=await api('/api/v1/queue/retry',{method:'POST'});if(r)toast(r.reset+' items reset','success');loadQueue()}
+loadQueue();setInterval(loadQueue,15000);
+</script>
+{% endblock %}

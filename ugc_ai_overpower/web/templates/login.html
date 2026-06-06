@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Skynet Login</title>
+<link rel="stylesheet" href="/static/css/dashboard.css">
+<style>
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg-body)}
+.login-card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--border-radius-xl);padding:var(--space-2xl);width:400px;max-width:90vw;box-shadow:var(--shadow-lg)}
+.login-logo{font-family:var(--font-heading);font-size:1.5rem;font-weight:800;color:var(--color-primary);text-align:center;margin-bottom:var(--space-xl);display:flex;align-items:center;justify-content:center;gap:var(--space-sm)}
+.login-logo svg{width:28px;height:28px;color:var(--color-primary-light)}
+.login-error{background:var(--color-error-bg);border:1px solid #FECACA;border-radius:var(--border-radius-md);padding:var(--space-sm) var(--space-md);color:#991B1B;margin-bottom:var(--space-md);display:none;font-size:0.813rem}
+</style>
+</head>
+<body>
+<div class="login-card">
+<div class="login-logo">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+Skynet
+</div>
+<form id="loginForm" onsubmit="return login(event)">
+<div class="login-error" id="errorMsg"></div>
+<div class="form-group"><label>Username</label><input type="text" class="form-input" id="username" placeholder="admin" required autocomplete="username"></div>
+<div class="form-group"><label>Password</label><input type="password" class="form-input" id="password" placeholder="admin123" required autocomplete="current-password"></div>
+<button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center">Sign In</button>
+</form>
+</div>
+<script>
+async function login(e){e.preventDefault();
+const u=document.getElementById('username').value;
+const p=document.getElementById('password').value;
+try{
+  const r=await fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+  const d=await r.json();
+  if(r.ok){localStorage.setItem('token',d.token);window.location.href='/'}
+  else{document.getElementById('errorMsg').textContent=d.detail;document.getElementById('errorMsg').style.display='block'}
+}catch(err){document.getElementById('errorMsg').textContent='Connection error';document.getElementById('errorMsg').style.display='block'}
+return false}
+</script>
+</body>
+</html>

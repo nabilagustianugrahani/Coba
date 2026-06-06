@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}UGC Gallery — Skynet{% endblock %}
+{% block content %}
+<div class="page-title">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+UGC Gallery
+</div>
+
+<div class="stats" id="galleryStats"></div>
+
+<div class="section">
+  <h3>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    Video Gallery
+    <button class="refresh-btn" onclick="loadGallery()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+  </h3>
+  <div class="filter-bar">
+    <select id="filterNiche" class="form-select" onchange="loadGallery()">
+      <option value="">All Niches</option>
+      <option value="skincare">Skincare</option><option value="fashion">Fashion</option>
+      <option value="food">Food</option><option value="tech">Tech</option><option value="general">General</option>
+    </select>
+    <select id="filterProduct" class="form-select" onchange="loadGallery()">
+      <option value="">All Products</option>
+    </select>
+  </div>
+  <div class="card-grid" id="galleryGrid"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadGallery(){
+  const d=await api('/api/v1/gallery/list?niche='+(document.getElementById('filterNiche').value||'')+'&product='+(document.getElementById('filterProduct').value||''));
+  if(!d)return;
+  const st=d.stats||{};
+  document.getElementById('galleryStats').innerHTML=
+    '<div class="stat-card"><div class="stat-value">'+st.total+'</div><div class="stat-label">Total Videos</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+st.total_views+'</div><div class="stat-label">Views</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+st.total_likes+'</div><div class="stat-label">Likes</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+(st.niches?st.niches.length:0)+'</div><div class="stat-label">Niches</div></div>';
+  const g=document.getElementById('galleryGrid');
+  if(d.videos&&d.videos.length){
+    g.innerHTML=d.videos.map(v=>'<div class="card"><div class="thumb">'+(v.thumbnail_path?'<img src="'+v.thumbnail_path+'" loading="lazy">':'<div style="color:var(--color-text-muted);font-size:1.25rem">UGC</div>')+'</div><div class="body"><div class="title">'+(v.title||'Untitled')+'</div><div class="meta">'+v.niche+' &middot; '+v.platform+' &middot; '+v.views+' views</div></div></div>').join('');
+  }else{
+    showEmpty('galleryGrid','No videos yet','Upload your first video to populate the gallery');
+  }
+}
+loadGallery();setInterval(loadGallery,30000);
+</script>
+{% endblock %}
