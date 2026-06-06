@@ -90,6 +90,7 @@ class AffiliateLink:
     commission_rate: float = 0.0
     short_url: str = ""
     expires_at: str = ""
+    error: Optional[str] = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
