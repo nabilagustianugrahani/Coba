@@ -94,6 +94,9 @@ def main():
         logger.info("  status [--json]        — Show one-line health check of all services")
         logger.info("  ui [--host H] [--port P] [--reload] [--workers N] — Launch web dashboard")
         logger.info("  do-everything [--dry-run] — Run all daily tasks in sequence")
+        logger.info("  affiliate create       — Create an affiliate link (--product --platform --url --affiliate-id)")
+        logger.info("  affiliate list         — List all affiliate links")
+        logger.info("  affiliate revenue      — Show revenue report [--date YYYY-MM-DD]")
         sys.exit(0)
 
     cmd = sys.argv[1]
@@ -658,6 +661,20 @@ def main():
 
     elif cmd == "do-everything":
         _cmd_do_everything()
+
+    elif cmd == "affiliate":
+        sub = sys.argv[2] if len(sys.argv) > 2 else "help"
+        if sub == "create":
+            _cmd_affiliate_create()
+        elif sub == "list":
+            _cmd_affiliate_list()
+        elif sub == "revenue":
+            _cmd_affiliate_revenue()
+        else:
+            logger.info("Usage: pk affiliate create|list|revenue [args]")
+            logger.info("  affiliate create --product ID --platform NAME --url URL --affiliate-id ID")
+            logger.info("  affiliate list [--platform NAME]")
+            logger.info("  affiliate revenue [--date YYYY-MM-DD]")
 
     else:
         logger.warning(f"Unknown command: {cmd}")
@@ -1267,6 +1284,73 @@ def _cmd_do_everything() -> None:
     else:
         print(warning("Daily routine completed with errors"))
     print()
+
+
+def _cmd_affiliate_create() -> None:
+    """Create an affiliate link."""
+    from ugc_ai_overpower.integrations.affiliate import AffiliateTracker
+    if len(sys.argv) < 6:
+        logger.error("Usage: affiliate create --product <id> --platform <name> --url <url> --affiliate-id <id>")
+        return
+    args_list = sys.argv[3:]
+    product = ""
+    platform = ""
+    url = ""
+    affiliate_id = ""
+    for i, a in enumerate(args_list):
+        if a == "--product" and i + 1 < len(args_list):
+            product = args_list[i + 1]
+        elif a == "--platform" and i + 1 < len(args_list):
+            platform = args_list[i + 1]
+        elif a == "--url" and i + 1 < len(args_list):
+            url = args_list[i + 1]
+        elif a == "--affiliate-id" and i + 1 < len(args_list):
+            affiliate_id = args_list[i + 1]
+    if not product or not platform or not url or not affiliate_id:
+        logger.error("All --product, --platform, --url, and --affiliate-id are required")
+        return
+    tracker = AffiliateTracker()
+    link = tracker.create_link(product_id=product, platform=platform, base_url=url, affiliate_id=affiliate_id)
+    print(success(f"Created link: {link.short_code}"))
+    print(info(f"Redirect URL: {tracker.build_redirect_url(link)}"))
+
+
+def _cmd_affiliate_list() -> None:
+    """List all affiliate links."""
+    from ugc_ai_overpower.integrations.affiliate import AffiliateTracker
+    platform = None
+    if "--platform" in sys.argv:
+        idx = sys.argv.index("--platform")
+        if idx + 1 < len(sys.argv):
+            platform = sys.argv[idx + 1]
+    tracker = AffiliateTracker()
+    links = tracker.list_links(platform=platform)
+    if not links:
+        print(warning("No links found"))
+        return
+    print(header(f"Affiliate Links ({len(links)})"))
+    for link in links[:20]:
+        rev = tracker.get_total_revenue(link.link_id)
+        print(f"  {link.short_code} | {link.platform:12} | {link.product_id:20} | ${rev:>8.2f}")
+
+
+def _cmd_affiliate_revenue() -> None:
+    """Show revenue report."""
+    from datetime import date
+    from ugc_ai_overpower.integrations.affiliate import AffiliateTracker
+    from ugc_ai_overpower.integrations.affiliate_analytics import AffiliateAnalytics
+    report_date = date.today().isoformat()
+    if "--date" in sys.argv:
+        idx = sys.argv.index("--date")
+        if idx + 1 < len(sys.argv):
+            report_date = sys.argv[idx + 1]
+    tracker = AffiliateTracker()
+    analytics = AffiliateAnalytics(tracker)
+    report = analytics.daily_report(report_date)
+    print(header(f"Revenue Report: {report.period}"))
+    print(f"  Clicks: {report.total_clicks} | Conversions: {report.total_conversions}")
+    print(f"  Revenue: ${report.total_revenue_usd:.2f} | Commission: ${report.total_commission_usd:.2f}")
+    print(f"  Conversion rate: {report.conversion_rate:.2%}")
 
 
 if __name__ == "__main__":
